@@ -150,7 +150,15 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
 bool regex_split(char* str, char** a, char** b);
 
-uint64_t string_hash(unsigned char* str);
+static inline uint64_t string_hash(unsigned char* str)
+{
+    uint64_t result(0);
+    unsigned char c;
+    while((c = *(str++))) {
+        result = result * 33 + c;
+    }
+    return result;
+}
 
   void* llvm_memset(void* ptr, int32_t c, int64_t n);
   int llvm_printf(char* format, ...);
