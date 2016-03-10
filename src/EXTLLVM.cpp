@@ -203,131 +203,13 @@ void llvm_runtime_error(int error,void* arg)
 // all be thread safe of course
 // but currently isn't!
 // FIX ME!!
-typedef struct llvm_zone_stack
-{
-    llvm_zone_t* head;
-    llvm_zone_stack* tail;
-} llvm_zone_stack;
 
-
-#ifdef EXT_BOOST
-std::map<std::thread::id,llvm_zone_stack*> LLVM_ZONE_STACKS;
-std::map<std::thread::id,uint64_t> LLVM_ZONE_STACKSIZES;
-std::map<std::thread::id,llvm_zone_t*> LLVM_CALLBACK_ZONES;
-#else
-std::map<long,llvm_zone_stack*> LLVM_ZONE_STACKS;
-std::map<long,uint64_t> LLVM_ZONE_STACKSIZES;
-std::map<uint64_t,llvm_zone_t*> LLVM_CALLBACK_ZONES;
-#endif
+thread_local llvm_zone_stack* tls_llvm_zone_stack = 0;
+thread_local uint64_t tls_llvm_zone_stacksize = 0;
+thread_local llvm_zone_t* tls_llvm_callback_zone = 0;
 
 int LLVM_ZONE_ALIGN = 32;
 int LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN-1;
-
-// this is going to cause concurrency problems at some stage.
-// you really need to FIX IT!
-llvm_zone_t* llvm_threads_get_callback_zone()
-{
-  llvm_zone_t* zone = 0;
-#ifdef EXT_BOOST
-  zone = LLVM_CALLBACK_ZONES[std::this_thread::get_id()];
-  if(!zone) {
-    zone = llvm_zone_create(1024*1024*1); // default callback zone 1M
-    LLVM_CALLBACK_ZONES[std::this_thread::get_id()] = zone;
-  }
-#elif __APPLE__
-  mach_port_t tid = pthread_mach_thread_np(pthread_self());  
-  zone = LLVM_CALLBACK_ZONES[(long)tid];
-  if(!zone) {
-    zone = llvm_zone_create(1024*1024*1); // default callback zone 1M
-    LLVM_CALLBACK_ZONES[(long)tid] = zone;
-  }  
-#else
-  pid_t tid = (pid_t) syscall (SYS_gettid);
-  zone = LLVM_CALLBACK_ZONES[(long)tid];
-  if(!zone) {
-    zone = llvm_zone_create(1024*1024*1); // default callback zone 1M
-    LLVM_CALLBACK_ZONES[(long)tid] = zone;
-  }
-#endif
-  return zone;
-}
-
-// this is going to cause concurrency problems at some stage.
-// you really need to FIX IT!
-llvm_zone_stack* llvm_threads_get_zone_stack()
-{
-  llvm_zone_stack* stack = 0;
-#ifdef EXT_BOOST
-  stack = LLVM_ZONE_STACKS[std::this_thread::get_id()];
-#elif __APPLE__
-  mach_port_t tid = pthread_mach_thread_np(pthread_self());
-  stack = LLVM_ZONE_STACKS[(long)tid];
-#else
-  pid_t tid = (pid_t) syscall (SYS_gettid);
-  stack = LLVM_ZONE_STACKS[(long)tid];
-#endif
-  return stack;
-}
-
-
-// this is going to cause concurrency problems at some stage.
-// you really need to FIX IT!
-void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
-{
-#ifdef EXT_BOOST
-  LLVM_ZONE_STACKS[std::this_thread::get_id()] = llvm_zone_stack;
-#elif __APPLE__
-  mach_port_t tid = pthread_mach_thread_np(pthread_self());
-  LLVM_ZONE_STACKS[(long)tid] = llvm_zone_stack;
-#else
-  pid_t tid = (pid_t) syscall (SYS_gettid);
-  LLVM_ZONE_STACKS[(long)tid] = llvm_zone_stack;
-#endif
-  return;
-}
-
-void llvm_threads_inc_zone_stacksize()
-{
-#ifdef EXT_BOOST
-  LLVM_ZONE_STACKSIZES[std::this_thread::get_id()] += 1;
-#elif __APPLE__
-  mach_port_t tid = pthread_mach_thread_np(pthread_self());
-  LLVM_ZONE_STACKSIZES[(long)tid] += 1;
-#else
-  pid_t tid = (pid_t) syscall (SYS_gettid);
-  LLVM_ZONE_STACKS[(long)tid] += 1;
-#endif
-  return;
-}
-
-void llvm_threads_dec_zone_stacksize()
-{
-#ifdef EXT_BOOST
-  LLVM_ZONE_STACKSIZES[std::this_thread::get_id()] -= 1;
-#elif __APPLE__
-  mach_port_t tid = pthread_mach_thread_np(pthread_self());
-  LLVM_ZONE_STACKSIZES[(long)tid] -= 1;
-#else
-  pid_t tid = (pid_t) syscall (SYS_gettid);
-  LLVM_ZONE_STACKS[(long)tid] -= 1;
-#endif
-  return;
-}
-
-uint64_t llvm_threads_get_zone_stacksize()
-{
-  uint64_t size = 0;
-#ifdef EXT_BOOST
-  size = LLVM_ZONE_STACKSIZES[std::this_thread::get_id()];
-#elif __APPLE__
-  mach_port_t tid = pthread_mach_thread_np(pthread_self());
-  size = LLVM_ZONE_STACKSIZES[(long)tid];
-#else
-  pid_t tid = (pid_t) syscall (SYS_gettid);
-  size = LLVM_ZONE_STACKSIZES[(long)tid];
-#endif
-  return size;
-}
 
 void llvm_push_zone_stack(llvm_zone_t* z)
 {

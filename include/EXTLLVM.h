@@ -43,26 +43,35 @@
 #include <memory>
  //#include <ucontext.h>
 
-typedef struct _zone_hooks_t {
+struct zone_hooks_t {
   uint64_t space; // here just so we don't get <i8*,i8*>
   void* hook; // xtlang closure of type [void]*
-  struct _zone_hooks_t* hooks;
-} zone_hooks_t;
+  zone_hooks_t* hooks;
+};
 
-typedef struct _llvm_zone_t {
+struct llvm_zone_t {
   void* memory;
   uint64_t offset;
   uint64_t mark;
   uint64_t size;
   zone_hooks_t* cleanup_hooks;
-  struct _llvm_zone_t* memories;
-} llvm_zone_t;
+  llvm_zone_t* memories;
+};
 
-typedef struct _llvm_callback_struct_ {
+struct _llvm_callback_struct_ {
     void(*fptr)(void*);
     void* dat;
-  } _llvm_callback_struct_;
+};
 
+struct llvm_zone_stack
+{
+    llvm_zone_t* head;
+    llvm_zone_stack* tail;
+};
+
+extern thread_local llvm_zone_stack* tls_llvm_zone_stack;
+extern thread_local uint64_t tls_llvm_zone_stacksize;
+extern thread_local llvm_zone_t* tls_llvm_callback_zone;
 
 /* extern double (&cosd)(double); */
 /* extern double (&tand)(double); */
@@ -88,10 +97,32 @@ typedef struct _llvm_callback_struct_ {
 
 extern "C"
 {
-  char* llvm_disassemble(const unsigned char*,int syntax);  
-  void* malloc16 (size_t s);
-  void free16(void* p);
-llvm_zone_t* llvm_threads_get_callback_zone();
+char* llvm_disassemble(const unsigned char*,int syntax);  
+void* malloc16(size_t s);
+void free16(void* p);
+
+inline llvm_zone_t* llvm_threads_get_callback_zone()
+{
+  return tls_llvm_callback_zone;
+}
+inline llvm_zone_stack* llvm_threads_get_zone_stack()
+{
+  return tls_llvm_zone_stack;
+}
+inline void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
+{
+  tls_llvm_zone_stack = llvm_zone_stack;
+}
+inline void llvm_threads_inc_zone_stacksize() {
+  ++tls_llvm_zone_stacksize;
+}
+inline void llvm_threads_dec_zone_stacksize() {
+  --tls_llvm_zone_stacksize;
+}
+inline uint64_t llvm_threads_get_zone_stacksize() {
+  return tls_llvm_zone_stacksize;
+}
+
 const char*  llvm_scheme_ff_get_name(foreign_func ff);
 void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
 void llvm_runtime_error(int error, void* arg);
