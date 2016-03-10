@@ -104,24 +104,24 @@ void free16(void* p);
 
 inline llvm_zone_t* llvm_threads_get_callback_zone()
 {
-  return tls_llvm_callback_zone;
+    return tls_llvm_callback_zone;
 }
 inline llvm_zone_stack* llvm_threads_get_zone_stack()
 {
-  return tls_llvm_zone_stack;
+    return tls_llvm_zone_stack;
 }
 inline void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
 {
-  tls_llvm_zone_stack = llvm_zone_stack;
+    tls_llvm_zone_stack = llvm_zone_stack;
 }
 inline void llvm_threads_inc_zone_stacksize() {
-  ++tls_llvm_zone_stacksize;
+    ++tls_llvm_zone_stacksize;
 }
 inline void llvm_threads_dec_zone_stacksize() {
-  --tls_llvm_zone_stacksize;
+    --tls_llvm_zone_stacksize;
 }
 inline uint64_t llvm_threads_get_zone_stacksize() {
-  return tls_llvm_zone_stacksize;
+    return tls_llvm_zone_stacksize;
 }
 
 const char*  llvm_scheme_ff_get_name(foreign_func ff);
