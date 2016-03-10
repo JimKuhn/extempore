@@ -526,7 +526,7 @@ void* llvm_get_function_ptr(char* fname)
 {
   using namespace llvm;
   
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(fname));        
+  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(fname);        
   if(func == NULL)
     {
       return NULL;
@@ -1194,7 +1194,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   std::string funcname(xtlang_name);
   std::string getter("_getter");
   //llvm::Function* func = M->getFunction(funcname+getter); //std::string(string_value(pair_car(args))));
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(funcname+getter);
+  llvm::Function* func = extemp::EXTLLVM::I()->getFunction((funcname+getter).c_str());
   if(func == 0) {
     printf("Error: no matching function for %s.%s\n",fname,vname);
     return _sc->F; 
@@ -1370,71 +1370,10 @@ namespace extemp {
 #endif
 	//initLLVM();
     }
-	
   EXTLLVM::~EXTLLVM() {}
 
-    llvm::Function* EXTLLVM::getFunction(std::string name) {
-    //llvm::Function* cf = llvm_func_cache[name];
-    //if (cf) return cf;
-    for(int i=0;i<Ms.size();i++) {
-      llvm::Module* m = Ms[i];
-      llvm::Function* f = m->getFunction(name);
-      //std::cout << "Checked " << m->getModuleIdentifier() << " for " << name << " found func " << f << std::endl;
-      if(f!=NULL) {
-        //if(!cf) llvm_func_cache[name] = cf;
-        return f;
-      }
-    }
-    return NULL;
-    }
-
-    llvm::GlobalVariable* EXTLLVM::getGlobalVariable(std::string name) {
-    //llvm::GlobalVariable* cgv = llvm_var_cache[name];
-    //if (cgv) return cgv;
-    for(int i=0;i<Ms.size();i++) {
-      llvm::Module* m = Ms[i];
-      llvm::GlobalVariable* gv = m->getGlobalVariable(name);
-      //std::cout << "Checked " << m->getModuleIdentifier() << " for " << name << " found var " << gv << std::endl;      
-      if(gv!=NULL) {
-        //if(!cgv) llvm_var_cache[name] = gv;
-        return gv;
-      }
-    }
-    return NULL;
-  }
-  
-  llvm::GlobalValue* EXTLLVM::getGlobalValue(std::string name) {
-    // llvm::GlobalValue* cgv = llvm_val_cache[name];
-    //if (cgv) return cgv;
-    for(int i=0;i<Ms.size();i++) {
-      llvm::Module* m = Ms[i];
-      llvm::GlobalValue* gv = m->getNamedValue(name);
-      //std::cout << "Checked " << m->getModuleIdentifier() << " for " << name << " found val " << gv << std::endl;      
-      if(gv!=NULL) {
-        //if(!cgv) llvm_val_cache[name] = gv;        
-        return gv;
-      }
-    }
-    return NULL;
-  }
-  
-  llvm::StructType* EXTLLVM::getNamedType(std::string name) {
-    //llvm::StructType* ct = llvm_struct_cache[name];
-    //if (ct) return ct;
-    for(int i=0;i<Ms.size();i++) {
-      llvm::Module* m = Ms[i];
-      llvm::StructType* t = m->getTypeByName(name);
-      //std::cout << "Checked " << m->getModuleIdentifier() << " for " << name << " found type " << t << std::endl;      
-      if(t!=NULL) {
-        //if(!ct) llvm_struct_cache[name];
-        return t;
-      }
-    }
-    return NULL;
-  }
-
 #ifdef EXT_MCJIT  
-    uint64_t EXTLLVM::getSymbolAddress(std::string name) {      
+    uint64_t EXTLLVM::getSymbolAddress(const std::string& name) {      
       return MM->getSymbolAddress(name);
     }
 #endif

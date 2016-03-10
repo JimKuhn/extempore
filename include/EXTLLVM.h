@@ -38,10 +38,11 @@
 
 #include "Scheme.h"
 #include <vector>
-#include <map>
 #include <string>
 #include <memory>
  //#include <ucontext.h>
+
+#include "llvm/IR/Module.h"
 
 struct zone_hooks_t {
   uint64_t space; // here just so we don't get <i8*,i8*>
@@ -252,12 +253,44 @@ namespace extemp {
 	void initLLVM();
 
   llvm::Module* activeModule();
-  llvm::Function* getFunction(std::string);
-  llvm::GlobalVariable* getGlobalVariable(std::string);
-  llvm::StructType* getNamedType(std::string);
-  llvm::GlobalValue* getGlobalValue(std::string);
+  llvm::Function* getFunction(const char* name) {
+    for (auto& m : Ms) {
+      auto f(m->getFunction(name));
+      if (f) {
+        return f;
+      }
+    }
+    return nullptr;
+  }
+  llvm::GlobalVariable* getGlobalVariable(const char* name) {
+    for (auto& m : Ms) {
+      auto gv(m->getGlobalVariable(name));
+      if (gv) {
+        return gv;
+      }
+    }
+    return nullptr;
+  }
+  llvm::GlobalValue* getGlobalValue(const char* name) {
+    for (auto& m : Ms) {
+      auto gv(m->getNamedValue(name));
+      if (gv) {
+        return gv;
+      }
+    }
+    return nullptr;
+  }
+  llvm::StructType* getNamedType(const char* name) {
+    for (auto& m : Ms) {
+      auto t(m->getTypeByName(name));
+      if (t) {
+        return t;
+      }
+    }
+    return nullptr;
+  }
 #ifdef EXT_MCJIT  
-  uint64_t getSymbolAddress(std::string);
+  uint64_t getSymbolAddress(const std::string&);
 #endif
   void addModule(llvm::Module* m) { Ms.push_back(m); }
   std::vector<llvm::Module*>& getModules() { return Ms; }
