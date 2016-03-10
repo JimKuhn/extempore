@@ -223,13 +223,13 @@ namespace extemp {
         while(_signal_cnt <= lcount) { 
           //sleep??
           cnt++; 
-          if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
+          if (0 == (cnt%100000)) printf("Still locked in %d cnt(%" PRId64 ":%" PRId64 ")\n!",idx,lcount,_signal_cnt);
         } // spin
 #else
       while(_signal_cnt <= lcount) { // wait);
         nanosleep(&MT_SLEEP_DURATION ,NULL); 
         cnt++; 
-        if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
+        if (0 == (cnt%100000)) printf("Still locked in %d cnt(%" PRId64 ":%" PRId64 ")\n!",idx,lcount,_signal_cnt);
       } // spin
 #endif
       lcount++; 
@@ -313,13 +313,13 @@ namespace extemp {
         while(_signal_cnt <= lcount) { 
           //sleep??
           cnt++; 
-          if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
+          if (0 == (cnt%100000)) printf("Still locked in %d cnt(%" PRId64 ":%" PRId64 ")\n!",idx,lcount,_signal_cnt);
         } // spin
 #else
       while(_signal_cnt <= lcount) { // wait);
         nanosleep(&MT_SLEEP_DURATION ,NULL); 
         cnt++; 
-        if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
+        if (0 == (cnt%100000)) printf("Still locked in %d cnt(%" PRId64 ":%" PRId64 ")\n!",idx,lcount,_signal_cnt);
       } // spin
 #endif
       lcount++; 
@@ -437,7 +437,7 @@ namespace extemp {
         _signal_cnt++;
         while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
           cnt++;
-          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
           nanosleep(&MT_SLEEP_DURATION ,NULL);
         }
       }
@@ -446,7 +446,7 @@ namespace extemp {
         _signal_cnt++;
         while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
           cnt++;
-          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
           nanosleep(&MT_SLEEP_DURATION ,NULL);
         }
       }
@@ -489,7 +489,7 @@ namespace extemp {
         _signal_cnt++;
         while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
           cnt++;
-          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
           nanosleep(&MT_SLEEP_DURATION ,NULL);
         }
       }
@@ -498,7 +498,7 @@ namespace extemp {
         _signal_cnt++;
         while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
           cnt++;
-          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
           nanosleep(&MT_SLEEP_DURATION ,NULL);
         }
       }
@@ -521,13 +521,13 @@ namespace extemp {
 #ifdef __APPLE__
       while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
         cnt++;
-        if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+        if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
         nanosleep(&MT_SLEEP_DURATION ,NULL);
       }
 #elif __linux__
       while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
         cnt++;
-        if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+        if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
         nanosleep(&MT_SLEEP_DURATION ,NULL);
       }
 #else
@@ -618,7 +618,7 @@ namespace extemp {
       ascii_text_color(1,5,10);
       printf("Warning: dsp input will be 0.0, use data* for channel data\n");
       ascii_text_color(0,7,10);
-      printf("");
+      printf("\n");
     }
 
     const   PaDeviceInfo *deviceInfo;
@@ -846,9 +846,9 @@ namespace extemp {
 #ifdef __linux__
     // check the timer resolution
     struct timespec res;     
-    clock_getres(CLOCK_REALTIME,&res);
+    clock_getres(CLOCK_REALTIME, &res);
     if(res.tv_sec > 0 || res.tv_nsec > 100)
-      printf("Warning: CLOCK_REALTIME resolution is %lus %luns, this may cause problems.\n",res.tv_sec);
+      printf("Warning: CLOCK_REALTIME resolution is %lds %ldns, this may cause problems.\n", res.tv_sec, res.tv_nsec);
 #endif
 
     const double thread_start_time = getRealTime();
