@@ -109,9 +109,22 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
 #ifdef _WIN32
 #define isnan(x) ((x) != (x))
 #define isinf(x) (isnan(x-x))
+#define LIKELY(X) (X)
+#define UNLIKELY(X) (X)
+#else //!_WIN32
+#define LIKELY(X) __builtin_expect(!!(X), 1)
+#define UNLIKELY(X) __builtin_expect((X), 0)
 #endif
 
-SAMPLE audio_sanity(SAMPLE x)
+#if defined(__GNUC__) && __GNUC__ >= 3
+#define isinf(x) __builtin_isinf(x)
+#define isnan(x) __builtin_isnan(x)
+#define isfinite(x) __builtin_finite(x)
+#else
+#define isfinite(x) (!isinf(x) && !isnan(x))
+#endif
+
+static inline SAMPLE audio_sanity(SAMPLE x)
 {
   if(isinf(x)) return 0.0f;
   else if(isnan(x)) return 0.0f;
@@ -120,13 +133,14 @@ SAMPLE audio_sanity(SAMPLE x)
   else return x;
 }
 
-float audio_sanity_f(float x)
+static inline float audio_sanity_f(float x)
 {
-  if(isinf(x)) return 0.0f;
-  else if(isnan(x)) return 0.0f;
-  else if(x < -0.99f) return -0.99f; 
-  else if(x > 0.99f) return 0.99f;  
-  else return x;
+  if (LIKELY(isfinite(x))) {
+    if (UNLIKELY(x < -0.99f)) return -0.99f;
+    if (UNLIKELY(x > 0.99f)) return 0.99f;
+    return x;
+  }
+  return 0.0;
 }
 
 // double audio_sanity_d(double x)
