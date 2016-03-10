@@ -1800,7 +1800,7 @@ namespace extemp {
   {
     using namespace llvm;
     //Module* M = EXTLLVM::I()->M;
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     if(func == 0)
       {
@@ -1815,7 +1815,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
-    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(std::string(string_value(pair_car(args))));   
+    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));   
     if(var == 0)
       {
         return _sc->F;
@@ -1830,7 +1830,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
     if(func == 0)
       {
         return _sc->F;
@@ -1846,7 +1846,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));  
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));  
     if(func == 0)
       {
         return _sc->F;
@@ -1984,7 +1984,7 @@ namespace extemp {
       {
         return _sc->F;
       }
-    StructType* type = newM->getTypeByName(std::string(name));
+    StructType* type = newM->getTypeByName(name);
     if(type == 0)
       {
         return _sc->F;
@@ -2002,7 +2002,7 @@ namespace extemp {
 
     Module* M = EXTLLVM::I()->M;
     //StructType* type = M->getTypeByName(std::string(string_value(pair_car(args))));
-    StructType* type = extemp::EXTLLVM::I()->getNamedType(std::string(string_value(pair_car(args))));
+    StructType* type = extemp::EXTLLVM::I()->getNamedType(string_value(pair_car(args)));
     if(type == 0)
       {
         return _sc->F;
@@ -2020,7 +2020,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));  
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));  
     if(func == 0)
       {
         return _sc->F;
@@ -2112,7 +2112,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
     if(func == 0)
       {
         return _sc->F;
@@ -2165,7 +2165,7 @@ namespace extemp {
 
 	// Module* M = EXTLLVM::I()->M;  
 	// llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
-	llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(std::string(string_value(pair_car(args))));  
+	llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));  
 	if(var == 0)
 	{
 	    return _sc->F;
@@ -2182,7 +2182,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;		
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
     if(func == 0)
       {
         return _sc->F;
@@ -2203,7 +2203,7 @@ namespace extemp {
     using namespace llvm;		
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));      
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));      
     if(func == 0)
       {
         return _sc->F;
@@ -2235,7 +2235,7 @@ namespace extemp {
     //Module* M = EXTLLVM::I()->M;
     //Module::global_iterator i = M->global_begin();
     //GlobalVariable* var = M->getNamedGlobal(std::string(string_value(pair_car(args))));
-    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(std::string(string_value(pair_car(args))));      
+    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));      
     if(var == 0)
       {
         return _sc->F;
@@ -2250,7 +2250,7 @@ namespace extemp {
   {
     using namespace llvm;
 
-    llvm::Function* func = EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));        
+    llvm::Function* func = EXTLLVM::I()->getFunction(string_value(pair_car(args)));        
     if(func == 0)
       {
         return _sc->F;
@@ -2277,7 +2277,7 @@ namespace extemp {
     char name[1024];
     sprintf(name,"%s_native",string_value(pair_car(args)));
     //llvm::Function* func = M->getFunction(std::string(name));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(name));     
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(name);     
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     //func->setCallingConv(CallingConv::C); //kCStackBased);
     if(func == 0)
@@ -2302,9 +2302,8 @@ namespace extemp {
   {
     using namespace llvm;
 		
-    std::string fname(string_value(pair_car(args)));
     //Module* M = EXTLLVM::I()->M;
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(fname);    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
     //llvm::Function* func = M->getFunction(fname); //std::string(string_value(pair_car(args))));
     //func->setCallingConv(CallingConv::C); //kCStackBased);
     if(func == 0)
@@ -2603,7 +2602,7 @@ namespace extemp {
 	llvm::raw_string_ostream ss(str);
 		
 	if(list_length(_sc, args) > 0) {
-    llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(std::string(string_value(pair_car(args))));    
+    llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(args)));    
     //llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(args))));
 	    if(val == NULL) {
 		std::cerr << "No such value found in LLVM Module" << std::endl;
@@ -2623,7 +2622,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 {
   //llvm::Module* M = EXTLLVM::I()->M;
   //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));      
+  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));      
 	std::string str;
 	llvm::raw_string_ostream ss(str);
 	ss << *func;
