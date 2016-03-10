@@ -42,6 +42,7 @@
 //#include "EXTMonitor.h"
 #include "EXTLLVM.h"
 #include "SchemeFFI.h"
+#include "BranchPrediction.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -109,11 +110,6 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
 #ifdef _WIN32
 #define isnan(x) ((x) != (x))
 #define isinf(x) (isnan(x-x))
-#define LIKELY(X) (X)
-#define UNLIKELY(X) (X)
-#else //!_WIN32
-#define LIKELY(X) __builtin_expect(!!(X), 1)
-#define UNLIKELY(X) __builtin_expect((X), 0)
 #endif
 
 #if defined(__GNUC__) && __GNUC__ >= 3
@@ -126,21 +122,22 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
 
 static inline SAMPLE audio_sanity(SAMPLE x)
 {
-  if(isinf(x)) return 0.0f;
-  else if(isnan(x)) return 0.0f;
-  else if(x < -0.99f) return -0.99f; 
-  else if(x > 0.99f) return 0.99f;  
-  else return x;
+    if (likely(isfinite(x))) {
+        if (unlikely(x < -0.99f)) return -0.99f;
+        if (unlikely(x > 0.99f)) return 0.99f;
+        return x;
+    }
+    return 0.0;
 }
 
 static inline float audio_sanity_f(float x)
 {
-  if (LIKELY(isfinite(x))) {
-    if (UNLIKELY(x < -0.99f)) return -0.99f;
-    if (UNLIKELY(x > 0.99f)) return 0.99f;
-    return x;
-  }
-  return 0.0;
+    if (likely(isfinite(x))) {
+        if (unlikely(x < -0.99f)) return -0.99f;
+        if (unlikely(x > 0.99f)) return 0.99f;
+        return x;
+    }
+    return 0.0;
 }
 
 // double audio_sanity_d(double x)

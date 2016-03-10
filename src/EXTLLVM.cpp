@@ -76,6 +76,7 @@
 #include "pcre.h"
 #include "OSC.h"
 #include "math.h"
+#include "BranchPrediction.h"
 
 #ifdef _WIN32
 #include <malloc.h>
@@ -233,43 +234,42 @@ llvm_zone_t* llvm_peek_zone_stack()
 {
     llvm_zone_t* z = 0;
     llvm_zone_stack* stack = llvm_threads_get_zone_stack();
-    if(!stack) {  // for the moment create a "DEFAULT" zone if stack is NULL      
+    if (unlikely(!stack)) {  // for the moment create a "DEFAULT" zone if stack is NULL
 #if DEBUG_ZONE_STACK      
-      printf("TRYING TO PEEK AT A NULL ZONE STACK\n"); 
+        printf("TRYING TO PEEK AT A NULL ZONE STACK\n");
 #endif
-      llvm_zone_t* z = llvm_zone_create(1024*1024*1); // default root zone is 1M
-      llvm_push_zone_stack(z);
-      stack = llvm_threads_get_zone_stack();
+        llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1); // default root zone is 1M
+        llvm_push_zone_stack(z);
+        stack = llvm_threads_get_zone_stack();
 #if DEBUG_ZONE_STACK      
-      printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
+        printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
 #endif      
-      return z;
-    }else{
-      z = stack->head;
-#if DEBUG_ZONE_STACK      
-      printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
-#endif
-      return z;
+        return z;
     }
+    z = stack->head;
+#if DEBUG_ZONE_STACK      
+    printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
+#endif
+    return z;
 }
 
 llvm_zone_t* llvm_pop_zone_stack()
 {
     llvm_zone_stack* stack = llvm_threads_get_zone_stack();
-    if(!stack) {
+    if (unlikely(!stack)) {
 #if DEBUG_ZONE_STACK      
       printf("TRYING TO POP A ZONE FROM AN EMPTY ZONE STACK\n");
 #endif
-      return 0;
+      return nullptr;
     }
     llvm_zone_t* head = stack->head;
     llvm_zone_stack* tail = stack->tail;
 #if DEBUG_ZONE_STACK    
     llvm_threads_dec_zone_stacksize();
-    if(tail == NULL) {
-      printf("%p: popping zone %p:%lld from stack with no tail\n",stack,head,head->size);
-    }else{
-      printf("%p: popping new zone %p:%lld back to old zone %p:%lld\n",stack,head,head->size,tail->head,tail->head->size);
+    if (!tail) {
+        printf("%p: popping zone %p:%lld from stack with no tail\n",stack,head,head->size);
+    } else {
+        printf("%p: popping new zone %p:%lld back to old zone %p:%lld\n",stack,head,head->size,tail->head,tail->head->size);
     }
 #endif
     free(stack);
@@ -279,35 +279,30 @@ llvm_zone_t* llvm_pop_zone_stack()
 
 llvm_zone_t* llvm_zone_create(uint64_t size)
 {
-  llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
-  if (zone == NULL)
-    {
-      ascii_text_color(0,3,10);      
-      printf("Catastrophic memory failure!\n");
-      ascii_text_color(0,9,10);
-      exit(1);
+    llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
+    if (unlikely(!zone)) {
+        ascii_text_color(0,3,10);
+        printf("Catastrophic memory failure!\n");
+        ascii_text_color(0,9,10);
+        exit(1);
     }
-  if (size > 0) {
 #ifdef _WIN32
-    zone->memory = malloc((size_t) size);
+    zone->memory = malloc(size_t(size));
 #else
     // zone->memory = malloc((size_t) size);
-    posix_memalign(&zone->memory,LLVM_ZONE_ALIGN,(size_t)size);
+    posix_memalign(&zone->memory, LLVM_ZONE_ALIGN, size_t(size));
 #endif
-  }else{
-    zone->memory = NULL;
-  }
     zone->mark = 0;
     zone->offset = 0;
-    if(zone->memory == NULL) {
+    if (unlikely(!zone->memory)) {
       //ascii_text_color(0,3,10);      
       //printf("Failed to allocate memory for Zone!\n");
       //ascii_text_color(0,9,10);    
       size = 0;
     }
     zone->size = size;
-    zone->cleanup_hooks = NULL;
-    zone->memories = NULL;
+    zone->cleanup_hooks = nullptr;
+    zone->memories = nullptr;
     #if DEBUG_ZONE_ALLOC    
     printf("CreateZone: %x:%x:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
     #endif
@@ -335,13 +330,13 @@ void llvm_zone_destroy(llvm_zone_t* zone)
 
 void llvm_zone_print(llvm_zone_t* zone)
 {
-  llvm_zone_t* tmp = zone;
-  int64_t total_size = zone->size;
-  int64_t segments = 1;
-  while(tmp->memories != NULL) {
-    tmp = tmp->memories;
-    total_size += tmp->size;
-    segments++;
+  auto tmp(zone);
+  auto total_size(zone->size);
+  int64_t segments(1);
+  while (tmp->memories) {
+      tmp = tmp->memories;
+      total_size += tmp->size;
+      segments++;
   }
   printf("<MemZone(%p) size(%" PRId64 ") free(%" PRId64 ") segs(%" PRId64 ")>",zone,total_size,(zone->size - zone->offset),segments);
   return;
@@ -354,7 +349,7 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
     printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
 #endif
     size += LLVM_ZONE_ALIGN; // for storing size information
-    if(zone->offset + size >= zone->size)
+    if (unlikely(zone->offset + size >= zone->size))
     {
 #if EXTENSIBLE_ZONES // if extensible_zones is true then extend zone size by zone->size
         int old_zone_size = zone->size;
@@ -423,15 +418,14 @@ bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
     uint64_t size1 = llvm_zone_ptr_size(ptr1);
     uint64_t size2 = llvm_zone_ptr_size(ptr2);
 
-    if(size1 != size2) { 
+    if (unlikely(size1 != size2)) {
   //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2); 
         return 1;
     }
-    if(size1 == 0) {
+    if (unlikely(!size1)) {
   //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2); 
         return 1;
     }
-
     //printf("zone_copy_ptr: %p,%p,%lld,%lld\n",ptr2,ptr1,size1,size2);
     memcpy(ptr2, ptr1, size1);
     return 0;
@@ -439,19 +433,16 @@ bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
 
 bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr)
 {
-    if( (ptr >= zone->memory) && (ptr < ((char*)zone->memory)+zone->size) ) return true;
-    while(zone->memories != NULL) {
-      zone = zone->memories;
-      if( (ptr >= zone->memory) && (ptr < ((char*)zone->memory)+zone->size) ) return true;
+    while (unlikely(zone && (ptr < zone->memory || ptr >= reinterpret_cast<char*>(zone->memory) + zone->size))) {
+        zone = zone->memories;
     }
-    return false;
+    return zone;
 }
 
 bool llvm_ptr_in_current_zone(void* ptr)
 {
-  return llvm_ptr_in_zone(llvm_peek_zone_stack(), ptr);
+    return llvm_ptr_in_zone(llvm_peek_zone_stack(), ptr);
 }
-
 
 extemp::CM* FreeWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,freeWithDelay);
 void free_after_delay(char* dat, double delay)
