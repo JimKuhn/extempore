@@ -554,17 +554,6 @@ char* extitoa(int64_t val) {
   return buf;//&buf[i+1];        
 }
 
-uint64_t string_hash(unsigned char* str) 
-{
-  unsigned long hash = 0;
-  int c;
-  
-  while ((c = *str++))
-    hash = c + (hash << 6) + (hash << 16) - hash;
-  
-  return hash;
-}
-
 int llvm_printf(char* format, ...)
 {
     va_list ap;
