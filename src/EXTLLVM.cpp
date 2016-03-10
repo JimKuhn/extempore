@@ -221,7 +221,7 @@ void llvm_push_zone_stack(llvm_zone_t* z)
 #if DEBUG_ZONE_STACK          
     llvm_threads_inc_zone_stacksize();
     if(stack->tail) {
-      printf("%p: push new zone %p:%lld onto old zone %p:%lld stacksize:%lld\n",stack,z,z->size,stack->tail->head,stack->tail->head->size,llvm_threads_get_zone_stacksize());
+      printf("%p: push new zone %p: %" PRIu64 " onto old zone %p:%lld stacksize:%lld\n",stack,z,z->size,stack->tail->head,stack->tail->head->size,llvm_threads_get_zone_stacksize());
     } else {
       printf("%p: push new zone %p:%lld onto empty stack\n",stack,z,z->size);
     }
@@ -344,7 +344,7 @@ void llvm_zone_print(llvm_zone_t* zone)
     total_size += tmp->size;
     segments++;
   }
-  printf("<MemZone(%p) size(%lld) free(%lld) segs(%lld)>",zone,total_size,(zone->size - zone->offset),segments);
+  printf("<MemZone(%p) size(%" PRId64 ") free(%" PRId64 ") segs(%" PRId64 ")>",zone,total_size,(zone->size - zone->offset),segments);
   return;
 }
 
@@ -550,7 +550,7 @@ char* extitoa(int64_t val) {
     buf[i] = "0123456789abcdef"[val % base]; 
 	*/
   static char buf[32] = {0};
-  sprintf(buf,"%lld",val);
+  sprintf(buf,"%" PRId64,val);
   return buf;//&buf[i+1];        
 }
 
@@ -860,7 +860,7 @@ void* llvm_memset(void* ptr, int32_t c, int64_t n)
 // these are helpers for runtime debugging in llvm
 void llvm_print_pointer(void* ptr)
 {
-    printf("llvm:ptr:>%p -- %lld\n",ptr,*((int64_t*)ptr));
+    printf("llvm:ptr:>%p -- %" PRId64 "\n",ptr,*((int64_t*)ptr));
     return;
 }
 
@@ -872,7 +872,7 @@ void llvm_print_i32(int32_t num)
 
 void llvm_print_i64(int64_t num)
 {
-    printf("llvm:i64:>%lld\n",num);
+    printf("llvm:i64:>%" PRId64 "\n",num);
     return;
 }
 
@@ -1049,7 +1049,7 @@ uint32_t get_address_offset(uint64_t id, closure_address_table* table)
       }
       table = table->next;
     }
-    printf("Unable to locate %llu in closure environment b\n",id);
+    printf("Unable to locate %" PRIu64 " in closure environment b\n",id);
     return 0;
 }
 
