@@ -39,7 +39,7 @@
 #include "Scheme.h"
 #include "EXTLLVM.h"
 #include "Task.h"
-#include <map>
+#include <unordered_map>
 
 namespace extemp {
 
@@ -219,12 +219,12 @@ namespace extemp {
 
     private:
 	static SchemeFFI SINGLETON;		
-	static std::map<std::string,std::pair<std::string,std::string> > IMPCIR_DICT;
+	static std::unordered_map<std::string,std::pair<std::string,std::string>> IMPCIR_DICT;
 	// these tmp buffers used for regex splits
 	static char* tmp_str_a;
 	static char* tmp_str_b;
 	// this used for trivial preoprocesor aliasing (for LLVM IR)
-	static std::map<std::string,std::string> LLVM_ALIAS_TABLE;    
+	static std::unordered_map<std::string,std::string> LLVM_ALIAS_TABLE;    
     };
 	
 } // end namespace

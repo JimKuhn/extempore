@@ -165,10 +165,10 @@ static inline std::string xtm_ftostr(const llvm::APFloat& V) {
 namespace extemp {
 	
     SchemeFFI SchemeFFI::SINGLETON;
-    std::map<std::string,std::pair<std::string,std::string> > SchemeFFI::IMPCIR_DICT;  
+    std::unordered_map<std::string,std::pair<std::string,std::string>> SchemeFFI::IMPCIR_DICT;  
     char* SchemeFFI::tmp_str_a = (char*) malloc(1024);
     char* SchemeFFI::tmp_str_b = (char*) malloc(4096);
-  std::map<std::string,std::string> SchemeFFI::LLVM_ALIAS_TABLE;
+  std::unordered_map<std::string,std::string> SchemeFFI::LLVM_ALIAS_TABLE;
 
     void SchemeFFI::initSchemeFFI(scheme* sc)
     {
@@ -2686,23 +2686,23 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
   }
 
     // For simple preprocessor alias's
-    pointer SchemeFFI::add_llvm_alias(scheme* _sc, pointer args)
-    {
+pointer SchemeFFI::add_llvm_alias(scheme* _sc, pointer args)
+{
 	char* name = string_value(pair_car(args));
 	char* type = string_value(pair_cadr(args));
-        LLVM_ALIAS_TABLE[std::string(name)] = std::string(type);
+  LLVM_ALIAS_TABLE[std::string(name)] = std::string(type);
 	return _sc->T;
-    }
+}
 
-    pointer SchemeFFI::get_llvm_alias(scheme* _sc, pointer args)
-    {
+pointer SchemeFFI::get_llvm_alias(scheme* _sc, pointer args)
+{
 	char* name = string_value(pair_car(args));
-	if (LLVM_ALIAS_TABLE.find(std::string(name)) != LLVM_ALIAS_TABLE.end())
-	  return mk_string(_sc,LLVM_ALIAS_TABLE[std::string(name)].c_str());
-	else
-	  return _sc->F; 
-    }
-
+  auto iter(LLVM_ALIAS_TABLE.find(std::string(name)));
+	if (iter != LLVM_ALIAS_TABLE.end()) {
+    return mk_string(_sc, iter->second.c_str());
+  }
+  return _sc->F; 
+}
 
 pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
 {
