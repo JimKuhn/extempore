@@ -1125,26 +1125,20 @@ struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, u
 }
 
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
-  char a[256];
-  char b[256];
   char c[1024];
-  memset(c,0,1024);
-  const char* d = "_xtlang_name";
-  if(!rsplit((char*)"\\.", symbol, (char*) a, (char*) b)) {
+  auto pos(strchr(symbol, '.'));
+  if (!pos) {
     //printf("Eval error: not valid dot syntax\n");
     return false;
   }
-  strcat(c,a);
-  strcat(c,d);
-  // printf("a:%s c:%s\n",a,c);
-  pointer x=find_slot_in_env(sc,sc->envir,mk_symbol(sc,a),1);
-  pointer y=find_slot_in_env(sc,sc->envir,mk_symbol(sc,c),1);  
-  if(x==sc->NIL || y==sc->NIL) { // || !is_closure(x)) { // then we failed
-    //printf("Eval error: not valid dot syntax: bad value\n");
+  strncpy(c, symbol, pos - symbol);
+  pointer x = find_slot_in_env(sc, sc->envir, mk_symbol(sc, c), 1);
+  if (x == sc->NIL) {
     return false;
-  }else{
-    return true;
   }
+  strcat(c, "_xtlang_name");
+  pointer y = find_slot_in_env(sc, sc->envir, mk_symbol(sc, c), 1);
+  return y != sc->NIL;
 }
 /*
     //llvm::Module* M = extemp::EXTLLVM::I()->M;
