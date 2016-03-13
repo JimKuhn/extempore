@@ -128,7 +128,13 @@ const char*  llvm_scheme_ff_get_name(foreign_func ff);
 void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
 void llvm_runtime_error(int error, void* arg);
 llvm_zone_t* llvm_zone_create(uint64_t size);
-llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone);
+
+inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
+{
+    Zone->offset = 0;
+    return Zone;
+}
+
 bool llvm_zone_copy_ptr(void* ptr1, void* ptr2);
 void llvm_zone_mark(llvm_zone_t* zone);
 uint64_t llvm_zone_mark_size(llvm_zone_t* zone);
