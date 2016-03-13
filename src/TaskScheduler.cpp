@@ -104,7 +104,7 @@ namespace extemp {
       TaskI* t = queue.peek();      
       // this is a task we need to do something with
       while(t != NULL && (t->getStartTime() < (UNIV::TIME + frames))) {
-        t = queue.get();
+        t = queue.pop();
         try{
           if(t->getTag() == 0) t->execute();
         }catch(std::exception& e){ //...){

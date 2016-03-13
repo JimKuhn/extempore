@@ -76,7 +76,7 @@ void start() { queueThread->create(TaskScheduler::queue_thread_callback, this); 
 
 private:
     unsigned m_numFrames;
-    PriorityQueue<uint64_t, TaskI*> queue;
+    PriorityQueue<TaskI> queue;
     //CAPThread* queueThread;
     //CAGuard* guard;
     EXTThread* queueThread;
