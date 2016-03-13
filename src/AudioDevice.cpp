@@ -339,10 +339,9 @@ namespace extemp {
 
 
   int audioCallback(const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
-  {        
-
+  {
     TaskScheduler* sched = static_cast<TaskScheduler*>(userData);
-    UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
+    UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + framesPerBuffer;
     if(UNIV::TIME_DIVISION == 1) UNIV::TIME = UNIV::DEVICE_TIME;
 
     if(AudioDevice::CLOCKBASE < 1.0) {
@@ -356,10 +355,11 @@ namespace extemp {
 
     int channels = 2;
     uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
+    sched->setFrames(framesPerBuffer);
     sched->getGuard()->signal();		
     void* dsp_closure = AudioDevice::I()->getDSPClosure();
     void* cache_closure = 0;
-    if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(float))); return 0; }
+    if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*framesPerBuffer*sizeof(float))); return 0; }
     cache_closure = ((void*(*)()) dsp_closure)(); 
 
     SAMPLE indata[256]; // 256 channels MAX!
@@ -378,7 +378,7 @@ namespace extemp {
 	    //llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
 	    llvm_zone_t* zone = llvm_peek_zone_stack();
 	    //llvm_push_zone_stack(zone);
-	    for(uint64_t i=0;i<UNIV::FRAMES;i++)
+	    for(uint64_t i=0;i<framesPerBuffer;i++)
         {
           uint32_t iout = i*UNIV::CHANNELS;
           uint32_t iin = i*UNIV::IN_CHANNELS;
