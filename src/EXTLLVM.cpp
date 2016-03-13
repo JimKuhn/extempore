@@ -309,12 +309,6 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
     return zone;
 }
 
-llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone)
-{
-    zone->offset = 0;
-    return zone;
-}
-
 void llvm_zone_destroy(llvm_zone_t* zone)
 {
   #if DEBUG_ZONE_ALLOC  
