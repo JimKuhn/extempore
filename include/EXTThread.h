@@ -36,8 +36,6 @@
 #ifndef EXT_THREAD
 #define EXT_THREAD
 
-#include <map>
-
 #ifdef _WIN32
 #include <thread>
 #include <functional>

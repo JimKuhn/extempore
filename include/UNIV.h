@@ -45,6 +45,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 #ifdef _WIN32
 #include <SDKDDKVer.h>

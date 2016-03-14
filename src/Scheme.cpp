@@ -1933,7 +1933,6 @@ struct dump_stack_frame {
     pointer code; 
 }; 
 
-
 static void treadmill_mark_roots(scheme* sc, pointer a, pointer b) {
 #ifdef TREADMILL_DEBUG
     std::cout << "TREADMILL: MARK ROOTS" << std::endl;//  top:" << sc->treadmill_top << "  scan: " << sc->treadmill_scan << "  bottom:" << sc->treadmill_bottom << "  scan: " << sc->treadmill_scan << std::endl;
@@ -1979,10 +1978,8 @@ static void treadmill_mark_roots(scheme* sc, pointer a, pointer b) {
     insert_treadmill(sc, b);
 
     /* mark pointers */
-    std::multiset<pointer>::iterator iter = sc->imp_env->begin();
-    while(iter != sc->imp_env->end()) {
-        insert_treadmill(sc, *iter);
-        iter++;
+    for (auto pointer : sc->imp_env) {
+        insert_treadmill(sc, pointer);
     }
 
     sc->mutex->unlock();
@@ -3402,30 +3399,30 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
     }
 
     if(current==0) {
-      while(!sc->applied_symbol_names->empty() && cnt<10)
+      while(!sc->applied_symbol_names.empty() && cnt<10)
         {
-          pointer item = sc->applied_symbol_names->top();
+          pointer item = sc->applied_symbol_names.top();
           std::stringstream ss;
           extemp::UNIV::printSchemeCell(sc, ss, item, true);
           std::cout << "stack-catch: " << ss.str() << std::endl;
           cnt++;
-          sc->applied_symbol_names->pop();
+          sc->applied_symbol_names.pop();
         }
     }    
 
-    while(!sc->applied_symbol_names->empty() && cnt<10 && current != 0)
+    while(!sc->applied_symbol_names.empty() && cnt<10 && current != 0)
     {
-        pointer item = sc->applied_symbol_names->top();
+        pointer item = sc->applied_symbol_names.top();
         if(is_symbol(item)) {
             if(strcmp(current,symname_sc(sc,item)) == 0) {
-                sc->applied_symbol_names->pop();
+                sc->applied_symbol_names.pop();
                 continue;
             }
             sss << " <- " << symname_sc(sc,item);
             current = symname_sc(sc,item);
         }
         cnt++;
-        sc->applied_symbol_names->pop();
+        sc->applied_symbol_names.pop();
     }
     //if(cnt>9) sss << " ... " << std::endl;
     //else sss << std::endl;
@@ -3481,9 +3478,9 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
         sc->last_symbol_apply = sc->NIL;
         sc->call_end_time = ULLONG_MAX;
         // empty applied_symbol_names stack is empty
-        while(!sc->applied_symbol_names->empty())
+        while(!sc->applied_symbol_names.empty())
         {
-            sc->applied_symbol_names->pop();
+            sc->applied_symbol_names.pop();
         }
         return sc->T;
     }
@@ -3494,18 +3491,22 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
         if(a!=0) {
             pointer p1 = mk_integer(sc, errnum);
             pointer p2 = cons(sc,p1,sc->NIL);
-            sc->imp_env->insert(p2);
-            pointer p3 = cons(sc, sc->QUOTE, cons(sc, a, sc->NIL)); // need to quote 'a
-            sc->imp_env->erase(p2);
+            pointer p3;
+            {
+                EnvInjector injector(sc, p2);
+                p3 = cons(sc, sc->QUOTE, cons(sc, a, sc->NIL)); // need to quote 'a
+            }
             sc->code = cons(sc, p3, p2);
             //sc->code = cons(sc, cons(sc, sc->QUOTE, cons(sc,(a), sc->NIL)), sc->NIL);
     } else {
             //sc->code = sc->NIL;
             pointer p1 = mk_integer(sc, errnum);
             pointer p2 = cons(sc,p1,sc->NIL);
-            sc->imp_env->insert(p2);
-            pointer p3 = cons(sc, sc->QUOTE, cons(sc, sc->F, sc->NIL));
-            sc->imp_env->erase(p2);
+            pointer p3;
+            {
+                EnvInjector injector(sc, p2);
+                p3 = cons(sc, sc->QUOTE, cons(sc, sc->F, sc->NIL));
+            }
             sc->code = cons(sc, p3, p2);
     }
     sc->code = cons(sc, mk_string(sc, (s)), sc->code);
@@ -3516,9 +3517,9 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
     sc->last_symbol_apply = sc->NIL;
     sc->call_end_time = ULLONG_MAX;
     // empty applied_symbol_names stack is empty
-    while(!sc->applied_symbol_names->empty())
+    while(!sc->applied_symbol_names.empty())
       {
-        sc->applied_symbol_names->pop();
+        sc->applied_symbol_names.pop();
       }
     return sc->T;
   }
@@ -3538,9 +3539,9 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
   sc->op = (int)OP_ERR0;
 
   // empty applied_symbol_names stack is empty
-  while(!sc->applied_symbol_names->empty())
+  while(!sc->applied_symbol_names.empty())
     {
-      sc->applied_symbol_names->pop();
+      sc->applied_symbol_names.pop();
     }
   sc->last_symbol_apply = sc->NIL;
   sc->call_end_time = ULLONG_MAX;
@@ -3565,11 +3566,11 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
 
 static void s_save(scheme *sc, enum scheme_opcodes op, pointer args, pointer code) 
 {
-    sc->applied_symbol_names->push(sc->last_symbol_apply);
+    sc->applied_symbol_names.push(sc->last_symbol_apply);
 //      if(is_symbol(sc->last_symbol_apply)) {
-//              std::cout << "PUSH SYM " << sc->applied_symbol_names->size() << " " << symname(sc->last_symbol_apply) << std::endl;
+//              std::cout << "PUSH SYM " << sc->applied_symbol_names.size() << " " << symname(sc->last_symbol_apply) << std::endl;
 //      }else{
-//              std::cout << "PUSH SYM " << sc->applied_symbol_names->size() << std::endl;
+//              std::cout << "PUSH SYM " << sc->applied_symbol_names.size() << std::endl;
 //      }
 
     //if(imp::SchemeInterface::SCHEME_OPS_LOGGING) CPPBridge::notification("SAVE STACK");
@@ -3592,13 +3593,13 @@ static void s_save(scheme *sc, enum scheme_opcodes op, pointer args, pointer cod
 
 static pointer _s_return(scheme *sc, pointer a) 
 { 
-    if(sc->applied_symbol_names->empty()) {
+    if(sc->applied_symbol_names.empty()) {
         sc->last_symbol_apply = sc->NIL;
     }else{
-        sc->last_symbol_apply = sc->applied_symbol_names->top();                
-        sc->applied_symbol_names->pop();
+        sc->last_symbol_apply = sc->applied_symbol_names.top();                
+        sc->applied_symbol_names.pop();
     }
-//      std::cout << "POP SYM " << sc->applied_symbol_names->size() << std::endl;       
+//      std::cout << "POP SYM " << sc->applied_symbol_names.size() << std::endl;       
 
 //      if(imp::SchemeInterface::SCHEME_OPS_LOGGING) CPPBridge::notification("RETURN STACK");
     intptr_t nframes = (intptr_t)sc->dump;
@@ -3720,7 +3721,7 @@ pointer dump_stack_copy(scheme* sc)
     newdump[0] = nframes;
         
     pointer new_stack_ptr = mk_cptr(sc, newdump);
-    sc->imp_env->insert(new_stack_ptr); 
+    EnvInjector injector(sc, new_stack_ptr);
 
     dump_stack_frame* frames = (dump_stack_frame*)&newdump[1];
 
@@ -3766,8 +3767,6 @@ pointer dump_stack_copy(scheme* sc)
 //              imp::SchemeInterface::printSchemeCell(sc, ss, envir, true);
 //              std::cout << "ENVIR" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
     }
-
-    sc->imp_env->erase(new_stack_ptr);
 
     return new_stack_ptr;
 }
@@ -4108,16 +4107,13 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
             //std::stringstream ss;
             // imp::SchemeInterface::printSchemeCell(sc, ss, car(sc->code), true);
             //std::cout << "new func: " << ss.str() << std::endl;
-            //sc->function_defs->insert(std::make_pair(symname_sc(sc,caar(sc->code)),ss.str()));
             char* pp;
             int ll;
             atom2str(sc,caar(sc->code),0,&pp,&ll);
             std::string str(pp);
-            sc->function_defs->insert(std::make_pair(symname_sc(sc,caar(sc->code)),str));
             //tinyscheme code
             x = caar(sc->code);
             sc->code = cons(sc, sc->LAMBDA, cons(sc, cdar(sc->code), cdr(sc->code)));
-            sc->reverse_symbol_lookup->insert(std::make_pair(cdr(sc->code),x));
         } else {
             x = car(sc->code);
             sc->code = cadr(sc->code);
@@ -4133,8 +4129,6 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
                 str = str + " ";
                 //str = ss.str().insert(1,str);
                 str = str2.insert(1,str);
-                sc->function_defs->insert(std::make_pair(symname_sc(sc,x),str));
-                sc->reverse_symbol_lookup->insert(std::make_pair(cdr(sc->code),x));
                 // if(strcmp("test",symname_sc(sc,x)) == 0) printf("test = %p,%p",cdr(sc->code),x);
             }
         }
@@ -4148,7 +4142,6 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
 //                      std::string str(symname_sc(sc,x));
 //                      str = str + " ";
 //                      str = ss.str().insert(1,str);
-//                      sc->function_defs->insert(std::make_pair(symname_sc(sc,x),str));
 //                      sc->reverse_symbol_lookup->insert(std::make_pair(cdr(sc->code),x));
 //                      //                              if(strcmp("test",symname_sc(sc,x)) == 0) printf("test = %p,%p",cdr(sc->code),x);
 //              }
@@ -4158,7 +4151,6 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
         if (!is_symbol(x)) {
             Error_1(sc,"variable is not a symbol",x,sc->code->_debugger->_size);
         }
-        sc->defined_keywords->insert(symname_sc(sc,x));
         s_save(sc,OP_DEF1, sc->NIL, x);
         s_goto(sc,OP_EVAL);
 
@@ -4448,7 +4440,6 @@ static pointer opexe_1(scheme *sc, enum scheme_opcodes op) {
         if (!is_symbol(x)) {
             Error_1(sc,"variable is not a symbol",x,sc->code->_debugger->_size);
         }
-        sc->defined_keywords->insert(symname_sc(sc,x));
 
         s_save(sc,OP_MACRO1, sc->NIL, x);
         s_goto(sc,OP_EVAL);
@@ -6303,6 +6294,7 @@ int scheme_init(scheme *sc) {
 }
 
 int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
+    new (sc) scheme; // initialize properly
     int i, n=sizeof(dispatch_table)/sizeof(dispatch_table[0]);
     pointer x;
     //printf("Scheme init custom alloc %p\n",sc);
@@ -6405,7 +6397,6 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
         
     //sc->imp_env = sc->NIL;
     //sc->imp_env.clear();
-    sc->imp_env = new std::multiset<pointer>();
     sc->tmp_dump = sc->NIL;
     sc->tmp_args = sc->NIL;
     sc->func_called_by_extempore = sc->NIL;
@@ -6421,32 +6412,7 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
         
 
     //define keywords
-    sc->defined_keywords = new std::set<const char*, CharPtrLess>();
-    sc->applied_symbol_names = new std::stack<pointer>(); 
-    sc->function_defs = new std::map<const char*, const std::string, CharPtrLess>();
-    sc->reverse_symbol_lookup = new std::map<pointer,pointer>();        
-    sc->defined_keywords->insert("lambda");
-    sc->defined_keywords->insert("quote");
-    sc->defined_keywords->insert("define");     
-    sc->defined_keywords->insert("if");
-    sc->defined_keywords->insert("begin");
-    sc->defined_keywords->insert("set!");
-    sc->defined_keywords->insert("let");
-    sc->defined_keywords->insert("let*");
-    sc->defined_keywords->insert("letrec");
-    sc->defined_keywords->insert("cond");
-    sc->defined_keywords->insert("delay");
-    sc->defined_keywords->insert("and");
-    sc->defined_keywords->insert("or");
-    sc->defined_keywords->insert("cons-stream");
-    sc->defined_keywords->insert("macro");
-    sc->defined_keywords->insert("case");
     int dispatch_table_length = sizeof(dispatch_table) / sizeof(dispatch_table[0]);
-    for(int i=0;i<dispatch_table_length;++i) {
-        if(dispatch_table[i].name != 0) {
-            sc->defined_keywords->insert(dispatch_table[i].name);
-        }
-    }
         
     treadmill_mark_roots(sc, sc->NIL, sc->NIL);
         
@@ -6630,9 +6596,9 @@ void scheme_load_file(scheme *sc, FILE *fin) {
         sc->retcode=sc->nesting!=0;
     }
         
-    while(!sc->applied_symbol_names->empty())
+    while(!sc->applied_symbol_names.empty())
     {
-        sc->applied_symbol_names->pop();
+        sc->applied_symbol_names.pop();
     }
     sc->last_symbol_apply = sc->NIL;
     sc->error_position = -1;
@@ -6677,9 +6643,9 @@ void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_ti
         sc->retcode=sc->nesting!=0;
     }
         
-    while(!sc->applied_symbol_names->empty())
+    while(!sc->applied_symbol_names.empty())
     {
-        sc->applied_symbol_names->pop();
+        sc->applied_symbol_names.pop();
     }
     sc->last_symbol_apply = sc->NIL;    
     sc->error_position = -1;
@@ -6690,9 +6656,6 @@ void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_ti
 void scheme_define(scheme *sc, pointer envir, pointer symbol, pointer value) {
     pointer x;
 
-    sc->defined_keywords->insert(symname_sc(sc,symbol));
-    sc->reverse_symbol_lookup->insert(std::make_pair(value,symbol));
-        
     x=find_slot_in_env(sc,envir,symbol,0);
     if (x != sc->NIL) { 
         set_slot_in_env(sc, x, value); 
@@ -6755,9 +6718,9 @@ void scheme_call(scheme *sc, pointer func, pointer args, uint64_t start_time, ui
         _Error_1(sc,err.msg,err.p,0,0);
     }
         
-    while(!sc->applied_symbol_names->empty())
+    while(!sc->applied_symbol_names.empty())
     {
-        sc->applied_symbol_names->pop();
+        sc->applied_symbol_names.pop();
     }
     sc->last_symbol_apply = sc->NIL;
     sc->error_position = -1;
