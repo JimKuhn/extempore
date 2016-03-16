@@ -7,12 +7,10 @@ from zero to running Extempore code.
 Installation
 ------------
 
-.. note:: There are much more detailed instructions in `INSTALL.md`_,
+.. note:: There are much more detailed instructions in :doc:`install`,
           so if you have any problems (or simply want to know what's
           going on) with the steps below then that's a good place to
           look.
-
-.. _INSTALL.md: https://github.com/digego/extempore/blob/master/INSTALL.md
           
 On **OSX** (with `homebrew`_) you can get the dependencies, build and
 install Extempore and the full standard library with::
@@ -44,26 +42,27 @@ Editor setup
 ------------
 
 To write Extempore code you need a text editor, and there are
-:ref:`Extempore "plugins" for several text editors <editor-support>`
+:doc:`Extempore "plugins" for several text editors <editor-support>`
 ---Atom, Emacs, Sublime Text and Vim.
 
 If you don't have a favourite text editor, then `Atom`_ is probably a
 good choice---it's free, available on all platforms and doesn't have
 as steep a learning curve as some other editors. Head over to the
-`Extempore Atom setup`_ docs to find out to download and set it up for
-Extempore. `extempore-and-emacs`_
+:ref:`Extempore Atom setup <atom-editor-setup>` docs to find out to
+download and set it up for Extempore.
 
 If you *do* have a favourite text editor, and it's one of the ones
 mentioned above, then see the :doc:`editor support page <editor-support>` for instructions on
 how to get started hacking Extempore code in your editor of choice.
 
 .. _Atom: https://atom.io/
-.. _Extempore Atom setup: extempore-and-emacs_
 
 "Hello, World!"
 ---------------
 
-Hello, World! is pretty straightforward in Extempore::
+Hello, World! is pretty straightforward in Extempore
+
+.. code-block:: extempore
 
   (printf "Hello, World!")
 
@@ -71,16 +70,23 @@ Hello, World! is pretty straightforward in Extempore::
 --------------
 
 Since Extempore has multimedia programming as a core part of its DNA,
-here's the "Hello, Sine!"::
+here's "Hello, Sine!"
 
-  Sine!  
+.. code-block:: extempore
+
+  (bind-func sine:DSP
+    (lambda (in time chan dat)
+      (* .1 (cos (* (convert time) .04)))))
+
+  ;; tell Extempore to use `sine` as the audio output sink
+  (dsp:set! sine)
 
 "Hello, Triangle!"
 ------------------
 
-Finally, here's "Hello, Triangle!"::
-
-  Triangle!
+"Hello, Triangle!" is a bit more complicated, since setting up the
+OpenGL state machine requires a bit of boilerplate. See
+``examples/external/shader-tutorials/triangle.xtm`` to get started.
 
 Beyond "Hello..."
 -----------------
