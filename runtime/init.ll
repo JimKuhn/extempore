@@ -1180,10 +1180,10 @@ define dllexport double @fp80ptrtod(i8* %fp80ptr) {
   ret double %5
 }
 
-declare i8* @memcpy(i8*, i8*, i64)
+;declare i8* @memcpy(i8*, i8*, i64)
 declare i8* @memset(i8* %dest, i32 %val, i64 %len)
 
-;declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1)
+declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1)
 ;
 ;define dllexport i8* @memcpy(i8* %dest, i8* %src, i64 %len) alwaysinline
 ;{
