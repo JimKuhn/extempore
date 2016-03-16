@@ -1430,6 +1430,7 @@ namespace extemp {
             PM->add(llvm::createGVNPass());
             // Function inlining
             PM->add(llvm::createFunctionInliningPass());
+            PM->add(llvm::createAlwaysInlinerPass());
             // loop invariants
             PM->add(llvm::createLICMPass());
             // vars

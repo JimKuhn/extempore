@@ -3787,19 +3787,6 @@
             "fastcc"
             "ccc"))))
 
-(define impc:ir:map-function-name
-  (lambda (name)
-    (if (string=? "memcpy" name)
-      "llvm.memcpy.p0i8.p0i8.i64"
-      name)))
-
-(define impc:ir:function-fixup-args
-  (lambda (name)
-    (if (string=? "memcpy" name)
-      ", i32 8, i1 0"
-      ""
-    )))
-
 ;; THIS VERSION FOR _NATIVE CALL CLOSURES!
 (define impc:ir:compiler:native-call
   (lambda (ast types)
@@ -3851,7 +3838,7 @@
                            ;; "tail "
                            "call " (impc:ir:function-calling-convention fname)
                            " " (car ftypes)
-                           " @" (impc:ir:map-function-name fname) "("
+                           " @" fname "("
                            (apply string-append
                                   (map (lambda (p ft i)
                                          (let ((atype (cadr (cdr p)))
@@ -3864,7 +3851,6 @@
                                            (string-append (if (> i 0) ", " "")
                                                           atype " " aname)))
                                        args (cdr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
-                           (impc:ir:function-fixup-args fname)
                            ")\n") os)
       (impc:ir:strip-space os))))
 
