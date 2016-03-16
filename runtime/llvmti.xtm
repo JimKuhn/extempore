@@ -1574,7 +1574,7 @@
     ("memccpy" . #((213 108 108 108 4 2) "" ()))
     ("memchr" . #((213 108 108 4 2) "" ()))
     ("memcmp" . #((213 4 108 108 2) "" ()))
-    ("memcpy" . #((213 -1 108 108 2) "" ()))
+    ("memcpy" . #((213 108 108 108 2) "" ()))
     ("memmove" . #((213 108 108 108 2) "" ()))
     ("memset" . #((213 108 108 4 2) "" ()))
     ("mk_cptr" . #((213 108 108 108) "" ()))
@@ -2742,7 +2742,8 @@
 
 (define impc:aot:compile-module
   (lambda (module-name module exit-afterwards?)
-    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
+    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc")))
+      (opt-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/opt"))))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
              (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
@@ -2763,6 +2764,7 @@
              (optimize-compiles? #t)
              (llc-command
               (unix-or-Windows (string-append
+                                opt-path " -always-inline " bc-path "|"
                                 llc-path
                                 (if optimize-compiles? " -O3 -tailcallopt" "-O0")
                                 " -relocation-model=pic "
@@ -2772,7 +2774,7 @@
                                                    (sys:cmdarg "mcpu")
                                                    " ")
                                     "")
-                                bc-path)
+                                "- -o " asm-path)
                                (string-append
                                 llc-path
                                 (if optimize-compiles? " -O3 -tailcallopt" "-O0")
