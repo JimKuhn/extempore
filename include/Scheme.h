@@ -163,7 +163,7 @@
 #endif
 
 typedef struct scheme scheme;
-typedef struct cell* pointer;
+typedef struct cell *pointer; 
 
 typedef void * (*func_alloc)(size_t);
 typedef void (*func_dealloc)(void *);
@@ -284,6 +284,7 @@ double rvalue(pointer p);
 double r64value(pointer p);
 float r32value(pointer p);
 int is_integer(pointer p);
+int is_real(pointer p);
 int is_rational(pointer p);
 int is_character(pointer p);
 long long charvalue(pointer p);
@@ -300,7 +301,7 @@ pointer pair_cdr(pointer p);
 pointer set_car(scheme* sc, pointer p, pointer q);
 pointer set_cdr(scheme* sc, pointer p, pointer q);
 
-int is_symbol(pointer Ptr);
+int is_symbol(pointer p);
 char* symname(pointer p);
 
 int is_syntax(pointer p);

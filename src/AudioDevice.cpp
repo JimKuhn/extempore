@@ -42,7 +42,6 @@
 //#include "EXTMonitor.h"
 #include "EXTLLVM.h"
 #include "SchemeFFI.h"
-#include "BranchPrediction.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -110,6 +109,11 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
 #ifdef _WIN32
 #define isnan(x) ((x) != (x))
 #define isinf(x) (isnan(x-x))
+#define LIKELY(X) (X)
+#define UNLIKELY(X) (X)
+#else //!_WIN32
+#define LIKELY(X) __builtin_expect(!!(X), 1)
+#define UNLIKELY(X) __builtin_expect((X), 0)
 #endif
 
 #if defined(__GNUC__) && __GNUC__ >= 3
@@ -122,22 +126,21 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
 
 static inline SAMPLE audio_sanity(SAMPLE x)
 {
-    if (likely(isfinite(x))) {
-        if (unlikely(x < -0.99f)) return -0.99f;
-        if (unlikely(x > 0.99f)) return 0.99f;
-        return x;
-    }
-    return 0.0;
+  if(isinf(x)) return 0.0f;
+  else if(isnan(x)) return 0.0f;
+  else if(x < -0.99f) return -0.99f; 
+  else if(x > 0.99f) return 0.99f;  
+  else return x;
 }
 
 static inline float audio_sanity_f(float x)
 {
-    if (likely(isfinite(x))) {
-        if (unlikely(x < -0.99f)) return -0.99f;
-        if (unlikely(x > 0.99f)) return 0.99f;
-        return x;
-    }
-    return 0.0;
+  if (LIKELY(isfinite(x))) {
+    if (UNLIKELY(x < -0.99f)) return -0.99f;
+    if (UNLIKELY(x > 0.99f)) return 0.99f;
+    return x;
+  }
+  return 0.0;
 }
 
 // double audio_sanity_d(double x)
@@ -220,13 +223,13 @@ namespace extemp {
         while(_signal_cnt <= lcount) { 
           //sleep??
           cnt++; 
-          if (0 == (cnt%100000)) printf("Still locked in %d cnt(%" PRId64 ":%" PRId64 ")\n!",idx,lcount,_signal_cnt);
+          if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
         } // spin
 #else
       while(_signal_cnt <= lcount) { // wait);
         nanosleep(&MT_SLEEP_DURATION ,NULL); 
         cnt++; 
-        if (0 == (cnt%100000)) printf("Still locked in %d cnt(%" PRId64 ":%" PRId64 ")\n!",idx,lcount,_signal_cnt);
+        if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
       } // spin
 #endif
       lcount++; 
@@ -310,13 +313,13 @@ namespace extemp {
         while(_signal_cnt <= lcount) { 
           //sleep??
           cnt++; 
-          if (0 == (cnt%100000)) printf("Still locked in %d cnt(%" PRId64 ":%" PRId64 ")\n!",idx,lcount,_signal_cnt);
+          if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
         } // spin
 #else
       while(_signal_cnt <= lcount) { // wait);
         nanosleep(&MT_SLEEP_DURATION ,NULL); 
         cnt++; 
-        if (0 == (cnt%100000)) printf("Still locked in %d cnt(%" PRId64 ":%" PRId64 ")\n!",idx,lcount,_signal_cnt);
+        if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
       } // spin
 #endif
       lcount++; 
@@ -339,9 +342,10 @@ namespace extemp {
 
 
   int audioCallback(const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
-  {
+  {        
+
     TaskScheduler* sched = static_cast<TaskScheduler*>(userData);
-    UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + framesPerBuffer;
+    UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
     if(UNIV::TIME_DIVISION == 1) UNIV::TIME = UNIV::DEVICE_TIME;
 
     if(AudioDevice::CLOCKBASE < 1.0) {
@@ -355,11 +359,10 @@ namespace extemp {
 
     int channels = 2;
     uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
-    sched->setFrames(framesPerBuffer);
     sched->getGuard()->signal();		
     void* dsp_closure = AudioDevice::I()->getDSPClosure();
     void* cache_closure = 0;
-    if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*framesPerBuffer*sizeof(float))); return 0; }
+    if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(float))); return 0; }
     cache_closure = ((void*(*)()) dsp_closure)(); 
 
     SAMPLE indata[256]; // 256 channels MAX!
@@ -378,7 +381,7 @@ namespace extemp {
 	    //llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
 	    llvm_zone_t* zone = llvm_peek_zone_stack();
 	    //llvm_push_zone_stack(zone);
-	    for(uint64_t i=0;i<framesPerBuffer;i++)
+	    for(uint64_t i=0;i<UNIV::FRAMES;i++)
         {
           uint32_t iout = i*UNIV::CHANNELS;
           uint32_t iin = i*UNIV::IN_CHANNELS;
@@ -434,7 +437,7 @@ namespace extemp {
         _signal_cnt++;
         while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
           cnt++;
-          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
           nanosleep(&MT_SLEEP_DURATION ,NULL);
         }
       }
@@ -443,7 +446,7 @@ namespace extemp {
         _signal_cnt++;
         while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
           cnt++;
-          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
           nanosleep(&MT_SLEEP_DURATION ,NULL);
         }
       }
@@ -486,7 +489,7 @@ namespace extemp {
         _signal_cnt++;
         while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
           cnt++;
-          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
           nanosleep(&MT_SLEEP_DURATION ,NULL);
         }
       }
@@ -495,7 +498,7 @@ namespace extemp {
         _signal_cnt++;
         while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
           cnt++;
-          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+          if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
           nanosleep(&MT_SLEEP_DURATION ,NULL);
         }
       }
@@ -518,13 +521,13 @@ namespace extemp {
 #ifdef __APPLE__
       while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
         cnt++;
-        if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+        if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
         nanosleep(&MT_SLEEP_DURATION ,NULL);
       }
 #elif __linux__
       while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
         cnt++;
-        if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%" PRId64 ")\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+        if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
         nanosleep(&MT_SLEEP_DURATION ,NULL);
       }
 #else
@@ -615,7 +618,7 @@ namespace extemp {
       ascii_text_color(1,5,10);
       printf("Warning: dsp input will be 0.0, use data* for channel data\n");
       ascii_text_color(0,7,10);
-      printf("\n");
+      printf("");
     }
 
     const   PaDeviceInfo *deviceInfo;
@@ -843,9 +846,9 @@ namespace extemp {
 #ifdef __linux__
     // check the timer resolution
     struct timespec res;     
-    clock_getres(CLOCK_REALTIME, &res);
+    clock_getres(CLOCK_REALTIME,&res);
     if(res.tv_sec > 0 || res.tv_nsec > 100)
-      printf("Warning: CLOCK_REALTIME resolution is %lds %ldns, this may cause problems.\n", res.tv_sec, res.tv_nsec);
+      printf("Warning: CLOCK_REALTIME resolution is %lus %luns, this may cause problems.\n",res.tv_sec);
 #endif
 
     const double thread_start_time = getRealTime();
