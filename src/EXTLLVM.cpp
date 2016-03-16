@@ -779,12 +779,6 @@ int mutex_trylock(void* mutex) {
 // }
 ///////////////////////////////////////////////////
 
-void* llvm_memset(void* ptr, int32_t c, int64_t n)
-{
-    return memset(ptr, c, (size_t)n);
-}
-
-
 // these are helpers for runtime debugging in llvm
 void llvm_print_pointer(void* ptr)
 {
@@ -1492,7 +1486,6 @@ namespace extemp {
             EE->updateGlobalMapping("llvm_zone_ptr_size", (uint64_t)&llvm_zone_ptr_size);
             EE->updateGlobalMapping("llvm_ptr_in_zone", (uint64_t)&llvm_ptr_in_zone);
             EE->updateGlobalMapping("llvm_ptr_in_current_zone", (uint64_t)&llvm_ptr_in_current_zone);
-            EE->updateGlobalMapping("llvm_memset", (uint64_t)&llvm_memset);
             EE->updateGlobalMapping("extitoa", (uint64_t)&extitoa);
             EE->updateGlobalMapping("string_hash", (uint64_t)&string_hash);
             EE->updateGlobalMapping("swap64i", (uint64_t)&swap64i);

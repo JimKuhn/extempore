@@ -2717,7 +2717,7 @@
               os)
         (emit (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", "
               *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size t)) ")\n" os)
-        (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, "
+        (emit "call i8* @memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, "
               *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size t)) ")\n" os)
         (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
               " = bitcast i8* " (car (impc:ir:gname "dat"))
@@ -2760,7 +2760,7 @@
          (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 "
          (car (impc:ir:gname "zonesize"))
          ")\n" os)
-        (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "zonesize")) ")\n" os)
+        (emit "call i8* @memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "zonesize")) ")\n" os)
         (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str tt) "*"))
               " = bitcast i8* " (car (impc:ir:gname "dat"))
               " to " (impc:ir:get-type-str tt) "*\n" os)
@@ -2780,7 +2780,7 @@
       (let* ;;((t (impc:ir:convert-from-pretty-types (cadr ast))))
           ((t (impc:ir:pointer-- (car hint?))))
         (emit  (impc:ir:gname "dat" "i8*") " = call i8* @malloc(" *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size t)) ")\n" os)
-        (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, " *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size t)) ")\n" os)
+        (emit "call i8* @memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, " *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size t)) ")\n" os)
         (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
               " = bitcast i8* " (car (impc:ir:gname "dat"))
               " to " (impc:ir:get-type-str t) "*\n" os)
@@ -2824,7 +2824,7 @@
             (emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @malloc(" *impc:ir:size_t_str* " "
                                  (car (impc:ir:gname "zonesize"))
                                  ")\n") os))
-        (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "zonesize")) ")\n" os)
+        (emit "call i8* @memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "zonesize")) ")\n" os)
         (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str tt) "*"))
                              " = bitcast i8* " (car (impc:ir:gname "dat"))
                              " to " (impc:ir:get-type-str tt) "*\n") os)
@@ -3784,6 +3784,19 @@
             "fastcc"
             "ccc"))))
 
+(define impc:ir:map-function-name
+  (lambda (name)
+    (if (string=? "memcpy" name)
+      "llvm.memcpy.p0i8.p0i8.i64"
+      name)))
+
+(define impc:ir:function-fixup-args
+  (lambda (name)
+    (if (string=? "memcpy" name)
+      ", i32 8, i1 0"
+      ""
+    )))
+
 ;; THIS VERSION FOR _NATIVE CALL CLOSURES!
 (define impc:ir:compiler:native-call
   (lambda (ast types)
@@ -3835,7 +3848,7 @@
                            ;; "tail "
                            "call " (impc:ir:function-calling-convention fname)
                            " " (car ftypes)
-                           " @" fname "("
+                           " @" (impc:ir:map-function-name fname) "("
                            (apply string-append
                                   (map (lambda (p ft i)
                                          (let ((atype (cadr (cdr p)))
@@ -3848,6 +3861,7 @@
                                            (string-append (if (> i 0) ", " "")
                                                           atype " " aname)))
                                        args (cdr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
+                           (impc:ir:function-fixup-args fname)
                            ")\n") os)
       (impc:ir:strip-space os))))
 

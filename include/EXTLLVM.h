@@ -166,7 +166,6 @@ static inline uint64_t string_hash(unsigned char* str)
     return result;
 }
 
-  void* llvm_memset(void* ptr, int32_t c, int64_t n);
   int llvm_printf(char* format, ...);
   int llvm_fprintf(FILE* f, char* format, ...);
   int llvm_sprintf(char* str, char* format, ...);
