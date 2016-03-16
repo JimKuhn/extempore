@@ -76,11 +76,11 @@
 
 ;; to compile the special init.ll file (which needs to be done on most
 ;; startups)
-(define sys:compile-init-ll
-  (lambda ()
+(define sys:compile-ll
+  (lambda (name)
     (let ((print? #f))
       (if (string=? (ipc:get-process-name) *impc:compiler:process*)
-          (let ((init-ll-string (sys:slurp-file (string-append (sys:share-dir) "/runtime/init.ll"))))
+          (let ((init-ll-string (sys:slurp-file (string-append (sys:share-dir) "/runtime/" name))))
             (if (and init-ll-string (llvm:compile-ir init-ll-string))
                 (if print?
                     (begin
@@ -91,10 +91,13 @@
                       (print "\n\n"))
                     #t)
                 (begin
-                  (print-with-colors 'red 'default #t (print "\n\nError compiling init.ll IR\n\n"))
+                  (print-with-colors 'red 'default #t (print "\n\nError compiling " name " IR\n\n"))
                   (print "This is pretty bad.  Exiting...\n")
                   (quit 1))))))))
 
+(define sys:compile-init-ll
+  (lambda ()
+    (sys:compile-ll "init.ll")))
 
 ;; GCHANGE
 ;; removes %b when returning base types (i.e. !head%b returns !head)
@@ -3785,6 +3788,19 @@
             "ccc"))))
 
 ;; THIS VERSION FOR _NATIVE CALL CLOSURES!
+
+(define impc:ir:intrinsic-substitution
+  (lambda (name)
+    (cond
+      ((string=? name "memcpy") "llvm.memcpy.p0i8.p0i8.i64")
+      (else name))))
+
+(define impc:ir:function-fixup-args
+  (lambda (name)
+    (cond
+      ((string=? name "memcpy") ", i32 1, i1 0")
+      (else ""))))
+
 (define impc:ir:compiler:native-call
   (lambda (ast types)
     ;; (println 'ast: ast 'types: types)
@@ -3835,7 +3851,7 @@
                            ;; "tail "
                            "call " (impc:ir:function-calling-convention fname)
                            " " (car ftypes)
-                           " @" fname "("
+                           " @" (impc:ir:intrinsic-substitution fname) "("
                            (apply string-append
                                   (map (lambda (p ft i)
                                          (let ((atype (cadr (cdr p)))
@@ -3848,6 +3864,7 @@
                                            (string-append (if (> i 0) ", " "")
                                                           atype " " aname)))
                                        args (cdr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
+                           (impc:ir:function-fixup-args fname)
                            ")\n") os)
       (impc:ir:strip-space os))))
 
@@ -3897,9 +3914,6 @@
                                        args (cddr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
                            ")\n") os)
       (impc:ir:strip-space os))))
-
-
-
 
 (define impc:ir:compiler
   (let ((intrinsics '(sin cos ceil floor exp fmod pow log log2 log10 sqrt fabs round trunc nearbyint fma exp2 powi)))
