@@ -49,247 +49,160 @@
 
 #define _EXTTHREAD_DEBUG_
 
-
 namespace extemp
 {
 
-  EXTThread::EXTThread() : initialised(false), detached(false), joined(false)
-    {       
-    }
+thread_local EXTThread* EXTThread::sm_currentThread = 0;
 
 #ifdef _WIN32
-  std::map<std::thread::id,EXTThread*> EXTThread::EXTTHREAD_MAP;
-  
-	EXTThread::EXTThread(std::thread&& _bthread) : initialised(false), detached(false), joined(false), bthread{ std::move(_bthread) }
-	{
-	}
+
+EXTThread::EXTThread(std::thread&& Thread) : initialised(false), detached(false), joined(false), m_thread(std::move(Thread)) {
+{
+}
+
 #else
-    std::map<pthread_t,EXTThread*> EXTThread::EXTTHREAD_MAP;
-  
-    EXTThread::EXTThread(pthread_t _pthread) : initialised(false), detached(false), joined(false), pthread{ _pthread }
-    {
-    }
+
+EXTThread::EXTThread(pthread_t Thread) : m_initialised(false), m_detached(false), m_joined(false), m_thread(Thread)
+{
+}
+
 #endif
 
-    EXTThread::~EXTThread()
-    {		
+EXTThread::~EXTThread()
+{           
 #ifdef _EXTTHREAD_DEBUG_
-	if (initialised && (! (detached || joined)))
-	{
-	    std::cerr << "Resource leak destroying EXTThread: creator has not joined nor detached thread." << std::endl;
-	}
-#endif
-#ifdef _WIN32
-  EXTTHREAD_MAP.erase(this->get_id());  
-#else
-  EXTTHREAD_MAP.erase(pthread);
-#endif
+    if (m_initialised && !m_detached && !m_joined) {
+        dprintf(2, "Resource leak destroying EXTThread: creator has not joined nor detached thread.\n");
     }
-
-    int EXTThread::create(void *(*start_routine)(void *), void *arg)
-    {
-	int result = 22; //EINVAL;
-
-	if (! initialised)
-	{
-#ifdef _WIN32
-    // std::function<void*(void*)> fn = static_cast<std::function<void*(void*)> >(start_routine);
-    std::function<void*()> fn = [start_routine,arg]()->void* { return start_routine(arg); };
-    bthread = std::thread(fn);
-    EXTTHREAD_MAP[this->get_id()] = this;
-    result = 0;
-#else
-    result = pthread_create(&pthread, NULL, start_routine, arg);
-    extemp::EXTThread::EXTTHREAD_MAP[pthread] = this;
 #endif
-	    initialised = ! result;
-	}
+}
 
+int EXTThread::create(void *(*EntryPoint)(void*), void* Arg)
+{
+    int result = 22; //EINVAL;
+    m_function = EntryPoint;
+    m_arg = Arg;
+    if (!m_initialised) {
+#ifdef _WIN32
+        std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
+        m_thread = std::thread(fn);
+        result = 0;
+#else
+        result = pthread_create(&m_thread, NULL, Trampoline, this);
+#endif
+        m_initialised = !result;
+    }
 #ifdef _EXTTHREAD_DEBUG_
-	if (result)
-	{
-	    std::cerr << "Error creating thread: " << result << std::endl;
-	}
-#endif
-
-	return result;
+    if (result) {
+        dprintf(2, "Error creating thread: %d\n", result);
     }
-
-  EXTThread* EXTThread::activeThread()
-  {
-       EXTThread* res = NULL;
-#ifdef _WIN32
-       return EXTThread::EXTTHREAD_MAP[std::this_thread::get_id()];
-#else
-       pthread_t p = pthread_self();
-       res = EXTThread::EXTTHREAD_MAP[p];
-       if (res == NULL) {         
-         res = new EXTThread(p);
-         EXTTHREAD_MAP[p] = res;
-       }
-       return res;
-#endif    
-  }
-
-	int EXTThread::kill()
-	{
-#ifdef _WIN32
-		return 0;
-#else
-		return pthread_cancel(pthread);
 #endif
-	}
+    return result;
+}
 
-
-    int EXTThread::detach()
-    {
-	int result = 22; //EINVAL;
-
-	if (initialised)
-	{
+int EXTThread::kill()
+{
 #ifdef _WIN32
-	    bthread.detach();
-	    result = 0;
+    return 0;
 #else
-	    result = pthread_detach(pthread);
+    return pthread_cancel(m_thread);
 #endif
-	    detached = ! result;
-	}
+}
 
+int EXTThread::detach()
+{
+    int result = 22; //EINVAL;
+    if (m_initialised) {
+#ifdef _WIN32
+        m_thread.detach();
+        result = 0;
+#else
+        result = pthread_detach(m_thread);
+#endif
+        m_detached = !result;
+    }
 #ifdef _EXTTHREAD_DEBUG_
-	if (result)
-	{
-	    std::cerr << "Error detaching thread: " << result << std::endl;
-	}
-#endif
-
-	return result;
+    if (result) {
+        dprintf(2, "Error detaching thread: %d\n", result);
     }
-
-    int EXTThread::join()
-    {
-	int result = 22; //EINVAL;
-
-	if (initialised)
-	{
-#ifdef _WIN32
-	    bthread.join();
-            result = 0;
-#else
-	    result = pthread_join(pthread, NULL);
 #endif
-	    joined = ! result;
-	}
+    return result;
+}
 
+int EXTThread::join()
+{
+    int result = 22; //EINVAL;
+    if (m_initialised) {
+#ifdef _WIN32
+        m_thread.join();
+        result = 0;
+#else
+        result = pthread_join(m_thread, NULL);
+#endif
+        m_joined = ! result;
+    }
 #ifdef _EXTTHREAD_DEBUG_
-	if (result)
-	{
-	    std::cerr << "Error joining thread: " << result << std::endl;
-	}
-#endif
-
-	return result;
+    if (result) {
+        dprintf(2, "Error joining thread: %d\n", result);
     }
+#endif
+    return result;
+}
 
-  int EXTThread::setPriority(int priority, bool realtime)
-  {
+int EXTThread::setPriority(int Priority, bool Realtime)
+{
 #ifdef _WIN32
-    auto thread = bthread.native_handle();
+    auto thread = m_thread.native_handle();
 #else
-	pthread_t thread = pthread;
+    auto thread = m_thread;
 #endif
 #ifdef __linux__
     sched_param param;
     int policy;
-    pthread_getschedparam(thread,&policy,&param);
-    param.sched_priority = priority;
-
-    // for realtime threads, use SCHED_RR policy
-    if(realtime)
-      policy = SCHED_RR;
-    
-    int result = pthread_setschedparam(thread,policy,&param);
-    if(result != 0) {
-      fprintf(stderr, "Error: failed to set thread priority: %s\n", strerror(result));
+    pthread_getschedparam(m_thread, &policy, &param);
+    param.sched_priority = Priority;
+    if (Realtime) { // for realtime threads, use SCHED_RR policy
+        policy = SCHED_RR;
+    }  
+    int result = pthread_setschedparam(m_thread, policy, &param);
+    if (result) {
+      dprintf(2, "Error: failed to set thread priority: %s\n", strerror(result));
       return 0;
-    }else{
-      return 1;
     }
+    return 1;
 #elif __APPLE__    
     struct thread_time_constraint_policy ttcpolicy;
     int result;
-    
     // OSX magic numbers
-    ttcpolicy.period=(uint32_t)(UNIV::SAMPLERATE/100); // HZ/160
-      ttcpolicy.computation=(uint32_t)(UNIV::SAMPLERATE/143); // HZ/3300;
-    ttcpolicy.constraint=(uint32_t)(UNIV::SAMPLERATE/143); // HZ/2200;
-    ttcpolicy.preemptible=1; // 1 
-
+    ttcpolicy.period = uint32_t(UNIV::SAMPLERATE / 100); // HZ/160
+    ttcpolicy.computation = uint32_t(UNIV::SAMPLERATE / 143); // HZ/3300;
+    ttcpolicy.constraint = uint32_t(UNIV::SAMPLERATE / 143); // HZ/2200;
+    ttcpolicy.preemptible = 1; // 1 
     result = thread_policy_set(pthread_mach_thread_np(thread),
                                THREAD_TIME_CONSTRAINT_POLICY,
                                (thread_policy_t)&ttcpolicy,
                                THREAD_TIME_CONSTRAINT_POLICY_COUNT);
-    if (result != KERN_SUCCESS)
-      {
-        fprintf(stderr, "Error: failed to set thread priority: %s\n", strerror(result));
+    if (result != KERN_SUCCESS) {
+        dprintf(2, "Error: failed to set thread priority: %s\n", strerror(result));
         return 0;
-      }else{
-        return 1;
-      }
+    }
+    return 1;
 #else
-    fprintf(stderr, "Error: cannot set thread priority on Windows\n");
+    dprintf(2, "Error: cannot set thread priority on Windows\n");
     return 0;
 #endif
-  }
+}     
 
-  int EXTThread::getPriority()
-  {
+int EXTThread::getPriority()
+{
 #ifdef __linux__ 
     int policy;
     sched_param param;
-    pthread_getschedparam(pthread,&policy,&param);
+    pthread_getschedparam(m_thread, &policy, &param);
     return param.sched_priority;
 #endif
     // fprintf(stderr, "Error: thread priority only available Linux\n");    
     return 0;
-  }
-  
-    bool EXTThread::isRunning() 
-    { 
-#ifdef _WIN32
-      return initialised;
-#else
-	return 0 != pthread; 
-#endif
-    }	
-	
-    bool EXTThread::isCurrentThread()
-    {
-#ifdef _WIN32
-      return (bthread.get_id() == std::this_thread::get_id());
-#else
-	return pthread_equal(pthread_self(), pthread);
-#endif
-    }
+}
 
-	bool EXTThread::isEqualTo(EXTThread* other_thread)
-	{
-#ifdef _WIN32
-		return bthread.get_id() == other_thread->getBthread().get_id();		
-#else
-		return pthread_equal(pthread, other_thread->getPthread());
-#endif  
-	}
-
-#ifdef _WIN32
-  std::thread& EXTThread::getBthread()
-    {
-	return bthread;
-    }
-#else
-    pthread_t EXTThread::getPthread()
-    {
-	return pthread;
-    }
-#endif
 }

@@ -104,31 +104,37 @@ void free16(void* p);
 
 inline llvm_zone_t* llvm_threads_get_callback_zone()
 {
-  return tls_llvm_callback_zone;
+    return tls_llvm_callback_zone;
 }
 inline llvm_zone_stack* llvm_threads_get_zone_stack()
 {
-  return tls_llvm_zone_stack;
+    return tls_llvm_zone_stack;
 }
 inline void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
 {
-  tls_llvm_zone_stack = llvm_zone_stack;
+    tls_llvm_zone_stack = llvm_zone_stack;
 }
 inline void llvm_threads_inc_zone_stacksize() {
-  ++tls_llvm_zone_stacksize;
+    ++tls_llvm_zone_stacksize;
 }
 inline void llvm_threads_dec_zone_stacksize() {
-  --tls_llvm_zone_stacksize;
+    --tls_llvm_zone_stacksize;
 }
 inline uint64_t llvm_threads_get_zone_stacksize() {
-  return tls_llvm_zone_stacksize;
+    return tls_llvm_zone_stacksize;
 }
 
 const char*  llvm_scheme_ff_get_name(foreign_func ff);
 void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
 void llvm_runtime_error(int error, void* arg);
 llvm_zone_t* llvm_zone_create(uint64_t size);
-llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone);
+
+inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
+{
+    Zone->offset = 0;
+    return Zone;
+}
+
 bool llvm_zone_copy_ptr(void* ptr1, void* ptr2);
 void llvm_zone_mark(llvm_zone_t* zone);
 uint64_t llvm_zone_mark_size(llvm_zone_t* zone);
@@ -150,9 +156,16 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
 bool regex_split(char* str, char** a, char** b);
 
-uint64_t string_hash(unsigned char* str);
+static inline uint64_t string_hash(unsigned char* str)
+{
+    uint64_t result(0);
+    unsigned char c;
+    while((c = *(str++))) {
+        result = result * 33 + c;
+    }
+    return result;
+}
 
-  void* llvm_memset(void* ptr, int32_t c, int64_t n);
   int llvm_printf(char* format, ...);
   int llvm_fprintf(FILE* f, char* format, ...);
   int llvm_sprintf(char* str, char* format, ...);

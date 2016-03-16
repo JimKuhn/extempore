@@ -62,7 +62,6 @@
 #include "EXTMonitor.h"
 
 #include <set>
-#include <map>
 #include <stack>
 #include <list>
 #include <string>
@@ -163,11 +162,9 @@ struct scheme {
 	
     pointer starting_cell;
 	
-    std::set<const char*, CharPtrLess>* defined_keywords;
-    std::map<const char*, const std::string, CharPtrLess>* function_defs;
-    std::map<pointer, pointer>* reverse_symbol_lookup;
     //pointer imp_env;
-    std::multiset<pointer>* imp_env;
+    typedef std::set<pointer> env_type;
+    env_type imp_env; // can't be unordered_set because of potential iterator invalidation
 //#define MARK_STACK_SIZE 200000 /* size of mark stack for knuth algorithm B */
 //	pointer mark_stack[MARK_STACK_SIZE];
 	
@@ -179,7 +176,7 @@ struct scheme {
 	
     pointer func_called_by_extempore; //for use in stack tracing
     pointer last_symbol_apply;
-    std::stack<pointer>* applied_symbol_names;
+    std::stack<pointer> applied_symbol_names;
 	
     // USED BY DUMP_STACK_COPY
     pointer tmp_dump;
@@ -269,5 +266,18 @@ enum scheme_opcodes {
 
 #define cons(sc,a,b) _cons(sc,a,b,0)
 #define immutable_cons(sc,a,b) _cons(sc,a,b,1)
+
+struct EnvInjector
+{
+    scheme::env_type&          m_env;
+    scheme::env_type::iterator m_iter;
+
+    EnvInjector(scheme* Scheme, pointer Pointer): m_env(Scheme->imp_env) {
+        m_iter = m_env.insert(Pointer).first;
+    }
+    ~EnvInjector() {
+        m_env.erase(m_iter);
+    }
+};
 
 #endif

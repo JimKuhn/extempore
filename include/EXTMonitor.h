@@ -43,29 +43,54 @@
 
 namespace extemp
 {
-    class EXTMonitor
+class EXTMonitor
+{
+private:
+    std::string  m_name;
+    EXTMutex     m_mutex;
+    EXTCondition m_condition;
+    bool         m_initialised;
+public:
+    EXTMonitor(const std::string& Name): m_name(Name), m_mutex(Name), m_initialised(false) {
+        init();
+    }
+    ~EXTMonitor() {
+        destroy();
+    }
+
+    void init()
     {
-    public:
-	EXTMonitor(std::string name);
-	~EXTMonitor();
+        if (!m_initialised)
+        {
+            m_mutex.init();
+            m_condition.init();
+            m_initialised = true;
+        }
+    }
+    void destroy() {
+        if (m_initialised)
+        {
+            m_initialised = false;
+            m_mutex.destroy();
+            m_condition.destroy();
+        }
+    }
+    void lock() {
+        m_mutex.lock();
+    }
+    void unlock() {
+        m_mutex.unlock();
+    }
+    void wait() {
+        m_condition.wait(&m_mutex);
+    }
+    void signal() {
+        m_condition.signal();
+    }
 
-	void init();
-	void destroy();
+    bool isOwnedByCurrentThread() { return m_mutex.isOwnedByCurrentThread(); } // TODO: DEPRECATE!
+};
 
-	bool isOwnedByCurrentThread();
-        
-	int lock();
-	int unlock();
-
-	int wait();
-	int signal();
-        
-    protected:
-	bool initialised;
-	std::string name;
-	EXTMutex mutex;
-	EXTCondition condition;
-    };
 } //End Namespace
 
 #endif

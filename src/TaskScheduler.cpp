@@ -41,7 +41,7 @@ namespace extemp {
 	
   TaskScheduler TaskScheduler::SINGLETON;
 	
-  TaskScheduler::TaskScheduler()
+  TaskScheduler::TaskScheduler(): m_numFrames(0)
   {
     queueThread = new EXTThread();
     guard = new EXTMonitor("task_scheduler_guard");		
@@ -81,7 +81,7 @@ namespace extemp {
 
   void TaskScheduler::timeSlice() 
   {
-    uint32_t frames = UNIV::FRAMES / UNIV::TIME_DIVISION;
+    uint32_t frames = m_numFrames / UNIV::TIME_DIVISION;
     uint64_t nanosecs = ((double)frames / (double)UNIV::SAMPLERATE) * 1000000000.0;
     uint32_t division_num = 0;
 
@@ -104,7 +104,7 @@ namespace extemp {
       TaskI* t = queue.peek();      
       // this is a task we need to do something with
       while(t != NULL && (t->getStartTime() < (UNIV::TIME + frames))) {
-        t = queue.get();
+        t = queue.pop();
         try{
           if(t->getTag() == 0) t->execute();
         }catch(std::exception& e){ //...){

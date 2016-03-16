@@ -1519,7 +1519,6 @@
     ("llvm_fscanf" . #(varargs "" ()))
     ("llvm_get_function_ptr" . #((213 108 108) "" ()))
     ("llvm_in_channels" . #((213 4) "" ()))
-    ("llvm_memset" . #((213 108 108 4 2) "" ()))
     ("llvm_now" . #((213 2) "" ()))
     ("llvm_peek_zone_stack" . #((213 "%mzone*") "" ()))
     ("llvm_pop_zone_stack" . #((213 "%mzone*") "" ()))
@@ -1575,7 +1574,7 @@
     ("memccpy" . #((213 108 108 108 4 2) "" ()))
     ("memchr" . #((213 108 108 4 2) "" ()))
     ("memcmp" . #((213 4 108 108 2) "" ()))
-    ("memcpy" . #((213 108 108 108 2) "" ()))
+    ("memcpy" . #((213 -1 108 108 2) "" ()))
     ("memmove" . #((213 108 108 108 2) "" ()))
     ("memset" . #((213 108 108 4 2) "" ()))
     ("mk_cptr" . #((213 108 108 108) "" ()))
@@ -2743,7 +2742,8 @@
 
 (define impc:aot:compile-module
   (lambda (module-name module exit-afterwards?)
-    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
+    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc")))
+      (opt-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/opt"))))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
              (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
@@ -2764,6 +2764,7 @@
              (optimize-compiles? #t)
              (llc-command
               (unix-or-Windows (string-append
+                                opt-path " -always-inline " bc-path "|"
                                 llc-path
                                 (if optimize-compiles? " -O3 -tailcallopt" "-O0")
                                 " -relocation-model=pic "
@@ -2773,7 +2774,7 @@
                                                    (sys:cmdarg "mcpu")
                                                    " ")
                                     "")
-                                bc-path)
+                                "- -o " asm-path)
                                (string-append
                                 llc-path
                                 (if optimize-compiles? " -O3 -tailcallopt" "-O0")
@@ -2783,7 +2784,7 @@
               (unix-or-Windows (string-append
                                 (cond ((string=? platform "Linux")
                                        (string-append "gcc " 
-                                                      (if optimize-compiles? "-O3" "-g -O0")
+                                                      (if optimize-compiles? "-O3 -g" "-g -O0")
                                                       " --shared -fPIC "))
                                       ((string=? platform "OSX")
                                        (string-append "clang "
@@ -9081,7 +9082,7 @@ xtlang's `let' syntax is the same as Scheme"
            (n1 (substring n 1 2))
            (name-str (impc:ir:make-const-string (string-append closure-name " Scheme wrapper error: check the arg arity and types\n")))
            (name (impc:ir:gname)))
-      (emit n "_bool = icmp eq i32 " n "_rt_check, 1\n" os)
+      (emit n "_bool = icmp ne i32 " n "_rt_check, 0\n" os)
       (emit "br i1 " n "_bool, label " n "_true, label " n "_false\n" os)
       (emit "\n" n1 "_true:\n" os)
       (emit "br label " n "_continue\n" os)

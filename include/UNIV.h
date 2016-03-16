@@ -45,6 +45,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 #ifdef _WIN32
 #include <SDKDDKVer.h>
@@ -88,8 +89,8 @@ struct regex_matched_buffer
 
 extern "C" {
 
-  bool rmatch(char* regex, char* str);
-  int64_t rmatches(char* regex, char* str, char** results,int64_t maxnum); //struct regex_matched_buffer* result);
+bool rmatch(char* regex, char* str);
+int64_t rmatches(char* regex, char* str, char** results,int64_t maxnum); //struct regex_matched_buffer* result);
 bool rsplit(char* regex, char* str, char* a, char* b);
 char* rreplace(char* regex, char* str, char* replacement, char* result);
 void ascii_text_color(int attr, int fg, int bg);
@@ -99,16 +100,8 @@ char* cname_encode(char *data,size_t input_length,size_t *output_length);
 char* cname_decode(char *data,size_t input_length,size_t *output_length);
 const char* sys_sharedir();
 char* sys_slurp_file(const char* fname);
+int register_for_window_events();
 
-// clock/time
-#ifdef EXT_BOOST
-#include <chrono>
-#endif
-  double getRealTime();
-  double clock_clock();
-  double audio_clock_base();
-  double audio_clock_now();  
-  int register_for_window_events();
 }
 
 namespace extemp {
@@ -161,8 +154,55 @@ namespace extemp {
     static void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
      
   private:
-	
+
   };
+
+extern "C" {
+//////////////////////////////////////////////////////////////////
+//  CLOCK/TIME
+#ifdef EXT_BOOST
+#include <chrono>
+
+inline double getRealTime()
+{
+    return std::chrono::high_resolution_clock::now().time_since_epoch().count();
+}
+
+#elif __linux__
+
+inline double getRealTime()
+{
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    return t.tv_sec + t.tv_nsec / D_BILLION;
+}
+
+#elif __APPLE__
+
+#include <CoreAudio/HostTime.h>
+
+inline double getRealTime()
+{
+    return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
+}
+
+#endif
+
+inline double clock_clock()
+{
+    return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
+}
+
+inline double audio_clock_base()
+{
+    return extemp::UNIV::AUDIO_CLOCK_BASE;
+}
+
+inline double audio_clock_now()
+{
+    return extemp::UNIV::AUDIO_CLOCK_NOW;
+}
+}
 
 } //End Namespace
 #endif
