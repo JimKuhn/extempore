@@ -226,11 +226,11 @@ namespace extemp {
 	{     
 		//std::cout << "ACCEPT_HANDLER" << std::endl;
 		if (!error) {
-                        ascii_text_color(1,7,10);
-		        std::cout << "New client connection" << std::endl;
-                        ascii_text_color(0,9,10); 
+            ascii_emphasize();
+	        std::cout << "New client connection" << std::endl;
+                        ascii_default();
                         fflush(NULL);
-			boost::asio::ip::tcp::acceptor* server_socket = scm->getServerSocket();        
+			boost::asio::ip::tcp::acceptor* server_socket = scm->getServerSocket();
 			boost::asio::io_service* io_service = scm->getIOService();
 			bool with_banner = scm->withBanner();
 			std::stringstream ss;
@@ -587,7 +587,7 @@ namespace extemp {
                   if(scm->getInitExpr().compare("") != 0) {
                     ascii_text_color(0,5,10);
                     printf("\nEvaluating expression: ");
-                    ascii_text_color(0,7,10);
+                    ascii_normal();
                     printf("%s\n\n", scm->getInitExpr().c_str());
                     memset(sstr,0,EXT_INITEXPR_BUFLEN);
 #ifdef _WIN32
@@ -865,9 +865,9 @@ namespace extemp {
 					}
 					pos++;
 				}
-				ascii_text_color(1,1,10);
+				ascii_error();
 				printf("%s SERVER ERROR: %s\n",scm->name.c_str(),strerror(errno));
-				ascii_text_color(0,7,10);
+				ascii_normal();
 				continue;
 			}
 			if(FD_ISSET(server_socket, &c_rfd)) { //check if we have any new accpets on our server socket
@@ -878,9 +878,9 @@ namespace extemp {
 				}
 				if(res >= highest_fd) highest_fd = res+1;
 				FD_SET(res, &rfd); //add new socket to the FD_SET
-				ascii_text_color(1,3,10);
+				ascii_warning();
 				printf("New Client Connection \n");
-				ascii_text_color(0,7,10);
+				ascii_normal();
 				client_sockets.push_back(res);
 				in_streams[res] = new std::stringstream;
 				std::stringstream* ss = new std::stringstream;
@@ -911,16 +911,16 @@ namespace extemp {
 							FD_CLR(sock, &rfd);	
 							delete(in_streams[sock]);
 							in_streams[sock] = 0;
-							ascii_text_color(1,3,10);			    
+							ascii_warning();
 							std::cout << "Close Client Socket" << std::endl;
-							ascii_text_color(0,7,10);
+							ascii_normal();
 							pos = client_sockets.erase(pos);							
 							close(sock);							
 							break;
 						}else if(res < 0){
-							ascii_text_color(1,1,10);
+							ascii_error();
 							printf("Error with socket read from extempore process %s",strerror(errno));
-							ascii_text_color(0,7,10);
+							ascii_normal();
 							pos++;
 							break;
 						}
@@ -936,9 +936,9 @@ namespace extemp {
 						}
 						// if we get to 1024 assume we aren't going to get a TERMINATION_CHAR and bomb out
 						if(j>(1024*10)) {
-							ascii_text_color(1,1,10);
+							ascii_error();
 							printf("Error reading eval string from server socket. No terminator received before 10MB limit.\n");
-							ascii_text_color(0,7,10);
+							ascii_normal();
 							in_streams[sock]->str("");														
 							evalstr = "";
 							break;

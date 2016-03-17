@@ -113,7 +113,6 @@ declare i8* @extitoa(i64)
 declare i64 @string_hash(i8*)
 declare void @llvm_schedule_callback(i64, i8*)
 declare i8* @llvm_get_function_ptr(i8*)
-declare void @ascii_text_color(i32,i32,i32)
 
 declare void @llvm_send_udp(i8*,i32,i8*,i32)
 

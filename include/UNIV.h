@@ -37,6 +37,7 @@
 #define UNIV_H
 
 #include <stdint.h>
+#include <BranchPrediction.h>
 #include "SchemePrivate.h"
 
 #ifdef EXT_BOOST
@@ -93,7 +94,6 @@ bool rmatch(char* regex, char* str);
 int64_t rmatches(char* regex, char* str, char** results,int64_t maxnum); //struct regex_matched_buffer* result);
 bool rsplit(char* regex, char* str, char* a, char* b);
 char* rreplace(char* regex, char* str, char* replacement, char* result);
-void ascii_text_color(int attr, int fg, int bg);
 char* base64_encode(const unsigned char *data,size_t input_length,size_t *output_length);
 unsigned char* base64_decode(const char *data,size_t input_length,size_t *output_length);
 char* cname_encode(char *data,size_t input_length,size_t *output_length);
@@ -136,9 +136,9 @@ namespace extemp {
     static uint32_t AUDIO_IN_DEVICE;
     static double CLOCK_OFFSET;
     static std::map<std::string,std::string> CMDPARAMS;
-    static std::vector<std::string> ARCH;
+    static std::string ARCH;
+    static std::string CPU;
     static std::vector<std::string> ATTRS;
-    static std::vector<std::string> CPU;
 #ifdef EXT_BOOST
     static std::random_device RNGDEV;
     static std::mt19937_64 RNGGEN;
@@ -205,4 +205,41 @@ inline double audio_clock_now()
 }
 
 } //End Namespace
+
+inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background)
+{
+    if (unlikely(extemp::UNIV::EXT_TERM == 3)) {
+        return;
+    }
+#ifdef _WIN32
+    extern int WINDOWS_COLORS;
+    if (unlikely(extemp::UNIV::EXT_TERM == 1)) {
+        Foreground = std::min(Foreground, 7);
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, WINDOWS_COLORS[Foreground]);
+        return;
+    }
+#else
+    // if simple term (that doesn't support defaults)
+    // then default to black background and white text
+    Foreground = (Foreground > 9 || Foreground == 8) ? 9 : Foreground;
+    Background = (Background > 9 || Background == 8) ? 9 : Background;
+    if (unlikely(extemp::UNIV::EXT_TERM == 2)) {
+        if (unlikely(Background == 9)) {
+            Background = 0;
+        }
+        if (unlikely(Foreground == 9)) {
+            Foreground = 7;
+        }
+    }
+    printf("\x1b[%u;%u;%um", Bold, Foreground + 30, Background + 40);
+#endif
+}
+
+inline void ascii_default() { ascii_text_color(false, 9, 9); }
+inline void ascii_normal() { ascii_text_color(false, 7, 9); }
+inline void ascii_error() { ascii_text_color(true, 1, 9); }
+inline void ascii_warning() { ascii_text_color(true, 3, 9); }
+inline void ascii_info() { ascii_text_color(true, 6, 9); }
+
 #endif

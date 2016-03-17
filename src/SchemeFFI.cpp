@@ -112,14 +112,14 @@
 
 #ifdef _WIN32
 #define PRINT_ERROR(format, ...)                \
-    ascii_text_color(1,1,10);                   \
+    ascii_error();                   \
     printf(format , __VA_ARGS__);                       \
-    ascii_text_color(0,7,10)
+    ascii_normal()
 #else
 #define PRINT_ERROR(format, args...)            \
-    ascii_text_color(1,1,10);                   \
+    ascii_error();                   \
     printf(format , ## args);                   \
-    ascii_text_color(0,7,10)
+    ascii_normal()
 #endif
 
 char* cstrstrip (char* inputStr)
@@ -1195,9 +1195,9 @@ namespace extemp {
         std::string s = ss.str();
         s.erase(0,1);
         s.erase(s.size()-1,1);
-        ascii_text_color(1,1,10);
+        ascii_error();
         printf("%s\n",s.c_str());
-        ascii_text_color(0,7,10);
+        ascii_normal();
         fflush(stdout);
         return _sc->T; //mk_string(_sc, s.c_str());
     }
@@ -1209,9 +1209,9 @@ namespace extemp {
         std::string s = ss.str();
         s.erase(0,1);
         s.erase(s.size()-1,1);
-        ascii_text_color(1,3,10);
+        ascii_warning();
         printf("%s\n",s.c_str());
-        ascii_text_color(0,7,10);
+        ascii_normal();
         fflush(stdout);
         return _sc->T; //mk_string(_sc, s.c_str());
     }
@@ -1705,7 +1705,7 @@ namespace extemp {
       }
     }while (newModule == 0);
 
-        if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH.front());
+        if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);
 
     if(EXTLLVM::OPTIMIZE_COMPILES)
       {

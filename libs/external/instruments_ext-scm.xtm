@@ -125,9 +125,9 @@
                                             ,bank
                                             0))))
                  (,parser file-list))
-       (ascii-print-color 0 6 10)
+       (ascii-print-color 0 6 9)
        (print 'Loaded cnt 'files 'into 'bank#: ,bank)
-       (ascii-print-color 0 7 10)
+       (ascii-print-color 0 7 9)
        (println)
        )))
 
@@ -140,9 +140,9 @@
        (dotimes (i 128)
          (if (> (clear_sample_data_ native (real->integer i) (real->integer ,bank)) 0)
              (set! cnt (+ cnt 1))))
-       (ascii-print-color 0 6 10)
+       (ascii-print-color 0 6 9)
        (print 'Cleared cnt 'slots 'from 'bank#: ,bank)
-       (ascii-print-color 0 7 10)
+       (ascii-print-color 0 7 9)
        (println)
        #t)))
 

@@ -646,9 +646,9 @@ namespace extemp {
     int socket_fd = *(osc->getSocketFD());
 
     if(socket_fd < 0){
-      ascii_text_color(1,1,10);
+      ascii_error();
       printf("Bad TCP-OSC socket: %s\n", strerror(errno));
-      ascii_text_color(0,7,10);
+      ascii_normal();
       return obj_p;
     }
     
@@ -688,9 +688,9 @@ namespace extemp {
           }
           pos++;
         }
-        ascii_text_color(1,1,10);
+        ascii_error();
         printf("%s SERVER ERROR: %s\n",scm->getName().c_str(),strerror(errno));
-        ascii_text_color(0,7,10);
+        ascii_normal();
         continue;
       }
       if(FD_ISSET(socket_fd, &c_rfd)) { //check if we have any new accpets on our server socket
@@ -719,16 +719,16 @@ namespace extemp {
               FD_CLR(sock, &rfd);
               delete(data_map[sock]);
               data_map[sock] = 0;
-              ascii_text_color(1,3,10);
+              ascii_warning();
               std::cout << "Closed TCP-OSC Socket" << std::endl;
-              ascii_text_color(0,7,10);
+              ascii_normal();
               pos = client_sockets.erase(pos);
               close(sock);
               break;
             }else if(res < 0){
-              ascii_text_color(1,1,10);
+              ascii_error();
               printf("Error with socket read for TCP OSC socket: %s",strerror(errno));
-              ascii_text_color(0,7,10);
+              ascii_normal();
               pos++;
               break;
             }            
@@ -763,9 +763,9 @@ namespace extemp {
               data_active_escape[sock] = false;
               data_packet[sock] = false;              
             }else if(result == -1){ // bad osc packet
-              ascii_text_color(1,1,10);
+              ascii_error();
               printf("Bad SLIP OSC Packet!!!!!\n");
-              ascii_text_color(0,7,10);
+              ascii_normal();
               data_map[sock]->clear();
               data_active_escape[sock] = false;
               data_packet[sock] = false;
@@ -773,9 +773,9 @@ namespace extemp {
               if(result == 0) data_active_escape[sock] = false;
               else data_active_escape[sock] = true;
             }else{
-              ascii_text_color(1,1,10);
+              ascii_error();
               printf("Unknown return type from parse_osc_slip_data!!!!!\n");
-              ascii_text_color(0,7,10);
+              ascii_normal();
               data_map[sock]->clear();
               data_active_escape[sock] = false;
               data_packet[sock] = false;
@@ -1407,9 +1407,9 @@ namespace extemp {
 
       osc->setSocketFD(socket_fd);
 
-      ascii_text_color(1,3,10);
+      ascii_warning();
       printf("Started TCP-OSC server on port %d\n", port);
-      ascii_text_color(0,7,10);
+      ascii_normal();
 
 #endif
       if(!osc->getStarted()) {

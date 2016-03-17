@@ -93,7 +93,7 @@ namespace extemp {
 
     class SchemeProcess {
     public:
-        SchemeProcess(std::string _load_path, std::string _name, int server_port=7010, bool banner=false, std::string load_file="");
+        SchemeProcess(std::string _load_path, std::string _name, int server_port=7010, bool banner=false, std::string load_file = std::string());
 	~SchemeProcess();
         static SchemeProcess* I();
 	static SchemeProcess* I(int index);

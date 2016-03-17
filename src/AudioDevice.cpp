@@ -577,9 +577,9 @@ namespace extemp {
 
     if(UNIV::AUDIO_NONE == 1)
       {
-        ascii_text_color(0,1,10);
+        ascii_error();
         fprintf(stderr, "Error: cannot set the audio device in --noaudio mode\n");
-        ascii_text_color(0,7,10);
+        ascii_normal();
         return;
       }
     
@@ -595,16 +595,16 @@ namespace extemp {
     }
     
     if((int)UNIV::AUDIO_DEVICE < -1 || (int)UNIV::AUDIO_DEVICE >= numDevices) {
-      ascii_text_color(0,1,10);
+      ascii_error();
       printf("Output device not valid! %d\n",(int)UNIV::AUDIO_DEVICE);
-      ascii_text_color(0,7,10);
+      ascii_normal();
       printf("\n");
       exit(1);
     }
     if((int)UNIV::AUDIO_IN_DEVICE < -1 || (int)UNIV::AUDIO_IN_DEVICE >= numDevices) {
-      ascii_text_color(0,1,10);
+      ascii_error();
       printf("Input device not valid! %d\n",(int)UNIV::AUDIO_IN_DEVICE);
-      ascii_text_color(0,7,10);
+      ascii_normal();
       printf("\n");
       exit(1);
     }
@@ -612,9 +612,9 @@ namespace extemp {
     if( (UNIV::IN_CHANNELS != UNIV::CHANNELS) &&
         (UNIV::IN_CHANNELS != 1) &&
         (UNIV::IN_CHANNELS > 0)) {
-      ascii_text_color(1,5,10);
+      ascii_warning();
       printf("Warning: dsp input will be 0.0, use data* for channel data\n");
-      ascii_text_color(0,7,10);
+      ascii_normal();
       printf("\n");
     }
 
@@ -669,10 +669,10 @@ namespace extemp {
     // std::cout << "Output Device: " << outputDevice << std::endl;
 
     if(err != paNoError) {
-      ascii_text_color(1,1,10);            
+      ascii_error();
 	    std::cerr << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
 	    std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
-	    ascii_text_color(0,7,10); 
+	    ascii_normal();
 	    exit(1);
     }
     //UNIV::CHANNELS = 2;
@@ -684,62 +684,60 @@ namespace extemp {
     err = Pa_StartStream(stream);
 	
     if(err != paNoError) {        
-      ascii_text_color(1,1,10);    
+      ascii_error();
       std::cout << "ERROR: " << Pa_GetErrorText(err) << std::endl; 
       std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
-      ascii_text_color(0,7,10); 
+      ascii_normal();
       exit(1);
     }
 	
     const PaStreamInfo* info = Pa_GetStreamInfo(stream);
     //std::cout << "Stream latency: " << info->outputLatency << std::endl;       
 
-    ascii_text_color(0,9,10);
+    ascii_default();
     RUNNING = true;
     //queueThread->Start();
     started = true;
 
-    // ascii_text_color(1,7,10);
-    // std::cout << "---PortAudio---" << std::endl;
-    ascii_text_color(0,7,10);
+    ascii_normal();
     std::cout << "Output Device  : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;	
-    ascii_text_color(0,7,10);
+    ascii_normal();
     std::cout << "Input Device   : " << std::flush;
-    ascii_text_color(1,6,10);
+    ascii_info();
     if(UNIV::AUDIO_IN_DEVICE != -1) {
       std::cout << (Pa_GetDeviceInfo( inputDevice ))->name << std::endl;	
     }else{
       std::cout << std::endl;
     }
-    ascii_text_color(0,7,10);
+    ascii_normal();
     std::cout << "SampleRate     : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
-    ascii_text_color(0,7,10);	
+    ascii_normal();
     std::cout << "Channels Out   : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << UNIV::CHANNELS << std::endl << std::flush;
-    ascii_text_color(0,7,10);	
+    ascii_normal();
     std::cout << "Channels In    : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << UNIV::IN_CHANNELS << std::endl << std::flush;
-    ascii_text_color(0,7,10);	
+    ascii_normal();
     std::cout << "Frames         : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << UNIV::FRAMES << std::endl << std::flush;
-    ascii_text_color(0,7,10); 
+    ascii_normal();
     std::cout << "Latency        : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << info->outputLatency << std::flush;
     std::cout << " sec" << std::endl << std::flush;
-    // ascii_text_color(0,7,10); 
+    // ascii_normal();
     // std::cout << "Interleaved\t: " << std::flush;
-    // ascii_text_color(1,6,10);	
+    // ascii_info();
     // std::cout << ((UNIV::INTERLEAVED==0) ? "TRUE" : "FALSE") << std::endl << std::flush;
-    // ascii_text_color(0,7,10);	
-    //ascii_text_color(0,7,10);
+    // ascii_normal();
+    //ascii_normal();
 
   }
 
@@ -801,9 +799,9 @@ namespace extemp {
       // printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
       exit(1);
     }        
-    ascii_text_color(0,2,10);
+    ascii_normal();
     printf("\n-----Available Audio Devices-----------------------------\n");
-    ascii_text_color(0,9,10);
+    ascii_default();
 
     const   PaDeviceInfo *deviceInfo;
     const   PaHostApiInfo* apiInfo;
@@ -813,9 +811,9 @@ namespace extemp {
       apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
       printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
     }
-    ascii_text_color(0,2,10);
+    ascii_normal();
     printf("----------------------------------------------------------\n\n");
-    ascii_text_color(0,9,10);
+    ascii_default();
 #ifdef _WIN32
     Pa_Terminate();
 #else
@@ -830,9 +828,9 @@ namespace extemp {
   // this is the callback function to run when in --noaudio mode
   void* noAudioCallback(void* args)
   {
-    ascii_text_color(1,3,10);	
+    ascii_warning();
     printf("\nStarting Extempore with dummy audio device\n");
-    ascii_text_color(0,7,10);
+    ascii_normal();
     printf("Code will run fine, but there will be no audio output.\n");
 
 #ifdef _WIN32
@@ -893,32 +891,32 @@ namespace extemp {
     extemp::UNIV::SAMPLERATE = 44100;
     extemp::UNIV::initRand();        
         
-    ascii_text_color(0,7,10);
+    ascii_normal();
     std::cout << "Output Device  : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << "Extempore dummy audio device" << std::endl;	
-    ascii_text_color(0,7,10);
+    ascii_normal();
     std::cout << "Input Device   : " << std::endl;
     std::cout << "SampleRate     : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << extemp::UNIV::SAMPLERATE << std::endl << std::flush;
-    ascii_text_color(0,7,10);	
+    ascii_normal();
     std::cout << "Channels Out   : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << extemp::UNIV::CHANNELS << std::endl << std::flush;
-    ascii_text_color(0,7,10);	
+    ascii_normal();
     std::cout << "Channels In    : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << extemp::UNIV::IN_CHANNELS << std::endl << std::flush;
-    ascii_text_color(0,7,10);	
+    ascii_normal();
     std::cout << "Frames         : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << extemp::UNIV::FRAMES << std::endl << std::flush;
-    ascii_text_color(0,7,10); 
+    ascii_normal();
     std::cout << "Latency        : " << std::flush;
-    ascii_text_color(1,6,10);	
+    ascii_info();
     std::cout << (double)extemp::UNIV::FRAMES / (double)UNIV::SAMPLERATE << std::flush;
-    ascii_text_color(0,7,10); 
+    ascii_normal();
     std::cout << " sec" << std::endl << std::flush;
 
     // start the scheduler thread running

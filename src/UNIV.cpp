@@ -76,60 +76,14 @@ enum Windows_Color_Convert
         Green       = FOREGROUND_GREEN,
         Yellow      = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
         Blue        = FOREGROUND_BLUE,
-        Purple      = FOREGROUND_RED   | FOREGROUND_BLUE,
+        Magenta     = FOREGROUND_RED   | FOREGROUND_BLUE,
         Cyan        = FOREGROUND_GREEN | FOREGROUND_BLUE,
         White       = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY,
-        LightGrey   = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE,
-        Grey        = FOREGROUND_INTENSITY,
-        Orange      = FOREGROUND_RED   | FOREGROUND_GREEN,
-        LightRed    = FOREGROUND_RED   | FOREGROUND_INTENSITY,
-        LightGreen  = FOREGROUND_GREEN | FOREGROUND_INTENSITY,
-        LightBlue   = FOREGROUND_BLUE  | FOREGROUND_INTENSITY,
-        LightPurple = FOREGROUND_RED   | FOREGROUND_BLUE  | FOREGROUND_INTENSITY,
-        LightCyan   = FOREGROUND_GREEN | FOREGROUND_BLUE  | FOREGROUND_INTENSITY,
-        //LightGrey   = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE,
 };
 
-int WINDOWS_COLORS[16] = {Black,LightRed,LightGreen,Yellow,Blue,Purple,LightCyan,White,LightGrey,Orange,Grey,LightRed,LightGreen,LightBlue,Cyan};
+int WINDOWS_COLORS[8] = { Black, Red, Green, Yellow, Blue, Magenta, Cyan, White };
 
 #endif
-
-void ascii_text_color(int attr, int fg, int bg)
-{
-  // for --term=nocolor, this function should do nothing
-  if (extemp::UNIV::EXT_TERM == 3) {
-    return;
-  }
-#ifdef _WIN32
-  if (extemp::UNIV::EXT_TERM == 1) {
-    char command[13];
-    if(fg>8) fg = 8;
-    if(bg>9) bg = 0;
-    sprintf(command, "COLOR %d%d", bg, fg);
-    HANDLE console=GetStdHandle(STD_OUTPUT_HANDLE);
-    SetConsoleTextAttribute(console, WINDOWS_COLORS[fg]);
-  }else{
-    char command[13];
-    /* Command is the control command to the terminal */
-    sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
-    printf("%s", command);
-  }
-#else
-  char command[20];  
-  if(attr>1) attr=0;
-  if(bg==10) bg=9; // background default is 9 NOT 10
-  // if simple term (that doesn't support defaults)
-  // then default to black background and white text
-  if (extemp::UNIV::EXT_TERM == 2) {
-    attr=0;
-    if(bg==9) bg=0;
-    if(fg==9) fg=7;
-  }
-  sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
-  command[strlen(command)]=0;
-  printf("%s", command);
-#endif
-}
 
 static char base64_codesafe_encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
                                                 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
@@ -637,10 +591,10 @@ namespace extemp {
   uint32_t UNIV::AUDIO_DEVICE = -1;
   uint32_t UNIV::AUDIO_IN_DEVICE = -1;
   double UNIV::CLOCK_OFFSET = 0.0;
-  std::map<std::string,std::string> UNIV::CMDPARAMS;
-  std::vector<std::string> UNIV::ARCH;
+  std::map<std::string, std::string> UNIV::CMDPARAMS;
+  std::string UNIV::ARCH;
+  std::string UNIV::CPU;
   std::vector<std::string> UNIV::ATTRS;
-  std::vector<std::string> UNIV::CPU;  
   
 #ifdef EXT_BOOST
   std::random_device UNIV::RNGDEV;

@@ -1,3 +1,5 @@
+#include <fstream>
+#include "llvm/AsmParser/Parser.h"
 /*
  * Copyright (c) 2011, Andrew Sorensen
  *
@@ -186,7 +188,7 @@ void llvm_scheme_ff_set_name(foreign_func ff,const char* name)
 // LLVM RUNTIME ERROR
 void llvm_runtime_error(int error,void* arg)
 {
-  ascii_text_color(0,2,10);
+  ascii_error();
   switch(error){
   case 1:
     printf("LLVM zptr_copy - invalid zptr! %p\n",arg);
@@ -194,7 +196,7 @@ void llvm_runtime_error(int error,void* arg)
   default:
     break;
   }
-  ascii_text_color(0,7,10);
+  ascii_normal();
   return;
 }
 
@@ -281,9 +283,9 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
 {
     llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
     if (unlikely(!zone)) {
-        ascii_text_color(0,3,10);
+        ascii_error();
         printf("Catastrophic memory failure!\n");
-        ascii_text_color(0,9,10);
+        ascii_default();
         exit(1);
     }
 #ifdef _WIN32
@@ -295,10 +297,7 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
     zone->mark = 0;
     zone->offset = 0;
     if (unlikely(!zone->memory)) {
-      //ascii_text_color(0,3,10);      
-      //printf("Failed to allocate memory for Zone!\n");
-      //ascii_text_color(0,9,10);    
-      size = 0;
+        size = 0;
     }
     zone->size = size;
     zone->cleanup_hooks = nullptr;
@@ -1130,15 +1129,15 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   closure_address_table* addy_table = (closure_address_table*) *(closure+0);
   // check address exists
   if(!check_address_exists(id, addy_table)) {
-    ascii_text_color(0,1,10);
+    ascii_error();
     printf("RunTime Error:");
-    ascii_text_color(0,7,10);
+    ascii_normal();
     printf(" slot");
-    ascii_text_color(1,7,10);
+    ascii_warning();
     printf(" %s.%s ",fname,vname);
-    ascii_text_color(0,7,10);
+    ascii_normal();
     printf("does not exist!\n");
-    ascii_text_color(0,9,10);    
+    ascii_default();
     return _sc->F;
   }
   char* eptr = (char*) *(closure+1);
@@ -1323,7 +1322,7 @@ namespace extemp {
       M = module.get();
       addModule(M);
 
-      if (!extemp::UNIV::ARCH.empty()) M->setTargetTriple(extemp::UNIV::ARCH.front());
+      if (!extemp::UNIV::ARCH.empty()) M->setTargetTriple(extemp::UNIV::ARCH);
 
       // Build engine with JIT
       llvm::EngineBuilder factory(std::move(module));
@@ -1364,20 +1363,20 @@ namespace extemp {
       EE = factory.create(tm);
       EE->DisableLazyCompilation(true);
 
-      ascii_text_color(0,7,10);
+      ascii_normal();
       std::cout << "ARCH           : " << std::flush;
-      ascii_text_color(1,6,10);
+      ascii_info();
       std::cout << std::string(tm->getTargetTriple().normalize()) << std::endl;
       if(!std::string(tm->getTargetCPU()).empty())
         {
-          ascii_text_color(0,7,10);
+          ascii_normal();
           std::cout << "CPU            : " << std::flush;
-          ascii_text_color(1,6,10);
+          ascii_info();
           std::cout << std::string(tm->getTargetCPU()) << std::endl;
         }
       if(!std::string(tm->getTargetFeatureString()).empty())
         {
-          ascii_text_color(0,7,10);
+          ascii_normal();
           std::cout << "ATTRS          : " << std::flush;
 
           const char* data = tm->getTargetFeatureString().data();
@@ -1385,15 +1384,15 @@ namespace extemp {
           for (int i = 0; i < strlen(data); i++) {
             switch (data[i]) {
             case '+': {
-              ascii_text_color(1,2,10);
+              ascii_info();
               break;
             }
             case '-': {
-              ascii_text_color(1,1,10);
+              ascii_error();
               break;
             }
             case ',': {
-              ascii_text_color(0,7,10);
+              ascii_normal();
               break;
             }
             }
@@ -1401,16 +1400,16 @@ namespace extemp {
           }
           std::cout << std::endl;
         }
-      ascii_text_color(0,7,10);
+      ascii_normal();
       std::cout << "LLVM           : " << std::flush;
-      ascii_text_color(1,6,10);
+      ascii_info();
       std::cout << LLVM_VERSION_STRING;
 #ifdef EXT_MCJIT
       std::cout << " MCJIT" << std::endl;
 #else
       std::cout << " JIT" << std::endl;
 #endif          
-      ascii_text_color(0,7,10);
+      ascii_normal();
           
 
 
@@ -1473,7 +1472,6 @@ namespace extemp {
             EE->updateGlobalMapping("llvm_print_i64", (uint64_t)&llvm_print_i64);
             EE->updateGlobalMapping("llvm_print_f32", (uint64_t)&llvm_print_f32);
             EE->updateGlobalMapping("llvm_print_f64", (uint64_t)&llvm_print_f64);
-            EE->updateGlobalMapping("ascii_text_color", (uint64_t)&ascii_text_color);
             EE->updateGlobalMapping("llvm_samplerate", (uint64_t)&llvm_samplerate);
             EE->updateGlobalMapping("llvm_frames", (uint64_t)&llvm_frames);
             EE->updateGlobalMapping("llvm_channels", (uint64_t)&llvm_channels);
@@ -1565,6 +1563,7 @@ namespace extemp {
       EE->updateGlobalMapping("llvm_atan2", (uint64_t)&llvm_atan2);
       EE->updateGlobalMapping("sys_sharedir", (uint64_t)&sys_sharedir);
       EE->updateGlobalMapping("sys_slurp_file", (uint64_t)&sys_slurp_file);
+
 #ifdef EXT_MCJIT
       extemp::EXTLLVM::I()->EE->finalizeObject();
 #endif
