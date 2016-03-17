@@ -333,7 +333,10 @@ endif()
 
 add_executable(extempore src/Extempore.cpp
   src/AudioDevice.cpp
+  src/EXTCondition.cpp
   src/EXTLLVM.cpp
+  src/EXTMonitor.cpp
+  src/EXTMutex.cpp
   src/EXTThread.cpp
   src/Extempore.cpp
   src/OSC.cpp

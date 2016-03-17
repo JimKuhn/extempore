@@ -33,44 +33,82 @@
  *
  */
 
-#ifndef EXT_MUTEX
-#define EXT_MUTEX
+#include <iostream>
 
-#ifdef EXT_BOOST
-#include <mutex>
-#else
-#include "pthread.h"
-#endif
+#include "EXTMonitor.h"
 
-#include <string>
+
+#define _EXTMONITOR_DEBUG_
+
 
 namespace extemp
 {
-    class EXTMutex
+    EXTMonitor::EXTMonitor(std::string _name) :
+	mutex(_name),
+	name(_name)
     {
-    public:
-	EXTMutex(std::string name);
-	~EXTMutex();
-        
-	int init();
-	void destroy();
+        initialised = false;
+        init();
+    }
+    
+    
+    EXTMonitor::~EXTMonitor()
+    {
+        destroy();
+    }
+    
 
-	bool isOwnedByCurrentThread();
+    void EXTMonitor::init()
+    {
+        if (! initialised)
+        {
+            mutex.init();
+            condition.init();
+            initialised = true;
+        }
+    }
 
-	int lock();
-	int unlock();
-        
-    protected:
-	bool initialised;
-	std::string name;
-#ifdef EXT_BOOST
-	std::recursive_mutex bmutex;
-#else
-	pthread_mutex_t pthread_mutex;
-	pthread_t owner;
-#endif
-	friend class EXTCondition;
-    };
-} //End Namespace
 
-#endif
+    void EXTMonitor::destroy()
+    {
+        if (initialised)
+        {
+            initialised = false;
+            mutex.destroy();
+            condition.destroy();
+        }
+    }
+
+    
+    int EXTMonitor::lock()
+    {
+        int result = mutex.lock();        
+        return result;
+    }
+
+
+    int EXTMonitor::unlock()
+    {
+        int result = mutex.unlock();
+        return result;
+    }
+
+
+    int EXTMonitor::wait()
+    {
+        int result = condition.wait(&mutex);
+        return result;
+    }
+
+
+    int EXTMonitor::signal()
+    {
+        int result = condition.signal(&mutex);
+        return result;
+    }
+
+    bool EXTMonitor::isOwnedByCurrentThread()
+    {
+      return mutex.isOwnedByCurrentThread();	
+    }
+}

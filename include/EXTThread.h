@@ -36,6 +36,8 @@
 #ifndef EXT_THREAD
 #define EXT_THREAD
 
+#include <map>
+
 #ifdef _WIN32
 #include <thread>
 #include <functional>
@@ -46,59 +48,48 @@
 
 namespace extemp
 {
-
-class EXTThread
-{
-private:
-    typedef void* (*function_type)(void*);
-private:
-    bool          m_initialised;
-    bool          m_detached;
-    bool          m_joined;
-    function_type m_function;
-    void*         m_arg;
-#ifndef _WIN32
-    pthread_t   m_thread;
-#else
-    std::thread m_thread;
-#endif
-
-    static thread_local EXTThread* sm_currentThread;
-public:
-    EXTThread() : m_initialised(false), m_detached(false), m_joined(false) {
-    }
+    class EXTThread
+    {
+    public:
+	EXTThread();
 #ifdef _WIN32
-    EXTThread(std::thread&& Thread);
+	EXTThread(std::thread&& _bthread);
 #else
-    EXTThread(pthread_t Thread);
+	EXTThread(pthread_t _pthread);
 #endif
-    ~EXTThread();
+	~EXTThread();
 
-    int create(void *(*EntryPoint)(void*), void* Arg);
-    int kill();
-    int detach();
-    int join();
-    bool isRunning() { return m_initialised; }
-    bool isCurrentThread() { return sm_currentThread == this; }
-    int setPriority(int Priority, bool Realtime);
-    int getPriority(); //doesn't say if it's realtime or not
-    bool isEqualTo(EXTThread* Other) { return this == Other; }
+	int create(void *(*start_routine)(void *), void *arg);
+	int kill();
+	int detach();
+	int join();
+	bool isRunning();
+	bool isCurrentThread();
+	int setPriority(int, bool);
+	int getPriority(); //doesn't say if it's realtime or not
+	bool isEqualTo(EXTThread* other_thread);
 #ifdef _WIN32
-    std::thread& getThread() { return m_thread; }
+	std::thread& getBthread();
 #else
-    pthread_t getThread() { return m_thread; }
+	pthread_t getPthread();
 #endif
 
-    static void* Trampoline(void* Arg) {
-        auto thread(reinterpret_cast<EXTThread*>(Arg));
-        sm_currentThread = thread;
-        return thread->m_function(thread->m_arg);
-    }
-    static EXTThread* activeThread() {
-        return sm_currentThread;
-    }
-};
+  static EXTThread* activeThread();
 
+    protected:
+	bool initialised;
+	bool detached;
+	bool joined;
+	bool cancelled;			
+#ifdef _WIN32
+	std::thread bthread;
+  static std::map<std::thread::id,EXTThread*> EXTTHREAD_MAP;  
+#else
+	pthread_t pthread;
+    static std::map<pthread_t,EXTThread*> EXTTHREAD_MAP;
+#endif
+
+    };
 } //End Namespace
 
 #endif

@@ -603,6 +603,84 @@ char* sys_slurp_file(const char* fname)
   return NULL;
 }
 
+//////////////////////////////////////////////////////////////////
+//  CLOCK/TIME
+#ifdef EXT_BOOST
+double getRealTime()
+{
+  auto time_in_sec = std::chrono::high_resolution_clock::now().time_since_epoch();
+  return time_in_sec.count();
+}
+
+#elif __linux__
+
+double time_to_double(struct timespec t) {
+  return t.tv_sec + t.tv_nsec/D_BILLION;
+}
+
+struct timespec double_to_time(double tm) {
+  struct timespec t;
+
+  t.tv_sec = (long)tm;
+  t.tv_nsec = (tm - t.tv_sec)*BILLION;
+  if (t.tv_nsec == BILLION) {
+    t.tv_sec++;
+    t.tv_nsec = 0;
+  }
+  return t;
+}
+
+double getRealTime()
+{
+  struct timespec t;
+  clock_gettime(CLOCK_REALTIME,&t);
+  return time_to_double(t);
+}
+
+#elif __APPLE__
+
+#include <CoreAudio/HostTime.h>
+
+// same as linux version
+double time_to_double(struct timespec t) {
+  return t.tv_sec + t.tv_nsec/D_BILLION;
+}
+
+// same as linux version
+struct timespec double_to_time(double tm) {
+  struct timespec t;
+
+  t.tv_sec = (long)tm;
+  t.tv_nsec = (tm - t.tv_sec)*BILLION;
+  if (t.tv_nsec == BILLION) {
+    t.tv_sec++;
+    t.tv_nsec = 0;
+  }
+  return t;
+}
+
+double getRealTime()
+{
+  return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
+}
+#endif
+
+double audio_clock_base()
+  {
+    return extemp::UNIV::AUDIO_CLOCK_BASE;
+  }
+
+double audio_clock_now()
+  {
+    return extemp::UNIV::AUDIO_CLOCK_NOW;
+  }
+
+
+double clock_clock()
+{
+  return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
+}
+
 int register_for_window_events()
 {
 #ifdef __APPLE__

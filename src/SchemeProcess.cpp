@@ -623,7 +623,7 @@ namespace extemp {
 				q.pop();
 				guard.unlock();
 				if(schemeTask.getType() == 2) { //delete old callback env reference
-					sc->imp_env.erase((pointer)schemeTask.getPtr());
+					sc->imp_env->erase((pointer)schemeTask.getPtr());
 				}else if(schemeTask.getType() == 5) { //string from local process (MIDI, OSC or similar)
 					std::string* evalString = (std::string*) schemeTask.getPtr();
 					if(evalString->size() > 2) {
@@ -1017,7 +1017,7 @@ namespace extemp {
 	SchemeObj::SchemeObj(scheme* _sc, pointer _val, pointer _env) : sc(_sc), env(_env)
 	{
 		if(env != NULL) {
-			sc->imp_env.insert(env);// = cons(sc, _env, sc->imp_env);
+			sc->imp_env->insert(env);// = cons(sc, _env, sc->imp_env);
 		}else{
 			std::cout << "BANG CRASH SHEBANG" << std::endl;
 			exit(0);
