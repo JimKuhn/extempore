@@ -40,14 +40,13 @@
 
 namespace extemp {
 	
-#define mk_cb(instance,class,func) (dynamic_cast<extemp::CM*>(new extemp::CMI<class>(instance,&class::func)))
+#define mk_cb(instance,class,func) (new extemp::CMI<class>(instance, &class::func))
 
 	
     class TaskI;
 	
     class CM {
     public:
-	//virtual void execute(TaskI* task) = 0;
 	virtual void execute(TaskI* task) = 0;
 	virtual ~CM() {}
 	virtual void print() {};

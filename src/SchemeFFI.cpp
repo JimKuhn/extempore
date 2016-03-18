@@ -589,13 +589,13 @@ namespace extemp {
   pointer SchemeFFI::setDefaultTimeout(scheme* _sc, pointer args)
   {
     long long timeout = ivalue(pair_car(args));
-    SchemeProcess::I(_sc)->setMaxDuration(timeout);
+    _sc->m_process->setMaxDuration(timeout);
     return _sc->T;
   }
 
   pointer SchemeFFI::getDefaultTimeout(scheme* _sc, pointer args)
   {
-    return mk_integer(_sc,SchemeProcess::I(_sc)->getMaxDuration());
+    return mk_integer(_sc, _sc->m_process->getMaxDuration());
   }
 
 #ifdef _WIN32
@@ -876,7 +876,7 @@ namespace extemp {
 
     pointer SchemeFFI::getNameOfCurrentProcess(scheme* _sc, pointer args)
     {
-            const char* name = SchemeProcess::I(_sc)->getName().c_str();
+            const char* name = _sc->m_process->getName().c_str();
                 return mk_string(_sc,name);
         //if(args == _sc->NIL) return mk_string(_sc, name);
         //else { printf("Error getting name of current process\n"); return _sc->F; }
@@ -1528,7 +1528,7 @@ namespace extemp {
 
     pointer SchemeFFI::defaultMallocZone(scheme* _sc, pointer args)
     {
-        return mk_cptr(_sc,SchemeProcess::I(_sc)->getDefaultZone()); //llvm_zone_default());
+        return mk_cptr(_sc,_sc->m_process->getDefaultZone()); //llvm_zone_default());
     }
 
     pointer SchemeFFI::destroyMallocZone(scheme* _sc, pointer args)

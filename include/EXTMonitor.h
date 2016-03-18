@@ -45,6 +45,23 @@ namespace extemp
 {
 class EXTMonitor
 {
+public:
+    class ScopedLock
+    {
+    private:
+        EXTMonitor& m_monitor;
+        bool        m_signal;
+    public:
+        ScopedLock(EXTMonitor& Monitor, bool Signal = false): m_monitor(Monitor), m_signal(Signal) {
+            m_monitor.lock();
+        }
+        ~ScopedLock() {
+            if (m_signal) {
+                m_monitor.signal();
+            }
+            m_monitor.unlock();
+        }
+    };
 private:
     std::string  m_name;
     EXTMutex     m_mutex;

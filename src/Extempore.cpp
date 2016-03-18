@@ -126,7 +126,6 @@ CSimpleOptA::SOption g_rgOptions[] = {
 int main(int argc, char** argv)
 {
     std::string initexpr;
-    bool initexpr_on(false);
     std::string host("localhost");
     std::string primary_name("primary");
     std::string utility_name("utility");
@@ -172,14 +171,12 @@ int main(int argc, char** argv)
                 break;
             case OPT_INITEXPR:
                 initexpr = std::string(args.OptionArg());
-                initexpr_on = true;
                 break;
             case OPT_INITFILE:
                 initexpr = std::string("(sys:load \"") + args.OptionArg() + "\")";
-                initexpr_on = true;
                 break;
             case OPT_NOBASE:
-                extemp::UNIV::EXT_LOADBASE = 0;
+                extemp::UNIV::EXT_LOADBASE = false;
                 break;
             case OPT_PORT:
                 primary_port = atoi(args.OptionArg());

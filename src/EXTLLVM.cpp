@@ -462,7 +462,7 @@ void llvm_schedule_callback(long long time, void* dat)
 
   uint64_t current_time = time; //task->getStartTime();
   uint64_t duration = 1000000000; //task->getDuration();
-  extemp::TaskScheduler::I()->addTask(current_time, duration, proc->extempore_lang_cb, dat, 0, true);
+  extemp::TaskScheduler::I()->addTask(current_time, duration, proc->getExtemporeCallback(), dat, 0, true);
   return;
 }
 

@@ -63,7 +63,7 @@ private:
     std::thread m_thread;
 #endif
 
-    static thread_local EXTThread* sm_currentThread;
+    static thread_local EXTThread* sm_current;
 public:
     EXTThread() : m_initialised(false), m_detached(false), m_joined(false) {
     }
@@ -78,10 +78,10 @@ public:
     int kill();
     int detach();
     int join();
-    bool isRunning() { return m_initialised; }
-    bool isCurrentThread() { return sm_currentThread == this; }
+    bool isRunning() const { return m_initialised; }
+    bool isCurrentThread() { return sm_current == this; }
     int setPriority(int Priority, bool Realtime);
-    int getPriority(); //doesn't say if it's realtime or not
+    int getPriority() const; //doesn't say if it's realtime or not
     bool isEqualTo(EXTThread* Other) { return this == Other; }
 #ifdef _WIN32
     std::thread& getThread() { return m_thread; }
@@ -91,11 +91,11 @@ public:
 
     static void* Trampoline(void* Arg) {
         auto thread(reinterpret_cast<EXTThread*>(Arg));
-        sm_currentThread = thread;
+        sm_current = thread;
         return thread->m_function(thread->m_arg);
     }
     static EXTThread* activeThread() {
-        return sm_currentThread;
+        return sm_current;
     }
 };
 

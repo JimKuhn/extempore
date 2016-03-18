@@ -34,6 +34,7 @@
  */
 
 #include "TaskScheduler.h"
+#include "EXTMonitor.h"
 #include "AudioDevice.h"
 #include <math.h>
 

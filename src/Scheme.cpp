@@ -3573,7 +3573,6 @@ static void s_save(scheme *sc, enum scheme_opcodes op, pointer args, pointer cod
 //              std::cout << "PUSH SYM " << sc->applied_symbol_names.size() << std::endl;
 //      }
 
-    //if(imp::SchemeInterface::SCHEME_OPS_LOGGING) CPPBridge::notification("SAVE STACK");
     intptr_t nframes = (intptr_t)sc->dump; 
     struct dump_stack_frame *next_frame; 
 
@@ -3591,7 +3590,7 @@ static void s_save(scheme *sc, enum scheme_opcodes op, pointer args, pointer cod
     sc->dump = (pointer)(nframes+1); 
 } 
 
-static pointer _s_return(scheme *sc, pointer a) 
+static pointer _s_return(scheme *sc, pointer a)
 { 
     if(sc->applied_symbol_names.empty()) {
         sc->last_symbol_apply = sc->NIL;
@@ -3599,9 +3598,7 @@ static pointer _s_return(scheme *sc, pointer a)
         sc->last_symbol_apply = sc->applied_symbol_names.top();                
         sc->applied_symbol_names.pop();
     }
-//      std::cout << "POP SYM " << sc->applied_symbol_names.size() << std::endl;       
 
-//      if(imp::SchemeInterface::SCHEME_OPS_LOGGING) CPPBridge::notification("RETURN STACK");
     intptr_t nframes = (intptr_t)sc->dump;
     struct dump_stack_frame *frame;
         

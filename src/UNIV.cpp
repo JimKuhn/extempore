@@ -43,6 +43,7 @@
 #include <iomanip>
 #include "pcre.h"
 #include "SchemeFFI.h"
+#include "SchemePrivate.h"
 
 #ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
@@ -579,10 +580,7 @@ namespace extemp {
   uint32_t UNIV::CHANNELS = 2;
   uint32_t UNIV::IN_CHANNELS = 0;
   uint32_t UNIV::SAMPLERATE = 44100;
-  uint32_t UNIV::SECOND = SAMPLERATE;
-  uint32_t UNIV::MINUTE = SECOND * 60;
-  uint32_t UNIV::HOUR = MINUTE * 60;
-  uint64_t UNIV::TIME = 0l;
+  volatile uint64_t UNIV::TIME = 0l;
   uint64_t UNIV::DEVICE_TIME = 0l;
   double UNIV::AUDIO_CLOCK_NOW = 0.0;
   double UNIV::AUDIO_CLOCK_BASE = 0.0;
@@ -608,13 +606,13 @@ namespace extemp {
 #else
     uint32_t UNIV::EXT_TERM = 0; 
 #endif
-    uint32_t UNIV::EXT_LOADBASE = 1;
+    bool UNIV::EXT_LOADBASE = true;
 
     void UNIV::initRand() {
 #ifdef _WIN32
       srand((int)UNIV::DEVICE_TIME); ///UNIV::SECOND));
 #elif __linux__
-      srand((int)(UNIV::DEVICE_TIME/UNIV::SECOND));
+      srand(DEVICE_TIME / SECOND());
 #else
       sranddev();
 #endif

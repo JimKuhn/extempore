@@ -52,7 +52,7 @@
 namespace extemp
 {
 
-thread_local EXTThread* EXTThread::sm_currentThread = 0;
+thread_local EXTThread* EXTThread::sm_current = 0;
 
 #ifdef _WIN32
 
@@ -193,7 +193,7 @@ int EXTThread::setPriority(int Priority, bool Realtime)
 #endif
 }     
 
-int EXTThread::getPriority()
+int EXTThread::getPriority() const
 {
 #ifdef __linux__ 
     int policy;

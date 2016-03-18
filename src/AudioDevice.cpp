@@ -39,7 +39,7 @@
 
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
-//#include "EXTMonitor.h"
+#include "EXTMonitor.h"
 #include "EXTLLVM.h"
 #include "SchemeFFI.h"
 #include "BranchPrediction.h"

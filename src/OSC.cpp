@@ -331,7 +331,7 @@ namespace extemp {
 #ifdef _OSC_DEBUG_
       std::cout << "SEND SCHEME: " << ss.str() << std::endl;
 #endif
-      SchemeProcess::I(_sc)->createSchemeTask(new std::string(ss.str()),"OSC TASK",5);
+      _sc->m_process->createSchemeTask(new std::string(ss.str()),"OSC TASK",5);
     } else {
       printf("No OSC Registered\n");
     }
@@ -1286,7 +1286,7 @@ namespace extemp {
 
     if(osc->getConnectionType() == OSC_UDP_TYPE){
 
-      SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
+      SchemeProcess* scm = _sc->m_process;
       scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 
 #ifdef EXT_BOOST
@@ -1349,7 +1349,7 @@ namespace extemp {
     // TCP setup
     if(osc->getConnectionType() == OSC_TCP_TYPE){
 
-      SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
+      SchemeProcess* scm = _sc->m_process;
       scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 
       // SchemeProcess* scm = new extemp::SchemeProcess(UNIV::SHARE_DIR, std::string("tcp-osc-server"), port, 0);

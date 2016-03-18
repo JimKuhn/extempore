@@ -38,7 +38,6 @@
 
 #include <stdint.h>
 #include <BranchPrediction.h>
-#include "SchemePrivate.h"
 
 #ifdef EXT_BOOST
 #include <random>
@@ -88,6 +87,10 @@ struct regex_matched_buffer
   };
 */
 
+struct scheme;
+struct cell;
+typedef struct cell* pointer;
+
 extern "C" {
 
 bool rmatch(char* regex, char* str);
@@ -120,17 +123,17 @@ namespace extemp {
     static uint32_t CHANNELS;
     static uint32_t IN_CHANNELS;
     static uint32_t SAMPLERATE;
-    static uint64_t TIME;
+    static volatile uint64_t TIME;
     static uint64_t DEVICE_TIME;
     static double AUDIO_CLOCK_BASE;
     static double AUDIO_CLOCK_NOW;
     static uint64_t TIME_DIVISION;
-    static uint32_t HOUR;
-    static uint32_t MINUTE;
-    static uint32_t SECOND;
+    static uint32_t SECOND() { return SAMPLERATE; }
+    static uint32_t MINUTE() { return SAMPLERATE * 60; }
+    static uint32_t HOUR() { return MINUTE() * 60; }
     static uint32_t FRAMES;
     static uint32_t EXT_TERM;
-    static uint32_t EXT_LOADBASE;
+    static bool EXT_LOADBASE;
     static uint32_t AUDIO_NONE;
     static uint32_t AUDIO_DEVICE;
     static uint32_t AUDIO_IN_DEVICE;

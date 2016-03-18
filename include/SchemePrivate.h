@@ -65,11 +65,15 @@
 #include <stack>
 #include <list>
 #include <string>
+
+namespace extemp {
+
+class SchemeProcess;
+
+}
+
 /*------------------ Ugly internals -----------------------------------*/
 /*------------------ Of interest only to FFI users --------------------*/
-
-class EXTMonitor;
-class EXTThread;
 
 enum scheme_port_kind { 
     port_free=0, 
@@ -141,6 +145,7 @@ struct scheme {
     /* added for concurrent treadmill GC */
     extemp::EXTMutex* mutex;
     extemp::EXTMonitor* Treadmill_Guard;
+    extemp::SchemeProcess* m_process;
     bool treadmill_flip_active;
     bool treadmill_scanner_finished;
 	

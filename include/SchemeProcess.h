@@ -37,18 +37,13 @@
 #define SCHEME_PROCESS_H
 
 #include "Scheme.h"
-#include "SchemePrivate.h"	
+#include "SchemePrivate.h"
 #include <string>
 #include "Task.h"
 #include <queue>
 #include <map>
 #include <sstream>
 #include "EXTLLVM.h"
-
-#ifdef EXT_BOOST
-#include <boost/asio.hpp>
-#include <boost/bind.hpp>
-#endif
 
 #define pair_caar(p) pair_car(pair_car(p))
 #define pair_cadr(p) pair_car(pair_cdr(p))
@@ -68,161 +63,156 @@
 #define pair_cddddddr(p) pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(p))))))
 #define pair_caddddddr(p) pair_car(pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(p)))))))
 
-#define TERMINATION_CHAR 23
+static char TERMINATION_CHAR = 23;
 
 namespace extemp {
-	
-    class SchemeTask {	
-    public:
-    SchemeTask(uint64_t _time, uint64_t _max_duration, void* _ptr, std::string _label, int _type, void* _ptr2 = 0) : time(_time), max_duration(_max_duration), ptr(_ptr), label(_label), type(_type), ptr2(_ptr2) /*, cnt_access_ptr(0) */ {}
-	uint64_t getTime() { return time; }
-	uint64_t getMaxDuration() { return max_duration; }
-	void* getPtr() { return ptr; }
-	void* getPtr2() { return ptr2; }
-	std::string getLabel() { return label; }
-	int getType() { return type; }
-				
-    private:
-	uint64_t time;
-	uint64_t max_duration;
-	void* ptr;
-	std::string label;
-	int type; // 0 = repl task,  1 = callback task,  2 = destroy env task
-	void* ptr2;
-    };
 
-    class SchemeProcess {
-    public:
-        SchemeProcess(std::string _load_path, std::string _name, int server_port=7010, bool banner=false, std::string load_file = std::string());
-	~SchemeProcess();
-        static SchemeProcess* I();
-	static SchemeProcess* I(int index);
-	static SchemeProcess* I(std::string name);
-	static SchemeProcess* I(scheme* sc);
+class SchemeTask {
+private:
+    uint64_t    m_time;
+    uint64_t    m_maxDuration;
+    void*       m_ptr;
+    std::string m_label;
+    int         m_type; // 0 = repl task,  1 = callback task,  2 = destroy env task
+    void*       m_ptr2;
+public:
+    SchemeTask(uint64_t Time, uint64_t MaxDuration, void* Ptr, const std::string& Label, int Type, void* Ptr2 = 0):
+            m_time(Time), m_maxDuration(MaxDuration), m_ptr(Ptr), m_label(Label), m_type(Type), m_ptr2(Ptr2) {
+    }
 
-/* #ifdef EXT_BOOST */
-/* 	//	static SchemeProcess* I(int); */
-/* #else */
-/* 	static SchemeProcess* I(pthread_t); */
-/* #endif */
-	//Thread functions
-	static void* impromptu_server_thread(void* obj_p);
-	static void* impromptu_task_executer(void* obj_p);		
-		
-	long long int getMaxDuration();
-	void setMaxDuration(long long int);		
-	bool loadFile(const std::string file, const std::string path);
-	bool loadFile(const std::string file);
-	std::string getInitExpr() { return init_expr; }
-	void addGlobal(char* symbol_name, pointer arg);		
-	void addForeignFunc(char* symbol_name, foreign_func func);
-	void addGlobalCptr(char* symbol_name, void* ptr);
-	void schemeCallback(TaskI* task);
-	void extemporeCallback(TaskI* task);
-	void createSchemeTask(void* arg, std::string label, int taskType);
-	bool isServerThreadRunning() { return threadServer.isRunning(); }
-	bool isSchemeThreadRunning() { return threadScheme.isRunning(); }
-		
-	void stop();
-	bool start();
-	bool withBanner() { return with_banner; }
-	int setPriority(int); 
-	int getPriority(); 
-		
-	std::string getLoadPath() { return load_path; };	
-	//pointer schemeApply(pointer func, pointer args);
-	pointer deleteMemberFromList(pointer member, pointer list);	
-	bool findMemberFromList(pointer member, pointer list);
-	void addSchemeGlobal(char* symbol_name, void* c_ptr);			
-	std::string eval(char* evalString);
-	scheme* getSchemeEnv() { return sc; }
-	void testCall(TaskI* task);
-	void repl();
-	std::string getEvalString();
-	//CAGuard& getGuard() { return guard; }
-	EXTMonitor& getGuard() { return guard; }
-	//std::map<int, std::string>& getResultStrings() { return result_string; }
-	bool getRunning() { return running; }
-	//static void printSchemeCons(scheme* sc, std::stringstream& ss, pointer cons, bool full = false, bool stringquotes = true);
-	static void banner(std::ostream* ss);
-#ifdef EXT_BOOST
-	boost::asio::ip::tcp::acceptor* getServerSocket() { return server_socket; }
-	boost::asio::io_service* getIOService() { return io_service; }
-        std::vector<boost::asio::ip::tcp::socket*>& getClientSockets() { return client_sockets;}
-        std::map<boost::asio::ip::tcp::socket*,std::stringstream*>& getInStreams() { return in_streams; }        
-#else
-	int getServerSocket() { return server_socket; }
-#endif
-	int getServerPort() { return server_port; }
-	std::queue<SchemeTask>& getQueue() { return taskq; }
-	llvm_zone_t* getDefaultZone() { return default_zone; }
-	/* // this added for dodgy contuations support */
-        /* ucontext_t* getContext() { return _context; }         */
-		
-	std::string& getName() { return name; }
-	void setLoadedLibs(bool v) { libs_loaded = v; }
-	bool loadedLibs() {return libs_loaded; }
-	//std::vector<int>* getClientSockets() { return &client_sockets; }
+    uint64_t getTime() const { return m_time; }
+    uint64_t getMaxDuration() const { return m_maxDuration; }
+    void* getPtr() const { return m_ptr; }
+    void* getPtr2() const { return m_ptr2; }
+    const std::string& getLabel() const { return m_label; }
+    int getType() const { return m_type; }
+};
 
-        #define SCHEME_OUTPORT_STRING_LENGTH 256
-	char scheme_outport_string[SCHEME_OUTPORT_STRING_LENGTH];
+class SchemeProcess {
+private:
+    typedef std::queue<SchemeTask> task_queue_type;
+    static const unsigned SCHEME_OUTPORT_STRING_LENGTH = 256;
+private:
+    std::string     m_loadPath;
+    std::string     m_name;
+    bool            m_libsLoaded;
+    scheme*         m_scheme;
+    EXTThread       m_threadScheme;
+    EXTThread       m_threadServer;
+    EXTMonitor      m_guard;
+    bool            m_running;
+    bool            m_banner;
+    int16_t         m_serverPort;
+    uint64_t        m_maxDuration;
+    int             m_serverSocket;
+    task_queue_type m_taskQueue;
+    llvm_zone_t*    m_defaultZone;
+    std::string     m_initExpr;
+    extemp::CM*     m_extemporeCallback;
+    char            m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH];
 
-	static bool CAPS_THROUGH; //send caps lock through to editor window or block?
-		
-	static std::vector<SchemeProcess*> INSTANCES;		
-	static bool EXTENDED_ERROR_LOGGING;
-	static bool SCHEME_OPS_LOGGING;				
-	static bool TASK_QUEUE_LOGGING;		
-	static bool SCHEME_EVAL_TIMING;				
-	static std::map<scheme*, SchemeProcess*> SCHEME_MAP;
-	static std::map<std::string, SchemeProcess*> SCHEME_NAME_MAP;
+    static thread_local SchemeProcess* sm_current;
+    static std::map<std::string, SchemeProcess*> SCHEME_NAME_MAP;
+private:
+    void schemeCallback(TaskI* Task) {
+        addCallback(Task, 1);
+    }
+    void extemporeCallback(TaskI* Task) {
+        addCallback(Task, 6);
+    }
+    void addCallback(TaskI* Task, int Type);
+    void* serverImpl();
+    void* taskImpl();
+    void resetOutportString() {
+        m_scheme->outport->_object._port->rep.string.curr = m_schemeOutportString;
+        memset(m_schemeOutportString, 0, sizeof(m_schemeOutportString));
+    }
 
-	extemp::CM* extempore_lang_cb;
-		
-    private:
-	bool libs_loaded;
-	std::string load_path;			
-	std::string name;
-	scheme* sc;
-	EXTThread threadScheme;
-	EXTThread threadServer;
-#ifdef EXT_BOOST
-	EXTThread threadBoost;
-#endif
-	EXTMonitor guard;
-	bool running;
-	int server_port;
-	bool with_banner;
-	uint64_t max_duration;				
-#ifdef EXT_BOOST
-	boost::asio::ip::tcp::acceptor* server_socket;
-	boost::asio::io_service* io_service;
-        std::vector<boost::asio::ip::tcp::socket*> client_sockets;
-        std::map<boost::asio::ip::tcp::socket*,std::stringstream*> in_streams;
-#else
-	int server_socket;				
-#endif
-	std::queue<SchemeTask> taskq;
-	llvm_zone_t* default_zone;
-	/* // this added for dodgy continuations support */
-        /* ucontext_t _context;		 */
-	std::string init_expr;
-    };
-	
-    class SchemeObj{
-    public:
-	SchemeObj(scheme* _sc, pointer _val, pointer _env = NULL);
-	~SchemeObj();
-	pointer getEnvironment();
-	pointer getValue();
-	scheme* getScheme();	
-		
-    private:
-	scheme* sc;
-	pointer env;
-	pointer values;
-    };
-	
+    static void* impromptu_server_thread(void* Arg) {
+        return reinterpret_cast<SchemeProcess*>(Arg)->serverImpl();
+    }
+    static void* impromptu_task_executer(void* Arg) {
+        return reinterpret_cast<SchemeProcess*>(Arg)->taskImpl();
+    }
+public:
+    SchemeProcess(const std::string& LoadPath, const std::string& Name, int ServerPort = 7010, bool Banner = false,
+            const std::string& InitExpr = std::string());
+
+    uint64_t getMaxDuration() const { return m_maxDuration; }
+    void setMaxDuration(uint64_t MaxDuration) { m_maxDuration = MaxDuration; }
+    const std::string& getInitExpr() const { return m_initExpr; }
+    bool getRunning() const { return m_running; }
+    int getServerSocket() const { return m_serverSocket; }
+    int16_t getServerPort() const { return m_serverPort; }
+    task_queue_type& getQueue() { return m_taskQueue; }
+    llvm_zone_t* getDefaultZone() { return m_defaultZone; }
+    const std::string& getName() { return m_name; }
+    void setLoadedLibs(bool Val) { m_libsLoaded = Val; }
+    bool loadedLibs() const { return m_libsLoaded; }
+    bool withBanner() const { return m_banner; }
+    scheme* getScheme() const { return m_scheme; }
+    EXTMonitor& getGuard() { return m_guard; }
+    extemp::CM* getExtemporeCallback() const { return m_extemporeCallback; }
+    const std::string& getLoadPath() const { return m_loadPath; };
+    void setPriority(int Priority) {
+        m_threadScheme.setPriority(Priority, false);
+        m_threadServer.setPriority(Priority, false);
+    }
+    int getPriority() const {
+        assert(m_threadScheme.getPriority() == m_threadServer.getPriority());
+        return m_threadScheme.getPriority();
+    }
+
+    bool isServerThreadRunning() const { return m_threadServer.isRunning(); }
+    bool isSchemeThreadRunning() const { return m_threadScheme.isRunning(); }
+    bool loadFile(const std::string& File, const std::string& Path = std::string());
+    void addGlobal(char* Symbol, pointer Arg) {
+        scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), Arg);
+    }
+    void addForeignFunc(char* Symbol, foreign_func Func) {
+        scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), mk_foreign_func(m_scheme, Func));
+    }
+    void addGlobalCptr(char* Symbol, void* Ptr) {
+        scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), mk_cptr(m_scheme, Ptr));
+    }
+    void addSchemeGlobal(char* Symbol, void* Cptr)
+    {
+        scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), mk_cptr(m_scheme, Cptr));
+    }
+    void createSchemeTask(void* Arg, const std::string& label, int TaskType);
+    void stop();
+    bool start();
+    const std::string& eval(char* evalString);
+    void testCall(TaskI* task);
+    void repl();
+
+    static void banner(std::ostream& Stream);
+    static SchemeProcess* I() { return sm_current; }
+//    static SchemeProcess* I(int index);
+    static SchemeProcess* I(const std::string& Name) {
+        auto iter(SCHEME_NAME_MAP.find(Name));
+        if (unlikely(iter == SCHEME_NAME_MAP.end())) {
+            throw std::runtime_error("Error: SchemeProcess does not exist");
+        }
+        return iter->second;
+    }
+};
+
+class SchemeObj
+{
+private:
+    scheme* m_scheme;
+    pointer m_env;
+    pointer m_values;
+public:
+    SchemeObj(scheme* Sheme, pointer Values, pointer Env);
+    ~SchemeObj();
+
+    pointer getEnvironment() const { return m_env; }
+    pointer getValue() const { return m_values; }
+    scheme* getScheme() const { return m_scheme; }
+};
+
 
 } //End Namespace
 

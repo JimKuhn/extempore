@@ -52,6 +52,7 @@
 
 #include <vector>
 #include "UNIV.h"
+#include "EXTThread.h"
 
 #define SAMPLE float
 
