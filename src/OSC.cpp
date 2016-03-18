@@ -331,7 +331,7 @@ namespace extemp {
 #ifdef _OSC_DEBUG_
       std::cout << "SEND SCHEME: " << ss.str() << std::endl;
 #endif
-      _sc->m_process->createSchemeTask(new std::string(ss.str()),"OSC TASK",5);
+      _sc->m_process->createSchemeTask(new std::string(ss.str()), "OSC TASK", SchemeTask::Type::LOCAL_PROCESS_STRING);
     } else {
       printf("No OSC Registered\n");
     }
@@ -399,7 +399,7 @@ namespace extemp {
 #ifdef _OSC_DEBUG_
       std::cout << "SEND SCHEME: " << ss.str() << std::endl;
 #endif
-      scm->createSchemeTask(new std::string(ss.str()),"OSC TASK",5);
+      scm->createSchemeTask(new std::string(ss.str()), "OSC TASK", SchemeTask::Type::LOCAL_PROCESS_STRING);
     } else {
       printf("No OSC Registered\n");
     }

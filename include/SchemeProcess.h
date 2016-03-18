@@ -68,15 +68,18 @@ static char TERMINATION_CHAR = 23;
 namespace extemp {
 
 class SchemeTask {
+public:
+    enum class Type { REPL, SCHEME_CALLBACK, DESTROY_ENV, CALLBACK_SYMBOL,
+            LOCAL_PROCESS_STRING = 5, EXTEMPORE_CALLBACK };
 private:
     uint64_t    m_time;
     uint64_t    m_maxDuration;
     void*       m_ptr;
     std::string m_label;
-    int         m_type; // 0 = repl task,  1 = callback task,  2 = destroy env task
+    Type        m_type; // 0 = repl task,  1 = callback task,  2 = destroy env task
     void*       m_ptr2;
 public:
-    SchemeTask(uint64_t Time, uint64_t MaxDuration, void* Ptr, const std::string& Label, int Type, void* Ptr2 = 0):
+    SchemeTask(uint64_t Time, uint64_t MaxDuration, void* Ptr, const std::string& Label, Type Type, void* Ptr2 = 0):
             m_time(Time), m_maxDuration(MaxDuration), m_ptr(Ptr), m_label(Label), m_type(Type), m_ptr2(Ptr2) {
     }
 
@@ -85,7 +88,7 @@ public:
     void* getPtr() const { return m_ptr; }
     void* getPtr2() const { return m_ptr2; }
     const std::string& getLabel() const { return m_label; }
-    int getType() const { return m_type; }
+    Type getType() const { return m_type; }
 };
 
 class SchemeProcess {
@@ -111,22 +114,23 @@ private:
     extemp::CM*     m_extemporeCallback;
     char            m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH];
 
-    static thread_local SchemeProcess* sm_current;
-    static std::map<std::string, SchemeProcess*> SCHEME_NAME_MAP;
+    static thread_local SchemeProcess*           sm_current;
+    static std::map<std::string, SchemeProcess*> sm_nameMap;
 private:
     void schemeCallback(TaskI* Task) {
-        addCallback(Task, 1);
+        addCallback(Task, SchemeTask::Type::SCHEME_CALLBACK);
     }
     void extemporeCallback(TaskI* Task) {
-        addCallback(Task, 6);
+        addCallback(Task, SchemeTask::Type::EXTEMPORE_CALLBACK);
     }
-    void addCallback(TaskI* Task, int Type);
+    void addCallback(TaskI* Task, SchemeTask::Type Type);
     void* serverImpl();
     void* taskImpl();
     void resetOutportString() {
         m_scheme->outport->_object._port->rep.string.curr = m_schemeOutportString;
         memset(m_schemeOutportString, 0, sizeof(m_schemeOutportString));
     }
+    bool loadFile(const std::string& File, const std::string& Path = std::string());
 
     static void* impromptu_server_thread(void* Arg) {
         return reinterpret_cast<SchemeProcess*>(Arg)->serverImpl();
@@ -140,20 +144,12 @@ public:
 
     uint64_t getMaxDuration() const { return m_maxDuration; }
     void setMaxDuration(uint64_t MaxDuration) { m_maxDuration = MaxDuration; }
-    const std::string& getInitExpr() const { return m_initExpr; }
     bool getRunning() const { return m_running; }
-    int getServerSocket() const { return m_serverSocket; }
-    int16_t getServerPort() const { return m_serverPort; }
-    task_queue_type& getQueue() { return m_taskQueue; }
+    task_queue_type& getQueue() { return m_taskQueue; } // seems dangerous - used by OSC
     llvm_zone_t* getDefaultZone() { return m_defaultZone; }
     const std::string& getName() { return m_name; }
-    void setLoadedLibs(bool Val) { m_libsLoaded = Val; }
-    bool loadedLibs() const { return m_libsLoaded; }
-    bool withBanner() const { return m_banner; }
-    scheme* getScheme() const { return m_scheme; }
-    EXTMonitor& getGuard() { return m_guard; }
+    EXTMonitor& getGuard() { return m_guard; } // dangerous - fix OSC interface
     extemp::CM* getExtemporeCallback() const { return m_extemporeCallback; }
-    const std::string& getLoadPath() const { return m_loadPath; };
     void setPriority(int Priority) {
         m_threadScheme.setPriority(Priority, false);
         m_threadServer.setPriority(Priority, false);
@@ -163,9 +159,6 @@ public:
         return m_threadScheme.getPriority();
     }
 
-    bool isServerThreadRunning() const { return m_threadServer.isRunning(); }
-    bool isSchemeThreadRunning() const { return m_threadScheme.isRunning(); }
-    bool loadFile(const std::string& File, const std::string& Path = std::string());
     void addGlobal(char* Symbol, pointer Arg) {
         scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), Arg);
     }
@@ -179,19 +172,15 @@ public:
     {
         scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), mk_cptr(m_scheme, Cptr));
     }
-    void createSchemeTask(void* Arg, const std::string& label, int TaskType);
+    void createSchemeTask(void* Arg, const std::string& label, SchemeTask::Type TaskType);
     void stop();
     bool start();
-    const std::string& eval(char* evalString);
-    void testCall(TaskI* task);
-    void repl();
 
     static void banner(std::ostream& Stream);
     static SchemeProcess* I() { return sm_current; }
-//    static SchemeProcess* I(int index);
     static SchemeProcess* I(const std::string& Name) {
-        auto iter(SCHEME_NAME_MAP.find(Name));
-        if (unlikely(iter == SCHEME_NAME_MAP.end())) {
+        auto iter(sm_nameMap.find(Name));
+        if (unlikely(iter == sm_nameMap.end())) {
             throw std::runtime_error("Error: SchemeProcess does not exist");
         }
         return iter->second;

@@ -69,7 +69,7 @@ namespace extemp {
 
 thread_local SchemeProcess* SchemeProcess::sm_current = 0;
 
-std::map<std::string, SchemeProcess*> SchemeProcess::SCHEME_NAME_MAP;
+std::map<std::string, SchemeProcess*> SchemeProcess::sm_nameMap;
 
 SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Name, int ServerPort, bool Banner,
             const std::string& InitExpr): m_loadPath(LoadPath), m_name(Name), m_serverPort(ServerPort),
@@ -132,7 +132,7 @@ bool SchemeProcess::start()
     m_threadServer.create(&impromptu_server_thread, this);
     m_guard.init();
     sm_current = this;
-    SCHEME_NAME_MAP[m_name] = this;
+    sm_nameMap[m_name] = this;
     return true;
 }
 
@@ -144,7 +144,7 @@ void SchemeProcess::stop()
     // TODO: what about sm_current?/name lookup
 }
 
-void SchemeProcess::addCallback(TaskI* TaskAdd, int Type)
+void SchemeProcess::addCallback(TaskI* TaskAdd, SchemeTask::Type Type)
 {
 #if !defined(NDEBUG)
     if (m_guard.isOwnedByCurrentThread())
@@ -160,7 +160,7 @@ void SchemeProcess::addCallback(TaskI* TaskAdd, int Type)
     m_taskQueue.push(SchemeTask(currentTime, duration, task->getArg(), "tmp_label", Type));
 }
 
-void SchemeProcess::createSchemeTask(void* Arg, const std::string& Label, int Type)
+void SchemeProcess::createSchemeTask(void* Arg, const std::string& Label, SchemeTask::Type Type)
 {
 #if !defined(NDEBUG)
     if (m_guard.isOwnedByCurrentThread())
@@ -206,11 +206,6 @@ bool SchemeProcess::loadFile(const std::string& File, const std::string& Path)
 
 void* SchemeProcess::taskImpl()
 {
-    // auto scm(reinterpret_cast<SchemeProcess*>(Arg);
-    // auto& guard = scm->getGuard();
-    // scheme* sc = scm->getSchemeEnv();
-    // std::queue<SchemeTask>& q = scm->getQueue();
-    // bool with_banner = scm->withBanner();
     OSC::schemeInit(this);
     std::stringstream ss;
 #ifdef _WIN32
@@ -223,7 +218,7 @@ void* SchemeProcess::taskImpl()
     loadFile("runtime/scheme.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/llvmti.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);
-    setLoadedLibs(true);
+    m_libsLoaded = true;
 #ifdef _WIN32
     Sleep(1000);
 #else
@@ -235,7 +230,8 @@ void* SchemeProcess::taskImpl()
         if (extemp::UNIV::EXT_LOADBASE) {
             EXTMonitor::ScopedLock lock(m_guard);
             m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
-                    new std::string("(sys:load \"libs/base/base.xtm\" 'quiet)"), "file_init", 5));
+                    new std::string("(sys:load \"libs/base/base.xtm\" 'quiet)"), "file_init",
+                        SchemeTask::Type::LOCAL_PROCESS_STRING));
         }
         if (!m_initExpr.empty()) {
             ascii_text_color(0, 5, 10);
@@ -244,7 +240,7 @@ void* SchemeProcess::taskImpl()
             printf("%s\n\n", m_initExpr.c_str());
             EXTMonitor::ScopedLock lock(m_guard);
             m_taskQueue.push(SchemeTask(extemp::UNIV::TIME + 1000, 60 * 60 * UNIV::SECOND(),
-                    new std::string(m_initExpr), "file_init", 5));
+                    new std::string(m_initExpr), "file_init", SchemeTask::Type::LOCAL_PROCESS_STRING));
         }
     }
     while (likely(m_running)) {
@@ -258,10 +254,10 @@ void* SchemeProcess::taskImpl()
             m_taskQueue.pop();
             m_guard.unlock();
             switch (task.getType()) {
-            case 2: //delete old callback env reference
+            case SchemeTask::Type::DESTROY_ENV:
                 m_scheme->imp_env.erase(reinterpret_cast<pointer>(task.getPtr()));
                 break;
-            case 5: //string from local process (MIDI, OSC or similar)
+            case SchemeTask::Type::LOCAL_PROCESS_STRING: //string from local process (MIDI, OSC or similar)
                 {
                     auto evalString(reinterpret_cast<std::string*>(task.getPtr()));
                     if (evalString->length() > 2) {
@@ -288,7 +284,7 @@ void* SchemeProcess::taskImpl()
                     delete evalString;
                 }
                 break;
-            case 0: //string from repl loop
+            case SchemeTask::Type::REPL:
                 {
                     auto returnSocket(atoi(task.getLabel().c_str()));
                     auto evalString(reinterpret_cast<std::string*>(task.getPtr()));
@@ -324,7 +320,7 @@ void* SchemeProcess::taskImpl()
                     delete evalString;
                 }
                 break;
-            case 1: //callback
+            case SchemeTask::Type::SCHEME_CALLBACK:
                 {
                     auto obj(reinterpret_cast<SchemeObj*>(task.getPtr()));
                     auto pair(reinterpret_cast<pointer>(obj->getValue()));
@@ -344,7 +340,7 @@ void* SchemeProcess::taskImpl()
                     delete obj;
                 }
                 break;
-            case 3: //callback with symbol as char*
+            case SchemeTask::Type::CALLBACK_SYMBOL: //callback with symbol as char*
                 {
                     auto obj(reinterpret_cast<SchemeObj*>(task.getPtr()));
                     auto symbol(reinterpret_cast<char*>(obj->getValue()));
@@ -365,7 +361,7 @@ void* SchemeProcess::taskImpl()
                     delete obj;
                 }
                 break;
-            case 6: // callback from extempore lang
+            case SchemeTask::Type::EXTEMPORE_CALLBACK:
                 {
                     auto s(reinterpret_cast<_llvm_callback_struct_*>(task.getPtr()));
                     s->fptr(s->dat);
@@ -507,7 +503,7 @@ void* SchemeProcess::serverImpl()
                         sprintf(c, "%i", sock);
                         std::string* s = new std::string(evalStr.substr(pos, end - pos + 1));
                         // std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << *s << std::endl;
-                        m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s, c, 0));
+                        m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s, c, SchemeTask::Type::REPL));
                     }
                 }
             }
@@ -540,7 +536,7 @@ SchemeObj::SchemeObj(scheme* Scheme, pointer Values, pointer Env): m_scheme(Sche
 SchemeObj::~SchemeObj()
 {
     if (m_env != NULL) { // impossible?
-        m_scheme->m_process->createSchemeTask(m_env, "destroy SchemeObj", 2);
+        m_scheme->m_process->createSchemeTask(m_env, "destroy SchemeObj", SchemeTask::Type::DESTROY_ENV);
     }
 }
 
