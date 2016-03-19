@@ -54,20 +54,6 @@ namespace extemp
 
 thread_local EXTThread* EXTThread::sm_current = 0;
 
-#ifdef _WIN32
-
-EXTThread::EXTThread(std::thread&& Thread) : initialised(false), detached(false), joined(false), m_thread(std::move(Thread)) {
-{
-}
-
-#else
-
-EXTThread::EXTThread(pthread_t Thread) : m_initialised(false), m_detached(false), m_joined(false), m_thread(Thread)
-{
-}
-
-#endif
-
 EXTThread::~EXTThread()
 {           
 #ifdef _EXTTHREAD_DEBUG_
@@ -77,11 +63,15 @@ EXTThread::~EXTThread()
 #endif
 }
 
-int EXTThread::create(void *(*EntryPoint)(void*), void* Arg)
+int EXTThread::start(function_type EntryPoint, void* Arg)
 {
+    if (EntryPoint) {
+        m_function = EntryPoint;
+    }
+    if (Arg) {
+        m_arg = Arg;
+    }
     int result = 22; //EINVAL;
-    m_function = EntryPoint;
-    m_arg = Arg;
     if (!m_initialised) {
 #ifdef _WIN32
         std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
@@ -89,6 +79,9 @@ int EXTThread::create(void *(*EntryPoint)(void*), void* Arg)
         result = 0;
 #else
         result = pthread_create(&m_thread, NULL, Trampoline, this);
+        if (!result && !m_name.empty()) {
+            pthread_setname_np(m_thread, m_name.c_str());
+        }
 #endif
         m_initialised = !result;
     }

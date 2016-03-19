@@ -37,17 +37,18 @@
 #define TASK_SCHEDULER_H
 
 #include "PriorityQueue.h"
-//#include "CAPThread.h"
-//#include "CAGuard.h"
+#include "EXTMonitor.h"
 #include "EXTThread.h"
-//#include "EXTMonitor.h"
 #include "UNIV.h"
 
 namespace extemp {
 
 class EXTMonitor;
 
-class TaskScheduler {
+class TaskScheduler
+{
+private:
+    static void* queue_thread_callback(void* p_obj);
 public:
     TaskScheduler();
     
@@ -56,7 +57,7 @@ public:
     // add task to task queue
     void add(TaskI* t) { queue.add(t); }
 
-void start() { queueThread->create(TaskScheduler::queue_thread_callback, this); }
+    void start() { queueThread.start(); }
     void setFrames(unsigned Frames) { m_numFrames = Frames; }
     
     // static addTask       
@@ -71,16 +72,13 @@ void start() { queueThread->create(TaskScheduler::queue_thread_callback, this); 
     // for pulling ready tasks from the task queue
     void timeSlice();
     //CAGuard* getGuard() {return guard;};
-    EXTMonitor* getGuard() { return guard; }
-    static void* queue_thread_callback(void* p_obj);
+    EXTMonitor& getGuard() { return guard; }
 
 private:
     unsigned m_numFrames;
     PriorityQueue<TaskI> queue;
-    //CAPThread* queueThread;
-    //CAGuard* guard;
-    EXTThread* queueThread;
-    EXTMonitor* guard;
+    EXTThread queueThread;
+    EXTMonitor guard;
     static TaskScheduler SINGLETON;
 };
 

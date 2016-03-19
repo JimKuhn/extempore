@@ -74,7 +74,8 @@ std::map<std::string, SchemeProcess*> SchemeProcess::sm_nameMap;
 SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Name, int ServerPort, bool Banner,
             const std::string& InitExpr): m_loadPath(LoadPath), m_name(Name), m_serverPort(ServerPort),
             m_banner(Banner), m_initExpr(InitExpr), m_libsLoaded(false), m_guard("scheme_server_guard"),
-            m_running(true)
+            m_running(true), m_threadTask(&taskTrampoline, this, "SP_task"),
+            m_threadServer(&serverTrampoline, this, "SP_server")
 {
     if (m_loadPath[m_loadPath.length() - 1] != '/') {
         m_loadPath.push_back('/');
@@ -128,8 +129,8 @@ bool SchemeProcess::start()
         m_running = false;
         return false;
     }
-    m_threadScheme.create(&impromptu_task_executer, this);
-    m_threadServer.create(&impromptu_server_thread, this);
+    m_threadTask.start();
+    m_threadServer.start();
     m_guard.init();
     sm_current = this;
     sm_nameMap[m_name] = this;

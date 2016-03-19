@@ -100,10 +100,10 @@ private:
     std::string     m_name;
     bool            m_libsLoaded;
     scheme*         m_scheme;
-    EXTThread       m_threadScheme;
-    EXTThread       m_threadServer;
     EXTMonitor      m_guard;
     bool            m_running;
+    EXTThread       m_threadTask;
+    EXTThread       m_threadServer;
     bool            m_banner;
     int16_t         m_serverPort;
     uint64_t        m_maxDuration;
@@ -132,10 +132,10 @@ private:
     }
     bool loadFile(const std::string& File, const std::string& Path = std::string());
 
-    static void* impromptu_server_thread(void* Arg) {
+    static void* serverTrampoline(void* Arg) {
         return reinterpret_cast<SchemeProcess*>(Arg)->serverImpl();
     }
-    static void* impromptu_task_executer(void* Arg) {
+    static void* taskTrampoline(void* Arg) {
         return reinterpret_cast<SchemeProcess*>(Arg)->taskImpl();
     }
 public:
@@ -151,12 +151,12 @@ public:
     EXTMonitor& getGuard() { return m_guard; } // dangerous - fix OSC interface
     extemp::CM* getExtemporeCallback() const { return m_extemporeCallback; }
     void setPriority(int Priority) {
-        m_threadScheme.setPriority(Priority, false);
+        m_threadTask.setPriority(Priority, false);
         m_threadServer.setPriority(Priority, false);
     }
     int getPriority() const {
-        assert(m_threadScheme.getPriority() == m_threadServer.getPriority());
-        return m_threadScheme.getPriority();
+        assert(m_threadTask.getPriority() == m_threadServer.getPriority());
+        return m_threadTask.getPriority();
     }
 
     void addGlobal(char* Symbol, pointer Arg) {

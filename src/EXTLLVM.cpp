@@ -656,9 +656,9 @@ long long llvm_get_next_prime(long long start)
 //
 /////////////////////////////////////////////
 
-void* thread_fork(void*(*start_routine)(void*),void* args) {
-        auto thread = new extemp::EXTThread;
-        int result = thread->create(start_routine, args);
+void* thread_fork(void*(*start_routine)(void*), void* args) {
+        auto thread = new extemp::EXTThread(start_routine, args, "fork");
+        int result = thread->start();
 
 #ifdef _EXTTHREAD_DEBUG_
         if (result)

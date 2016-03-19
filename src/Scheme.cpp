@@ -6500,8 +6500,8 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
         
 
     sc->treadmill_stop = false;
-    sc->treadmill_scan_thread = new extemp::EXTThread();
-    sc->treadmill_scan_thread->create(&treadmill_scanner, sc); //, CAPThread::kDefaultThreadPriority);
+    sc->treadmill_scan_thread = new extemp::EXTThread(&treadmill_scanner, sc, "treadmill");
+    sc->treadmill_scan_thread->start(); //, CAPThread::kDefaultThreadPriority);
         
     sc->call_end_time = ULLONG_MAX;
     //sc->call_default_time = 158760000ll;  // 1 hour

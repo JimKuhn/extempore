@@ -821,7 +821,7 @@ namespace extemp {
   }
 #endif
 
-  OSC::OSC() : threadOSC(), message_length(0), started(false)
+  OSC::OSC() : threadOSC(&osc_mesg_callback, this, "OSC"), message_length(0), started(false)
   {
 #ifdef EXT_BOOST
     io_service = new boost::asio::io_service;
@@ -1339,7 +1339,7 @@ namespace extemp {
       osc->setClientAddressSize(sizeof(*osc_client_address));
 #endif
       if(!osc->getStarted()) {
-        osc->getThread().create(&osc_mesg_callback, osc);
+        osc->getThread().start();
         osc->setStarted(true);
       }
       osc->sc = _sc;
@@ -1416,7 +1416,7 @@ namespace extemp {
         scm_osc_pair* sop = new scm_osc_pair;
         sop->scm_p = scm;
         sop->osc_p = osc;
-        osc->getThread().create(&tcp_osc_server_thread, sop);
+        osc->getThread().start(&tcp_osc_server_thread, sop);
         osc->setStarted(true);
       }
       osc->sc = _sc;

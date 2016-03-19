@@ -356,7 +356,7 @@ namespace extemp {
     int channels = 2;
     uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
     sched->setFrames(framesPerBuffer);
-    sched->getGuard()->signal();		
+    sched->getGuard().signal();		
     void* dsp_closure = AudioDevice::I()->getDSPClosure();
     void* cache_closure = 0;
     if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*framesPerBuffer*sizeof(float))); return 0; }
@@ -765,8 +765,8 @@ namespace extemp {
     memset(outbuf,0,UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)*numthreads*2);
     for(int i=0;i<128;i++) thread_idx[i] = i;
     for(int i=0;i<numthreads;i++) {
-      threads[i] = new EXTThread();
-      threads[i]->create(audioCallbackMT, &thread_idx[i]);
+      threads[i] = new EXTThread(audioCallbackMT, &thread_idx[i]);
+      threads[i]->start();;
     }
   }
 
@@ -779,8 +779,8 @@ namespace extemp {
     outbuf_f = (float*) malloc(UNIV::CHANNELS*UNIV::FRAMES*4*numthreads);
     for(int i=0;i<128;i++) thread_idx[i] = i;
     for(int i=0;i<numthreads;i++) {
-      threads[i] = new EXTThread();
-      threads[i]->create(audioCallbackMTBuf, &thread_idx[i]);
+      threads[i] = new EXTThread(audioCallbackMTBuf, &thread_idx[i]);
+      threads[i]->start();
     }
   }
 
@@ -880,13 +880,13 @@ namespace extemp {
       nanosleep(&sleepDur, NULL);
 #endif
       // trigger the scheduler
-      TaskScheduler::I()->getGuard()->signal();
+      TaskScheduler::I()->getGuard().signal();
     }
   }
 
   void AudioDevice::startNoAudioThread()
   {
-    extemp::EXTThread* render_thread = new extemp::EXTThread();
+    extemp::EXTThread* render_thread(new EXTThread(&noAudioCallback, nullptr, "noaudio"));  // leak
     extemp::UNIV::CHANNELS = 1; // only one channel for dummy device
     extemp::UNIV::SAMPLERATE = 44100;
     extemp::UNIV::initRand();        
@@ -920,7 +920,7 @@ namespace extemp {
     std::cout << " sec" << std::endl << std::flush;
 
     // start the scheduler thread running
-    render_thread->create(&noAudioCallback,NULL);
+    render_thread->start();
     render_thread->setPriority(20, true);
   }
 

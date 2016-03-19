@@ -52,29 +52,26 @@ class EXTThread
 private:
     typedef void* (*function_type)(void*);
 private:
+    function_type m_function;
+    void*         m_arg;
+    std::string   m_name;
     bool          m_initialised;
     bool          m_detached;
     bool          m_joined;
-    function_type m_function;
-    void*         m_arg;
 #ifndef _WIN32
-    pthread_t   m_thread;
+    pthread_t     m_thread;
 #else
-    std::thread m_thread;
+    std::thread   m_thread;
 #endif
 
     static thread_local EXTThread* sm_current;
 public:
-    EXTThread() : m_initialised(false), m_detached(false), m_joined(false) {
+    EXTThread(function_type EntryPoint, void* Arg, const std::string& Name = std::string()): m_function(EntryPoint),
+            m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false), m_joined(false) {
     }
-#ifdef _WIN32
-    EXTThread(std::thread&& Thread);
-#else
-    EXTThread(pthread_t Thread);
-#endif
     ~EXTThread();
 
-    int create(void *(*EntryPoint)(void*), void* Arg);
+    int start(function_type EntryPoint = nullptr, void* Arg = nullptr); // overrides - ugly, from OSC
     int kill();
     int detach();
     int join();

@@ -39,49 +39,20 @@
 #include <math.h>
 
 namespace extemp {
-	
-  TaskScheduler TaskScheduler::SINGLETON;
-	
-  TaskScheduler::TaskScheduler(): m_numFrames(0)
-  {
-    queueThread = new EXTThread();
-    guard = new EXTMonitor("task_scheduler_guard");		
-    guard->init();
-    //std::cout << "QUEUE THREAD " << queueThread->getPthread() << std::endl;
-  }
+        
+TaskScheduler TaskScheduler::SINGLETON;
+        
+TaskScheduler::TaskScheduler(): m_numFrames(0), queueThread(TaskScheduler::queue_thread_callback, this, "scheduler"),
+    guard("task_scheduler_guard")
+{
+    guard.init();
+}
 
-  // void TaskScheduler::timeSlice() 
-  // {
-  //   //lock the queue for this thread only
-  //   queue.lock();
+static uint64_t AUDIO_DEVICE_START_OFFSET = 0;
+static double LAST_REALTIME_STAMP = 0.0;
 
-  //   // if(clearFlag) {
-  //   // 	queue.clear();
-  //   // 	clearFlag = false;
-  //   // }
-  //   TaskI* t = queue.peek();
-
-  //   // this is a task we need to do something with
-  //   while(t != NULL && (t->getStartTime() < (UNIV::TIME + UNIV::FRAMES))) {
-	//     t = queue.get();
-	//     try{
-  //       if(t->getTag() == 0) t->execute();
-	//     }catch(std::exception& e){ //...){
-  //       std::cout << "Error executing scheduled task! " << e.what() << std::endl;
-	//     }
-	//     delete t;
-	//     t = queue.peek();
-  //   }
-
-  //   //unlock queue for this thread
-  //   queue.unlock();
-  // }
-  
-  static uint64_t AUDIO_DEVICE_START_OFFSET = 0;
-  static double LAST_REALTIME_STAMP = 0.0;
-
-  void TaskScheduler::timeSlice() 
-  {
+void TaskScheduler::timeSlice() 
+{
     uint32_t frames = m_numFrames / UNIV::TIME_DIVISION;
     uint64_t nanosecs = ((double)frames / (double)UNIV::SAMPLERATE) * 1000000000.0;
     uint32_t division_num = 0;
@@ -143,8 +114,8 @@ namespace extemp {
         }
         nanosleep(&a,&b);
 #endif
-	  }
-	}while(UNIV::TIME_DIVISION > 1);
+          }
+        }while(UNIV::TIME_DIVISION > 1);
     // return will never be called if UNIV::TIME_DIVISION > 1
     return;
   }
@@ -154,22 +125,22 @@ namespace extemp {
   {
     // if TIME_DIVISION == 1 then lock to audiodevice.
     if(UNIV::TIME_DIVISION == 1) {      
-      TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);					
-      EXTMonitor* guard = sched->getGuard();
+      TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);                                        
+      EXTMonitor& guard = sched->getGuard();
       while(true) {
 #ifdef EXT_BOOST
-        sched->timeSlice();		
-        guard->wait();
+        sched->timeSlice();             
+        guard.wait();
 #else
         sched->timeSlice();
-        guard->lock();
-        guard->wait();
-        guard->unlock();
+        guard.lock();
+        guard.wait();
+        guard.unlock();
 #endif
       }
       return obj_p;
     }else{ // otherwise if TIME_DIVISION > 1 then timeSlice never returns!
-      TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);					      
+      TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);                                              
       sched->timeSlice();
       // should never return from timeSlice
       return NULL;
