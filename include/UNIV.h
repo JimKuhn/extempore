@@ -4,31 +4,31 @@
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -38,10 +38,6 @@
 
 #include <stdint.h>
 #include <BranchPrediction.h>
-
-#ifdef EXT_BOOST
-#include <random>
-#endif
 
 #include <string>
 #include <vector>
@@ -72,20 +68,11 @@
 #define D_BILLION 1000000000.0
 #define D_MILLION 1000000.0
 
-
 #ifdef _WIN32
 #define OS_PATH_DELIM '\\'
 #else
 #define OS_PATH_DELIM '/'
 #endif
-
-/*
-struct regex_matched_buffer
-{
-  int matches;
-  char* data[100];
-  };
-*/
 
 struct scheme;
 struct cell;
@@ -107,58 +94,44 @@ int register_for_window_events();
 
 }
 
-namespace extemp {
+namespace extemp
+{
 
-//#define mk_cb(instance,class,func) (dynamic_cast<CM*>(new CMI<class>(instance,&class::func)))
-    
-  class UNIV {
+namespace UNIV
+{
 
-#define EIGHT_BIT 127
-#define SIXTEEN_BIT 32767
-#define TWENTY_FOUR_BIT 8388608
-#define THIRTY_TWO_BIT 214748647
-    
-  public:
-    static std::string SHARE_DIR;
-    static uint32_t CHANNELS;
-    static uint32_t IN_CHANNELS;
-    static uint32_t SAMPLERATE;
-    static volatile uint64_t TIME;
-    static uint64_t DEVICE_TIME;
-    static double AUDIO_CLOCK_BASE;
-    static double AUDIO_CLOCK_NOW;
-    static uint64_t TIME_DIVISION;
-    static uint32_t SECOND() { return SAMPLERATE; }
-    static uint32_t MINUTE() { return SAMPLERATE * 60; }
-    static uint32_t HOUR() { return MINUTE() * 60; }
-    static uint32_t FRAMES;
-    static uint32_t EXT_TERM;
-    static bool EXT_LOADBASE;
-    static uint32_t AUDIO_NONE;
-    static uint32_t AUDIO_DEVICE;
-    static uint32_t AUDIO_IN_DEVICE;
-    static double CLOCK_OFFSET;
-    static std::map<std::string,std::string> CMDPARAMS;
-    static std::string ARCH;
-    static std::string CPU;
-    static std::vector<std::string> ATTRS;
-#ifdef EXT_BOOST
-    static std::random_device RNGDEV;
-    static std::mt19937_64 RNGGEN;
-    static std::uniform_real_distribution<double> uniform_01;
-#endif
+extern std::string SHARE_DIR;
+extern uint32_t CHANNELS;
+extern uint32_t IN_CHANNELS;
+extern uint32_t SAMPLERATE;
+extern volatile uint64_t TIME;
+extern uint64_t DEVICE_TIME;
+extern double AUDIO_CLOCK_BASE;
+extern double AUDIO_CLOCK_NOW;
+extern uint64_t TIME_DIVISION;
+inline uint32_t SECOND() { return SAMPLERATE; }
+inline uint32_t MINUTE() { return SAMPLERATE * 60; }
+inline uint32_t HOUR() { return MINUTE() * 60; }
+extern uint32_t FRAMES;
+extern uint32_t EXT_TERM;
+extern bool EXT_LOADBASE;
+extern uint32_t AUDIO_NONE;
+extern uint32_t AUDIO_DEVICE;
+extern uint32_t AUDIO_IN_DEVICE;
+extern double CLOCK_OFFSET;
+extern std::map<std::string,std::string> CMDPARAMS;
+extern std::string ARCH;
+extern std::string CPU;
+extern std::vector<std::string> ATTRS;
+extern double midi2frq(double pitch);
+extern double frqRatio(double semitones);
+extern void initRand();
+extern int random(int range);
+extern double random();
+extern bool file_check(const std::string& filename);
+extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
 
-    static double midi2frq(double pitch);
-    static double frqRatio(double semitones);
-    static void initRand();
-    static int random(int range);
-    static double random();
-    static bool file_check(const std::string& filename);
-    static void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
-     
-  private:
-
-  };
+}
 
 extern "C" {
 //////////////////////////////////////////////////////////////////
