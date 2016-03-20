@@ -42,10 +42,10 @@ namespace extemp {
 
 TaskScheduler TaskScheduler::SINGLETON;
 
-TaskScheduler::TaskScheduler(): m_numFrames(0), queueThread(TaskScheduler::queue_thread_callback, this, "scheduler"),
-    guard("task_scheduler_guard")
+TaskScheduler::TaskScheduler(): m_numFrames(0), m_queueThread(TaskScheduler::queueThread, this, "scheduler"),
+    m_guard("task_scheduler_guard")
 {
-    guard.init();
+    m_guard.init();
 }
 
 static uint64_t AUDIO_DEVICE_START_OFFSET = 0;
@@ -54,96 +54,72 @@ static double LAST_REALTIME_STAMP = 0.0;
 void TaskScheduler::timeSlice()
 {
     uint32_t frames = m_numFrames / UNIV::TIME_DIVISION;
-    uint64_t nanosecs = ((double)frames / (double)UNIV::SAMPLERATE) * 1000000000.0;
-    uint32_t division_num = 0;
-
+    uint64_t nanosecs = double(frames) / UNIV::SAMPLERATE * BILLION;
+    timespec remain { 0, 0 };
+    if (unlikely(UNIV::AUDIO_NONE)) { // i.e. if no audio device
+        AudioDevice::CLOCKBASE = getRealTime();
+        UNIV::AUDIO_CLOCK_BASE = AudioDevice::CLOCKBASE;
+    }
+    LAST_REALTIME_STAMP = getRealTime();
+    do {
+        m_queue.lock();
+        auto task(m_queue.peek());
+        while (task && task->getStartTime() < UNIV::TIME + frames) {
+            m_queue.pop();
+            try {
+                if (likely(!task->getTag())) {
+                    task->execute();
+                }
+            } catch(std::exception& e) {
+                std::cout << "Error executing scheduled task! " << e.what() << std::endl;
+            }
+            delete task;
+            task = m_queue.peek();
+        }
+        m_queue.unlock();
+        if (likely(UNIV::TIME_DIVISION == 1)) {
+            return;
+        }
+        if (unlikely(UNIV::AUDIO_NONE)) {
+            AudioDevice::REALTIME = getRealTime();
+            UNIV::AUDIO_CLOCK_NOW = AudioDevice::REALTIME;
+        } else if (!UNIV::DEVICE_TIME) {
+            AUDIO_DEVICE_START_OFFSET = UNIV::TIME;
+        }
+        UNIV::TIME += frames;
 #ifdef _WIN32
     // not on windows yet!
 #else
-    struct timespec a, b;
-    b.tv_sec = 0;
-    b.tv_nsec = 0;
-#endif
-
-    if(UNIV::AUDIO_NONE > 0) { // i.e. if no audio device
-      AudioDevice::CLOCKBASE = getRealTime();
-      UNIV::AUDIO_CLOCK_BASE = AudioDevice::CLOCKBASE;
-    }
-
-    LAST_REALTIME_STAMP=getRealTime();
-    do{
-      queue.lock();
-      TaskI* t = queue.peek();
-      // this is a task we need to do something with
-      while(t != NULL && (t->getStartTime() < (UNIV::TIME + frames))) {
-        t = queue.pop();
-        try{
-          if(t->getTag() == 0) t->execute();
-        }catch(std::exception& e){ //...){
-          std::cout << "Error executing scheduled task! " << e.what() << std::endl;
-        }
-        delete t;
-        t = queue.peek();
-      }
-      queue.unlock();
-      // increment time and run nanosleep if running separate to audiodevice (i.e. TIME_DIVISION > 1)
-      if (UNIV::TIME_DIVISION > 1) {
-        if(UNIV::AUDIO_NONE > 0) {
-          AudioDevice::REALTIME = getRealTime();
-          UNIV::AUDIO_CLOCK_NOW = AudioDevice::REALTIME;
-        }else if(UNIV::DEVICE_TIME == 0) {
-          AUDIO_DEVICE_START_OFFSET = UNIV::TIME;
-        }
-        //std::cout << "TIME: " << UNIV::TIME << " diff: " << ((double)UNIV::TIME - ((double)UNIV::DEVICE_TIME+(double)AUDIO_DEVICE_START_OFFSET)) << " frames: " << frames << std::endl;
-        UNIV::TIME += frames;
-#ifdef _WIN32
-        // not on windows yet!
-#else
-        // if last error (b.tv_nsec) is small then keep sleeping
-        double realtime_stamp = getRealTime();
-        double timediff = realtime_stamp - (LAST_REALTIME_STAMP + ((double) frames / (double)UNIV::SAMPLERATE));
-        LAST_REALTIME_STAMP = realtime_stamp;
-        a.tv_sec = 0;
-        a.tv_nsec = nanosecs - b.tv_nsec; // subtract error from last nanosleep
+    // if last error (b.tv_nsec) is small then keep sleeping
+        double realtimeStamp = getRealTime();
+        double timediff = realtimeStamp - (LAST_REALTIME_STAMP + double(frames) / UNIV::SAMPLERATE);
+        LAST_REALTIME_STAMP = realtimeStamp;
+        timespec delay { 0, long(nanosecs - remain.tv_nsec) }; // this better be all sub-second
         // subtract any timediff error!
         // then multiply by 0.5 to split the difference (i.e only move halfway towards the error).
-        a.tv_nsec -= ((uint64_t) (0.5*timediff*1000000000.0));
-        // if we are running an audio device move slowly towards the device time.
-        if(UNIV::AUDIO_NONE < 1) {
-          a.tv_nsec += (uint64_t)(((double)UNIV::TIME - ((double)UNIV::DEVICE_TIME+AUDIO_DEVICE_START_OFFSET)) / (double)UNIV::SAMPLERATE * 1000000000.0 * 0.5);
+        delay.tv_nsec -= timediff / 2 * BILLION;
+        if (likely(!UNIV::AUDIO_NONE)) {
+            delay.tv_nsec += (double(UNIV::TIME) - (UNIV::DEVICE_TIME + AUDIO_DEVICE_START_OFFSET)) /
+                    UNIV::SAMPLERATE / 2 * BILLION;
         }
-        nanosleep(&a,&b);
+        nanosleep(&delay, &remain);
 #endif
-          }
-        }while(UNIV::TIME_DIVISION > 1);
-    // return will never be called if UNIV::TIME_DIVISION > 1
-    return;
-  }
+    } while (true);
+}
 
-  //realtime thread for handling all scheduled tasks
-  void* TaskScheduler::queue_thread_callback(void* obj_p)
-  {
-    // if TIME_DIVISION == 1 then lock to audiodevice.
-    if(UNIV::TIME_DIVISION == 1) {
-      TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);
-      EXTMonitor& guard = sched->getGuard();
-      while (true) {
-#ifdef EXT_BOOST
-        sched->timeSlice();
-        guard.wait();
-#else
-        sched->timeSlice();
-        guard.lock();
-        guard.wait();
-        guard.unlock();
-#endif
-      }
-      return obj_p;
-    }else{ // otherwise if TIME_DIVISION > 1 then timeSlice never returns!
-      TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);
-      sched->timeSlice();
-      // should never return from timeSlice
-      return NULL;
+void* TaskScheduler::queueThreadImpl()
+{
+    if (likely(UNIV::TIME_DIVISION == 1)) {
+        while (true) {
+            timeSlice();
+            m_guard.lock();
+            m_guard.wait();
+            m_guard.unlock();
+        }
+        return this;
     }
-  }
+    timeSlice();
+    return nullptr;
+}
+
 } // End Namespace

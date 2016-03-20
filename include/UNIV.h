@@ -115,7 +115,7 @@ inline uint32_t HOUR() { return MINUTE() * 60; }
 extern uint32_t FRAMES;
 extern uint32_t EXT_TERM;
 extern bool EXT_LOADBASE;
-extern uint32_t AUDIO_NONE;
+extern bool AUDIO_NONE;
 extern uint32_t AUDIO_DEVICE;
 extern uint32_t AUDIO_IN_DEVICE;
 extern double CLOCK_OFFSET;
