@@ -4,31 +4,31 @@
 * All rights reserved.
 *
 *
-* Redistribution and use in source and binary forms, with or without 
+* Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are met:
 *
-* 1. Redistributions of source code must retain the above copyright notice, 
+* 1. Redistributions of source code must retain the above copyright notice,
 *    this list of conditions and the following disclaimer.
 *
 * 2. Redistributions in binary form must reproduce the above copyright notice,
-*    this list of conditions and the following disclaimer in the documentation 
+*    this list of conditions and the following disclaimer in the documentation
 *    and/or other materials provided with the distribution.
 *
 * Neither the name of the authors nor other contributors may be used to endorse
-* or promote products derived from this software without specific prior written 
+* or promote products derived from this software without specific prior written
 * permission.
 *
 *
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
-* AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
-* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
-* ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
-* LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
-* CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
-* SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
-* INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
-* CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-* ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+* AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+* ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+* LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+* CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+* SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+* INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+* CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+* ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 * POSSIBILITY OF SUCH DAMAGE.
 *
 */
@@ -68,14 +68,27 @@ extern llvm_zone_t* llvm_zone_create(uint64_t);
 namespace extemp {
 
 thread_local SchemeProcess* SchemeProcess::sm_current = 0;
-
 std::map<std::string, SchemeProcess*> SchemeProcess::sm_nameMap;
+const char* SchemeProcess::sm_banner = "\n"
+        "##########################################\n"
+        "##                                      ##\n"
+        "##               EXTEMPORE              ##\n"
+        "##                                      ##\n"
+        "##           andrew@moso.com.au         ##\n"
+        "##                                      ##\n"
+        "##            (c) 2005-2015             ##\n"
+        "##                                      ##\n"
+        "##########################################\n"
+        "     ################################\n"
+        "          ######################\n"
+        "               ############\n"
+        "                    ##\n\n";
 
 SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Name, int ServerPort, bool Banner,
-            const std::string& InitExpr): m_loadPath(LoadPath), m_name(Name), m_serverPort(ServerPort),
-            m_banner(Banner), m_initExpr(InitExpr), m_libsLoaded(false), m_guard("scheme_server_guard"),
-            m_running(true), m_threadTask(&taskTrampoline, this, "SP_task"),
-            m_threadServer(&serverTrampoline, this, "SP_server")
+        const std::string& InitExpr): m_loadPath(LoadPath), m_name(Name), m_serverPort(ServerPort),
+        m_banner(Banner), m_initExpr(InitExpr), m_libsLoaded(false), m_guard("scheme_server_guard"),
+        m_running(true), m_threadTask(&taskTrampoline, this, "SP_task"),
+        m_threadServer(&serverTrampoline, this, "SP_server")
 {
     if (m_loadPath[m_loadPath.length() - 1] != '/') {
         m_loadPath.push_back('/');
@@ -185,25 +198,6 @@ bool SchemeProcess::loadFile(const std::string& File, const std::string& Path)
     scheme_load_file(m_scheme, impscm);
     return true;
 }
-
-    void SchemeProcess::banner(std::ostream& Stream) {
-        Stream << std::endl;
-        Stream << "##########################################" << std::endl;
-        Stream << "##                                      ##" << std::endl;
-        Stream << "##               EXTEMPORE              ##" << std::endl;
-        Stream << "##                                      ##" << std::endl;
-        Stream << "##           andrew@moso.com.au         ##" << std::endl;
-        Stream << "##                                      ##" << std::endl;
-        Stream << "##            (c) 2005-2015             ##" << std::endl;
-        Stream << "##                                      ##" << std::endl;
-        Stream << "##########################################" << std::endl;
-        Stream << "     ################################" << std::endl;
-        Stream << "          ######################" << std::endl;
-        Stream << "               ############" << std::endl;
-        Stream << "                    ##" << std::endl;
-        Stream << std::endl;
-    }
-
 
 void* SchemeProcess::taskImpl()
 {
@@ -384,8 +378,8 @@ void* SchemeProcess::serverImpl()
         usleep(1000);
     }
     fd_set readFds;
-    std::vector<int> client_sockets;
-    std::map<int, std::stringstream*> in_streams;
+    std::vector<int> clientSockets;
+    std::map<int, std::string> inStrings;
     FD_ZERO(&readFds); //zero out open sockets
     FD_SET(m_serverSocket, &readFds); //add server socket to open sockets list
     int numFds = m_serverSocket + 1;
@@ -395,12 +389,12 @@ void* SchemeProcess::serverImpl()
         FD_COPY(&readFds, &curReadFds);
         int res(select(numFds, &curReadFds, NULL, NULL, &timeout));
         if (unlikely(res < 0)) { // assumes only one failure
-            auto iter(client_sockets.begin());
-            for (; iter != client_sockets.end(); ++iter) {
+            auto iter(clientSockets.begin());
+            for (; iter != clientSockets.end(); ++iter) {
                 struct stat buf;
                 if (fstat(*iter, &buf) < 0) {
                     FD_CLR(*iter, &readFds);
-                    client_sockets.erase(iter);
+                    clientSockets.erase(iter);
                     break;
                 }
             }
@@ -424,11 +418,11 @@ void* SchemeProcess::serverImpl()
                 ascii_warning();
                 printf("New Client Connection \n");
                 ascii_normal();
-                client_sockets.push_back(res);
-                in_streams[res] = new std::stringstream;
-                std::stringstream ss;
+                clientSockets.push_back(res);
+                inStrings[res] = std::string();
+                std::string outString;
                 if (m_banner) {
-                    banner(ss);
+                    outString += sm_banner;
                     auto time(UNIV::TIME);
                     unsigned hours(time / UNIV::HOUR());
                     time -= hours * UNIV::HOUR();
@@ -437,32 +431,29 @@ void* SchemeProcess::serverImpl()
                     unsigned seconds(time / UNIV::SECOND());
                     char prompt[23];
                     sprintf(prompt, "[extempore %.2u:%.2u:%.2u]: ", hours, minutes, seconds);
-                    ss << prompt;
+                    outString += prompt;
                 } else {
-                    ss << "Welcome to extempore!";
+                    outString += "Welcome to extempore!";
                 }
-                auto str(ss.str());
-                write(res, str.c_str(), str.length() + 1);
+                write(res, outString.c_str(), outString.length() + 1);
                 continue;
             }
         }
-        for (int index = 0; index < client_sockets.size(); ++index) {
-            auto sock(client_sockets[index]);
+        for (int index = 0; index < clientSockets.size(); ++index) {
+            auto sock(clientSockets[index]);
             int BUFLEN = 1024;
             char buf[BUFLEN + 1];
             if (FD_ISSET(sock, &curReadFds)) { //see if any client sockets have data for us
-                std::string evalStr("\r\n");
+                std::string evalStr;
                 for (int j = 0; true; j++) { //read from stream in BUFLEN blocks
                     res = read(sock, buf, BUFLEN);
                     if (unlikely(!res)) { //close the socket
                         FD_CLR(sock, &readFds);
-                        auto iter(in_streams.find(sock));
-                        delete iter->second;
-                        in_streams.erase(iter);
+                        inStrings.erase(sock);
                         ascii_warning();
                         std::cout << "Close Client Socket" << std::endl;
                         ascii_normal();
-                        client_sockets.erase(client_sockets.begin() + index);
+                        clientSockets.erase(clientSockets.begin() + index);
                         close(sock);
                         --index;
                         break;
@@ -472,21 +463,18 @@ void* SchemeProcess::serverImpl()
                         ascii_normal();
                         break;
                     }
-                    auto& stream(*in_streams[sock]);
+                    auto& string(inStrings[sock]);
                     buf[res] = '\0';
-                    stream << buf;
-                    evalStr = in_streams[sock]->str();
-                    auto len(evalStr.length());
-                    if (!evalStr.compare(len - 2, 2, "\x0d\x0a")) {
-                        stream.str(std::string());
+                    string += buf;
+                    if (buf[res - 2] == 0x0d && buf[res - 1] == 0x0a) {
+                        evalStr.swap(string);
                         break;
                     }
                     if (unlikely(j > 1024 *10)) {
                         ascii_error();
                         printf("Error reading eval string from server socket. No terminator received before 10MB limit.\n");
                         ascii_normal();
-                        stream.str(std::string());
-                        evalStr.clear();
+                        string.clear();
                         break;
                     }
                 }
@@ -494,11 +482,11 @@ void* SchemeProcess::serverImpl()
                     std::string::size_type pos = 0;
                     std::string::size_type end = evalStr.find_first_of('\x0d', pos);
                     for (; end != std::string::npos; pos = end + 2, end = evalStr.find_first_of('\x0d', pos)) {
-    #if !defined(NDEBUG)
+#if !defined(NDEBUG)
                         if (m_guard.isOwnedByCurrentThread()) {
                                 printf("Extempore interpreter server thread trying to relock. Dropping Task!. Let me know andrew@moso.com.au\n");
                         }
-    #endif
+#endif
                         EXTMonitor::ScopedLock lock(m_guard, true);
                         char c[8];
                         sprintf(c, "%i", sock);
@@ -510,8 +498,7 @@ void* SchemeProcess::serverImpl()
             }
         }
     }
-    for (auto sock : client_sockets) {
-        delete(in_streams[sock]);
+    for (auto sock : clientSockets) {
         std::cout << "CLOSE CLIENT-SOCKET" << std::endl;
         close(sock);
         std::cout << "DONE-CLOSING_CLIENT" << std::endl;

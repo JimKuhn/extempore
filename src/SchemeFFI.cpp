@@ -4,31 +4,31 @@
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -100,7 +100,7 @@
 #else
 #include <time.h>
 #endif
- 
+
 #ifdef _WIN32
 //#include <unistd.h>
 #include <malloc.h>
@@ -165,7 +165,7 @@ static inline std::string xtm_ftostr(const llvm::APFloat& V) {
 namespace extemp {
 
     SchemeFFI SchemeFFI::SINGLETON;
-    std::unordered_map<std::string,std::pair<std::string,std::string>> SchemeFFI::IMPCIR_DICT;  
+    std::unordered_map<std::string,std::pair<std::string,std::string>> SchemeFFI::IMPCIR_DICT;
     char* SchemeFFI::tmp_str_a = (char*) malloc(1024);
     char* SchemeFFI::tmp_str_b = (char*) malloc(4096);
   std::unordered_map<std::string,std::string> SchemeFFI::LLVM_ALIAS_TABLE;
@@ -316,7 +316,7 @@ namespace extemp {
       { "llvm:print-all-closures",         &SchemeFFI::llvm_print_all_closures },
       { "llvm:print-closure",    &SchemeFFI::llvm_print_closure },
       { "llvm:get-closure-work-name", &SchemeFFI::llvm_closure_last_name },
-      { "llvm:disassemble",           &SchemeFFI::llvm_disasm },      
+      { "llvm:disassemble",           &SchemeFFI::llvm_disasm },
             { "llvm:bind-symbol",                             &SchemeFFI::bind_symbol },
             { "llvm:update-mapping",                      &SchemeFFI::update_mapping },
             { "llvm:add-llvm-alias",        &SchemeFFI::add_llvm_alias },
@@ -334,9 +334,9 @@ namespace extemp {
             { "clock:get-offset",           &SchemeFFI::getClockOffset},
       { "clock:adjust-offset",        &SchemeFFI::adjustClockOffset},
             { "clock:clock",                &SchemeFFI::getClockTime},
-      { "clock:ad:clock",             &SchemeFFI::lastSampleBlockClock},    
+      { "clock:ad:clock",             &SchemeFFI::lastSampleBlockClock},
             //#endif
-           
+
 
 
         };
@@ -409,7 +409,7 @@ namespace extemp {
     }
 
     pointer SchemeFFI::dataGETi64(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
         int64_t offset = ivalue(pair_cadr(args));
         int64_t* ptr = (int64_t*) (cptr+offset);
@@ -417,7 +417,7 @@ namespace extemp {
     }
 
     pointer SchemeFFI::dataGETdouble(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
         int64_t offset = ivalue(pair_cadr(args));
         double* ptr = (double*) (cptr+offset);
@@ -425,7 +425,7 @@ namespace extemp {
     }
 
     pointer SchemeFFI::dataGETfloat(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
         int64_t offset = ivalue(pair_cadr(args));
         float* ptr = (float*) (cptr+offset);
@@ -433,7 +433,7 @@ namespace extemp {
     }
 
     pointer SchemeFFI::dataSETi64(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
         int64_t offset = ivalue(pair_cadr(args));
         int64_t* ptr = (int64_t*) (cptr+offset);
@@ -442,7 +442,7 @@ namespace extemp {
     }
 
     pointer SchemeFFI::dataSETdouble(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
         int64_t offset = ivalue(pair_cadr(args));
         double* ptr = (double*) (cptr+offset);
@@ -451,7 +451,7 @@ namespace extemp {
     }
 
     pointer SchemeFFI::dataSETfloat(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
         int64_t offset = ivalue(pair_cadr(args));
         float* ptr = (float*) (cptr+offset);
@@ -514,14 +514,14 @@ namespace extemp {
     }
 
     pointer SchemeFFI::makeCptr(scheme* _sc, pointer args)
-    {                                                     
-         long num_bytes = ivalue(pair_car(args));            
-         void* ptr = malloc(num_bytes);                      
-         memset(ptr,0,num_bytes);                            
-         return mk_cptr(_sc, ptr);                           
-    }                                                     
+    {
+         long num_bytes = ivalue(pair_car(args));
+         void* ptr = malloc(num_bytes);
+         memset(ptr,0,num_bytes);
+         return mk_cptr(_sc, ptr);
+    }
 
-  pointer SchemeFFI::pathExpansion(scheme* _sc, pointer args) {    
+  pointer SchemeFFI::pathExpansion(scheme* _sc, pointer args) {
   #ifdef _WIN32
     char* path = string_value(pair_car(args));
     char* exp_path = path;
@@ -530,24 +530,24 @@ namespace extemp {
         memset(exp_path,0,8192);
     char* path = string_value(pair_car(args));
     if(path[0] == '~') {
-      char* h = getenv("HOME");      
+      char* h = getenv("HOME");
       strcpy(exp_path,h);
       strcat(exp_path,&path[1]);
     }else{
       realpath(path,exp_path);
     }
-    
-  #endif  
+
+  #endif
     return mk_string(_sc,exp_path);
   }
-  
-  pointer SchemeFFI::command(scheme* _sc, pointer args) {    
+
+  pointer SchemeFFI::command(scheme* _sc, pointer args) {
     // NOTE: doesn't work for Windows yet
     int res = system(string_value(pair_car(args)));
     return mk_integer(_sc,res);
   }
 
-  pointer SchemeFFI::commandOutput(scheme* _sc, pointer args) {    
+  pointer SchemeFFI::commandOutput(scheme* _sc, pointer args) {
 
     char outbuf[8192];
     memset(outbuf,0,8192);
@@ -570,7 +570,7 @@ namespace extemp {
         return mk_string(_sc,outbuf);
       }
     else
-      return _sc->F;     
+      return _sc->F;
   }
 
   pointer SchemeFFI::setEnv(scheme* _sc, pointer args) {
@@ -775,7 +775,7 @@ namespace extemp {
     repl->writeString(str);
     return _sc->T;
   }
-    
+
   pointer SchemeFFI::ipcDefine(scheme* _sc, pointer args)
   {
     std::string process(string_value(pair_car(args)));
@@ -834,7 +834,7 @@ namespace extemp {
     SchemeREPL::I(process)->writeString(expr);
     return _sc->T;
     }
-    
+
   pointer SchemeFFI::ipcLoad(scheme* _sc, pointer args)
   {
     std::string process(string_value(pair_car(args)));
@@ -935,7 +935,7 @@ namespace extemp {
     pointer SchemeFFI::rationalToNumerator(scheme* _sc, pointer args)
     {
         pointer rat = pair_car(args);
-        if(!is_rational(rat)) 
+        if(!is_rational(rat))
           return mk_integer(_sc, ivalue(rat));
         return mk_integer(_sc,rat->_object._number.value.ratvalue.n);
     }
@@ -1004,8 +1004,8 @@ namespace extemp {
 #else
       return _sc->F;
 #endif
-    }  
-  
+    }
+
     pointer SchemeFFI::cmdarg(scheme* _sc, pointer args)
     {
       char* key = string_value(pair_car(args));
@@ -1045,7 +1045,7 @@ namespace extemp {
     {
       char* str = string_value(pair_car(args));
       size_t lth = 0;
-      unsigned char* res = base64_decode(str,strlen(str),&lth);      
+      unsigned char* res = base64_decode(str,strlen(str),&lth);
       return mk_string(_sc,(char*)res);
     }
 
@@ -1072,10 +1072,10 @@ namespace extemp {
       char* str = string_value(pair_car(args));
       // unsigned long hash = 0;
       // int c;
-  
+
   //     while ((c = *str++))
         // hash = c + (hash << 6) + (hash << 16) - hash;
-  
+
       return mk_integer(_sc,string_hash((unsigned char*) str));
     }
 
@@ -1581,13 +1581,13 @@ namespace extemp {
 
     pointer SchemeFFI::optimizeCompiles(scheme* _sc, pointer args)
     {
-        EXTLLVM::OPTIMIZE_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0; 
+        EXTLLVM::OPTIMIZE_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0;
         return _sc->T;
     }
 
     pointer SchemeFFI::verifyCompiles(scheme* _sc, pointer args)
     {
-        EXTLLVM::VERIFY_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0; 
+        EXTLLVM::VERIFY_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0;
         return _sc->T;
     }
 
@@ -1647,7 +1647,7 @@ namespace extemp {
         }
         Function* func = extemp::EXTLLVM::I()->getFunction(symname);
         const char* tmp_name = NULL;
-      
+
         if(func != NULL) {
           Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
           int cntt = 0;
@@ -1664,9 +1664,9 @@ namespace extemp {
               }
               funcargs++;
               cntt++;
-            }          
+            }
         }
-      
+
         GlobalValue* vvv = gv;
         std::string typestr;
         llvm::raw_string_ostream ss(typestr);
@@ -1681,24 +1681,24 @@ namespace extemp {
           llvm::raw_string_ostream sts(typestr);
           rettype->print(sts);
           std::size_t pos = sts.str().find(" = type");
-          std::string rettypestr = sts.str();                    
+          std::string rettypestr = sts.str();
           if (pos > 0) {
             rettypestr = sts.str().substr(0, pos);
           }
           std::string argstypestr = stype.substr(rettypestr.length()+1,stype.length());
           sprintf(tmpbuf,"declare %s @%s%s",rettypestr.c_str(),symname,argstypestr.c_str());
-          
+
           exprr.append(tmpbuf);
         } else {
           exprr.append("@");
           exprr.append(symname);
           exprr.append(" = external global ");
-          exprr.append(stype);          
+          exprr.append(stype);
         }
-        exprr.append("\n\n");        
-        exprr.append(asmcode);        
+        exprr.append("\n\n");
+        exprr.append(asmcode);
         asmcode.clear();
-        asmcode.append(exprr);        
+        asmcode.append(exprr);
         cnt++;
       }else{
         break;
@@ -1713,7 +1713,7 @@ namespace extemp {
       }
 
 #endif
-  
+
     //std::stringstream ss;
     if(newModule == 0)
       {
@@ -1721,7 +1721,7 @@ namespace extemp {
         llvm::raw_string_ostream ss(errstr);
         pa.print("LLVM IR",ss);
         printf("%s\n",ss.str().c_str());
-#ifndef EXT_MCJIT    
+#ifndef EXT_MCJIT
         // if the number of functions in module has changed when
         // calling runFunction then we assume a stub was made and
         // appended to the end of the modules function list. we remove
@@ -1739,7 +1739,7 @@ namespace extemp {
       if (extemp::EXTLLVM::VERIFY_COMPILES) {
         if (verifyModule(*M)) {
           std::cout << "\nInvalid LLVM IR\n";
-#ifndef EXT_MCJIT        
+#ifndef EXT_MCJIT
           if(num_of_funcs != M->getFunctionList().size()) {
             iplist<Function>::iterator iter = M->getFunctionList().end();
             Function* func = dyn_cast<Function>(--iter);
@@ -1747,9 +1747,9 @@ namespace extemp {
             func->dropAllReferences();
             func->removeFromParent();
           }
-#endif        
+#endif
           return _sc->F;
-        } 
+        }
       }
 #ifdef EXT_MCJIT
       llvm::Module *modulePtr = newModule.get();
@@ -1803,7 +1803,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
-    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));   
+    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));
     if(var == 0)
       {
         return _sc->F;
@@ -1818,7 +1818,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
@@ -1834,7 +1834,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));  
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
@@ -1855,7 +1855,7 @@ namespace extemp {
     Module* M = NULL;
     std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
     for (int i=0;i<Ms.size();i++) {
-      M = Ms[i];    
+      M = Ms[i];
       for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
         const llvm::Function* func = GI;
         if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
@@ -1863,7 +1863,7 @@ namespace extemp {
           std::string str;
           llvm::raw_string_ostream ss(str);
           ss << *func;
-          printf("\n---------------------------------------------------\n%s",str.c_str());        
+          printf("\n---------------------------------------------------\n%s",str.c_str());
         }
       }
     }
@@ -1884,7 +1884,7 @@ namespace extemp {
     Module* M = NULL;
     std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
     for (int i=0;i<Ms.size();i++) {
-      M = Ms[i];    
+      M = Ms[i];
       for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
         const llvm::Function* func = GI;
         if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
@@ -1902,7 +1902,7 @@ namespace extemp {
   {
     using namespace llvm;
     char* fname = string_value(pair_car(args));
-    
+
     Module* M = NULL;
     std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
     for (int i=0;i<Ms.size();i++) {
@@ -1922,7 +1922,7 @@ namespace extemp {
     }
     return _sc->T;
   }
-  
+
 
   pointer SchemeFFI::llvm_disasm(scheme* _sc, pointer args)
   {
@@ -1936,15 +1936,15 @@ namespace extemp {
     }
     if (syntax > 1) {
       std::cout << "Syntax argument must be either 0: at&t or 1: intel" << std::endl;
-      std::cout << "The default is 1: intel" << std::endl;      
+      std::cout << "The default is 1: intel" << std::endl;
       syntax = 1;
     }
     pointer name = SchemeFFI::llvm_closure_last_name(_sc, args);
     unsigned char* fptr = (unsigned char*) cptr_value(SchemeFFI::get_function_pointer(_sc,cons(_sc,name,pair_cdr(args))));
     char* dasm = llvm_disassemble(fptr,syntax); //,bytes,x64);
     return mk_string(_sc,dasm);
-  }  
-  
+  }
+
   pointer SchemeFFI::get_struct_size(scheme* _sc, pointer args)
   {
     using namespace llvm;
@@ -1999,7 +1999,7 @@ namespace extemp {
     const StructLayout* sl = layout->getStructLayout(type);
     long size = sl->getSizeInBytes();
     delete layout;
-    return mk_integer(_sc,size);       
+    return mk_integer(_sc,size);
   }
 
   pointer SchemeFFI::get_function_type(scheme* _sc, pointer args)
@@ -2008,7 +2008,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));  
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
@@ -2049,7 +2049,7 @@ namespace extemp {
       {
         return _sc->F;
       }
-        
+
     char* filename = string_value(pair_cadr(args));
 #ifdef _WIN32
     std::string str;
@@ -2091,7 +2091,7 @@ namespace extemp {
     }
     llvm::WriteBitcodeToFile(m,ss);
 #endif
-    return _sc->T;    
+    return _sc->T;
   }
 
   pointer SchemeFFI::get_function_args(scheme* _sc, pointer args)
@@ -2100,7 +2100,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
@@ -2119,7 +2119,7 @@ namespace extemp {
     }
 
     pointer str = mk_string(_sc, tmp_name); //_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
-    pointer p = cons(_sc, str, _sc->NIL); 
+    pointer p = cons(_sc, str, _sc->NIL);
 
     Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
     while(funcargs != func->getArgumentList().end())
@@ -2171,7 +2171,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
@@ -2192,16 +2192,16 @@ namespace extemp {
     using namespace llvm;
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));      
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
       }
-#ifndef EXT_MCJIT    
+#ifndef EXT_MCJIT
     extemp::EXTLLVM::I()->EE->lock.acquire();
     extemp::EXTLLVM::I()->EE->freeMachineCodeForFunction(func);
     extemp::EXTLLVM::I()->EE->lock.release();
-#endif    
+#endif
     func->deleteBody();
     func->eraseFromParent();
 
@@ -2224,7 +2224,7 @@ namespace extemp {
     //Module* M = EXTLLVM::I()->M;
     //Module::global_iterator i = M->global_begin();
     //GlobalVariable* var = M->getNamedGlobal(std::string(string_value(pair_car(args))));
-    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));      
+    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));
     if(var == 0)
       {
         return _sc->F;
@@ -2239,7 +2239,7 @@ namespace extemp {
   {
     using namespace llvm;
 
-    llvm::Function* func = EXTLLVM::I()->getFunction(string_value(pair_car(args)));        
+    llvm::Function* func = EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
@@ -2266,7 +2266,7 @@ namespace extemp {
     char name[1024];
     sprintf(name,"%s_native",string_value(pair_car(args)));
     //llvm::Function* func = M->getFunction(std::string(name));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(name);     
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(name);
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     //func->setCallingConv(CallingConv::C); //kCStackBased);
     if(func == 0)
@@ -2283,7 +2283,7 @@ namespace extemp {
 
     void(*f)(void) = (void(*)(void)) p;
     f();
-        
+
     return _sc->T;
   }
 
@@ -2292,7 +2292,7 @@ namespace extemp {
     using namespace llvm;
 
     //Module* M = EXTLLVM::I()->M;
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     //llvm::Function* func = M->getFunction(fname); //std::string(string_value(pair_car(args))));
     //func->setCallingConv(CallingConv::C); //kCStackBased);
     if(func == 0)
@@ -2307,14 +2307,14 @@ namespace extemp {
     try{
       EXTLLVM* xll = EXTLLVM::I();
       ExecutionEngine* EE = xll->EE;
-      
+
 #ifdef EXT_MCJIT
       void* p = NULL;
-#else      
+#else
       EE->lock.acquire();
       void* p = EE->recompileAndRelinkFunction(func);
       EE->lock.release();
-#endif      
+#endif
     }catch(std::exception& e) {
       std::cout << "EXCEPT: " << e.what() << std::endl;
     }
@@ -2331,7 +2331,7 @@ namespace extemp {
 
     //
     // This will not be threadsafe whenever a bind-func is done!
-    // 
+    //
     pointer SchemeFFI::call_compiled(scheme* _sc, pointer args)
     {
         using namespace llvm;
@@ -2456,10 +2456,10 @@ namespace extemp {
         char* floatin = string_value(pair_car(args));
         char floatout[256];
         // if already converted to hex value just return Hex String Unchanged
-        if(floatin[1]=='x') return pair_car(args); 
+        if(floatin[1]=='x') return pair_car(args);
 #ifdef _WIN32
         float f = (float) strtod(floatin, (char**) &floatout);
-#else        
+#else
         float f = strtof(floatin, (char**) &floatout);
 #endif
         llvm::APFloat apf(f);
@@ -2514,7 +2514,7 @@ namespace extemp {
         char* floatin = string_value(pair_car(args));
         char floatout[256];
         // if already converted to hex value just return Hex String Unchanged
-        if(floatin[1]=='x') return pair_car(args); 
+        if(floatin[1]=='x') return pair_car(args);
  #ifdef _WIN32
         double f = strtod(floatin, (char**) &floatout);
  #else
@@ -2564,7 +2564,7 @@ namespace extemp {
         //std::cout << "STR: " << tmpstr << "  v: " << v <<  std::endl;
         return mk_string(_sc, tmpstr);
      }
- 
+
 
     pointer SchemeFFI::llvm_count_set(scheme* _sc, pointer args)
     {
@@ -2591,7 +2591,7 @@ namespace extemp {
         llvm::raw_string_ostream ss(str);
 
         if(list_length(_sc, args) > 0) {
-    llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(args)));    
+    llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(args)));
     //llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(args))));
             if(val == NULL) {
                 std::cerr << "No such value found in LLVM Module" << std::endl;
@@ -2611,7 +2611,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 {
   //llvm::Module* M = EXTLLVM::I()->M;
   //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));      
+  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
         std::string str;
         llvm::raw_string_ostream ss(str);
         ss << *func;
@@ -2690,7 +2690,7 @@ pointer SchemeFFI::get_llvm_alias(scheme* _sc, pointer args)
         if (iter != LLVM_ALIAS_TABLE.end()) {
     return mk_string(_sc, iter->second.c_str());
   }
-  return _sc->F; 
+  return _sc->F;
 }
 
 pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
@@ -2709,7 +2709,7 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
 
         //llvm::Module* M = EXTLLVM::I()->M;
         //const llvm::Type* tt = M->getTypeByName(name);
-  const llvm::Type* tt = extemp::EXTLLVM::I()->getNamedType(name);  
+  const llvm::Type* tt = extemp::EXTLLVM::I()->getNamedType(name);
 
         if(tt) {
           //return mk_string(_sc,M->getTypeName(tt).c_str());
