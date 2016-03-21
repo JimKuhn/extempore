@@ -52,8 +52,9 @@ private:
     PriorityQueue<TaskI>   m_queue;
     EXTThread              m_queueThread;
     EXTMonitor             m_guard;
+    EXTMutex               m_queueMutex;
 
-    static TaskScheduler SINGLETON;
+    static TaskScheduler sm_instance;
 private:
     void* queueThreadImpl();
     void timeSlice();
@@ -66,18 +67,19 @@ public:
 
     void start() { m_queueThread.start(); }
     void setFrames(unsigned Frames) { m_numFrames = Frames; }
-
-    void add(TaskI* Task) { m_queue.add(Task); }
-
-    template<typename T>
-    static void addTask(uint64_t StartTime, uint64_t Duration, CM* ClassMember, const T& Arg, int Tag, bool Callback)
-    {
-        I()->add(new Task<T>(StartTime, Duration, ClassMember, Arg, Tag, Callback));
-    };
-
     EXTMonitor& getGuard() { return m_guard; }
 
-    static TaskScheduler* I() { return &SINGLETON; };
+    void add(TaskI* Task) {
+        EXTMutex::ScopedLock lock(m_queueMutex);
+        m_queue.add(Task);
+    }
+    template <typename T>
+    static void addTask(uint64_t StartTime, uint64_t Duration, CM* ClassMember, const T& Arg, int Tag, bool Callback)
+    {
+        sm_instance.add(new Task<T>(StartTime, Duration, ClassMember, Arg, Tag, Callback));
+    };
+
+    static TaskScheduler* I() { return &sm_instance; };
 };
 
 } //End Namespace

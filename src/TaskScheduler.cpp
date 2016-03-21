@@ -40,12 +40,13 @@
 
 namespace extemp {
 
-TaskScheduler TaskScheduler::SINGLETON;
+TaskScheduler TaskScheduler::sm_instance;
 
 TaskScheduler::TaskScheduler(): m_numFrames(0), m_queueThread(TaskScheduler::queueThread, this, "scheduler"),
-    m_guard("task_scheduler_guard")
+    m_guard("task_scheduler_guard"), m_queueMutex("taskQueue")
 {
     m_guard.init();
+    m_queueMutex.init();
 }
 
 static uint64_t AUDIO_DEVICE_START_OFFSET = 0;
@@ -62,9 +63,11 @@ void TaskScheduler::timeSlice()
     }
     LAST_REALTIME_STAMP = getRealTime();
     do {
+        m_queueMutex.lock();
         auto task(m_queue.peek());
         while (task && task->getStartTime() < UNIV::TIME + frames) {
             m_queue.pop();
+            m_queueMutex.unlock();
             try {
                 if (likely(!task->getTag())) {
                     task->execute();
@@ -73,8 +76,10 @@ void TaskScheduler::timeSlice()
                 std::cout << "Error executing scheduled task! " << e.what() << std::endl;
             }
             delete task;
+            m_queueMutex.lock();
             task = m_queue.peek();
         }
+        m_queueMutex.unlock();
         if (likely(UNIV::TIME_DIVISION == 1)) {
             return;
         }
