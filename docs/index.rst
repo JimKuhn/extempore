@@ -27,7 +27,7 @@ this is an attempt to do things right, using Sphinx_.
    :caption: Getting started
 
    quickstart
-   installation
+   install
    editor-support
    about-this-documentation
 
@@ -35,23 +35,25 @@ this is an attempt to do things right, using Sphinx_.
 
 .. toctree::
    :maxdepth: 1
-   :caption: Extempore programming environment
+   :caption: Key concepts
 
    philosophy
    caas
    time
    c-xtlang-interop
    scheme-xtlang-interop
+   concurrency
+   memory
 
 .. _xtlang-docs:
 
 .. toctree::
    :maxdepth: 1
-   :caption: xtlang---the Extempore language
+   :caption: xtlang
 
-   type-system
-   generics
-   memory
+   types
+   type-inference
+   best-practices
 
 .. _tutorials:
 
@@ -59,7 +61,10 @@ this is an attempt to do things right, using Sphinx_.
    :maxdepth: 1
    :caption: Tutorials & Guides
 
-   audio
+   audio-signal-processing
+   making-an-instrument
+   note-level-music
+   sampler
    graphics
    impromptu-users
 
