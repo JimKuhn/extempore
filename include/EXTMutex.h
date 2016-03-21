@@ -63,8 +63,8 @@ public:
         }
     };
 private:
-    bool                 m_initialised;
     std::string          m_name;
+    bool                 m_initialised;
 #ifdef EXT_BOOST
     std::recursive_mutex m_mutex;
 #else
@@ -143,7 +143,7 @@ inline void EXTMutex::destroy()
     if (m_initialised)
     {
         m_initialised = false;
-        auto result(pthread_mutex_destroy(&m_mutex));
+        auto __attribute__((unused)) result(pthread_mutex_destroy(&m_mutex));
 #ifdef _EXTMUTEX_DEBUG_
         if (result)
         {
@@ -155,7 +155,7 @@ inline void EXTMutex::destroy()
 
 inline void EXTMutex::lock()
 {
-    auto result(pthread_mutex_lock(&m_mutex));
+    auto __attribute__((unused)) result(pthread_mutex_lock(&m_mutex));
 #ifdef _EXTMUTEX_DEBUG_
     if (result)
     {
@@ -166,7 +166,7 @@ inline void EXTMutex::lock()
 
 inline void EXTMutex::unlock()
 {
-    auto result(pthread_mutex_unlock(&m_mutex));
+    auto __attribute__((unused)) result(pthread_mutex_unlock(&m_mutex));
 #ifdef _EXTMUTEX_DEBUG_
     if (result)
     {

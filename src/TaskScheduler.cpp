@@ -62,7 +62,6 @@ void TaskScheduler::timeSlice()
     }
     LAST_REALTIME_STAMP = getRealTime();
     do {
-        m_queue.lock();
         auto task(m_queue.peek());
         while (task && task->getStartTime() < UNIV::TIME + frames) {
             m_queue.pop();
@@ -76,7 +75,6 @@ void TaskScheduler::timeSlice()
             delete task;
             task = m_queue.peek();
         }
-        m_queue.unlock();
         if (likely(UNIV::TIME_DIVISION == 1)) {
             return;
         }

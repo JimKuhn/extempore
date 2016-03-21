@@ -4,31 +4,31 @@
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -45,46 +45,32 @@
 #include "BranchPrediction.h"
 
 namespace extemp {
-                        
+
 template<typename T>
 class PriorityQueue
 {
-private:    
-    typedef std::pair<uint64_t, T*>                                                      key_type;
-    typedef std::priority_queue<key_type, std::vector<key_type>, std::greater<key_type>> queue_type;                        
 private:
-    EXTMutex    m_mutex;
+    typedef std::pair<uint64_t, T*>                                                      key_type;
+    typedef std::priority_queue<key_type, std::vector<key_type>, std::greater<key_type>> queue_type;
+private:
     queue_type  m_queue;
 public:
-    PriorityQueue(): m_mutex("priority_queue") {
-        m_mutex.init();
-    }
     ~PriorityQueue()
     {
         clear();
-        m_mutex.destroy();
     }
-                        
-    void lock() {
-        m_mutex.lock();
-    }
-    void unlock() {
-        m_mutex.unlock();
-    }
-    bool add(T* Val)
+
+    void add(T* Val)
     {
-        EXTMutex::ScopedLock lock(m_mutex); // this shouldn't be here, I think
         m_queue.push(key_type(Val->getStartTime(), Val));
-    }                      
+    }
     void clear()
     {
         while (!m_queue.empty()) {
             delete m_queue.top().second;
             m_queue.pop();
-        } 
+        }
     }
-    // if you want the locks you'll need mutex recursion!
-    // you can set this in EXTMutex if you want it!
     T* pop()
     {
         if (unlikely(m_queue.empty())) {
@@ -94,16 +80,14 @@ public:
         m_queue.pop();
         return element;
     }
-    // if you want the locks you'll need mutex recursion!
-    // you can set this in EXTMutex if you want it!
     T* peek()
     {
         if (unlikely(m_queue.empty())) {
             return nullptr;
         }
         return m_queue.top().second;
-    }                    
+    }
 };
-        
+
 } //End Namespace
 #endif

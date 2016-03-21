@@ -63,8 +63,6 @@
 #define pair_cddddddr(p) pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(p))))))
 #define pair_caddddddr(p) pair_car(pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(p)))))))
 
-static char TERMINATION_CHAR = 23;
-
 namespace extemp {
 
 class SchemeTask {
@@ -98,19 +96,19 @@ private:
 private:
     std::string     m_loadPath;
     std::string     m_name;
+    int16_t         m_serverPort;
+    bool            m_banner;
+    std::string     m_initExpr;
     bool            m_libsLoaded;
-    scheme*         m_scheme;
     EXTMonitor      m_guard;
     bool            m_running;
     EXTThread       m_threadTask;
     EXTThread       m_threadServer;
-    bool            m_banner;
-    int16_t         m_serverPort;
+    scheme*         m_scheme;
     uint64_t        m_maxDuration;
     int             m_serverSocket;
     task_queue_type m_taskQueue;
     llvm_zone_t*    m_defaultZone;
-    std::string     m_initExpr;
     extemp::CM*     m_extemporeCallback;
     char            m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH];
 
@@ -146,10 +144,8 @@ public:
     uint64_t getMaxDuration() const { return m_maxDuration; }
     void setMaxDuration(uint64_t MaxDuration) { m_maxDuration = MaxDuration; }
     bool getRunning() const { return m_running; }
-    task_queue_type& getQueue() { return m_taskQueue; } // seems dangerous - used by OSC
     llvm_zone_t* getDefaultZone() { return m_defaultZone; }
     const std::string& getName() { return m_name; }
-    EXTMonitor& getGuard() { return m_guard; } // dangerous - fix OSC interface
     extemp::CM* getExtemporeCallback() const { return m_extemporeCallback; }
     void setPriority(int Priority) {
         m_threadTask.setPriority(Priority, false);
@@ -191,8 +187,8 @@ class SchemeObj
 {
 private:
     scheme* m_scheme;
-    pointer m_env;
     pointer m_values;
+    pointer m_env;
 public:
     SchemeObj(scheme* Sheme, pointer Values, pointer Env);
     ~SchemeObj();

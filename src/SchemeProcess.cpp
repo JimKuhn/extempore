@@ -57,6 +57,7 @@
 #include "UNIV.h"
 
 #define EXT_INITEXPR_BUFLEN 1024
+static const char TERMINATION_CHAR = 23;
 
 // FD_COPY IS BSD ONLY
 #ifndef FD_COPY
@@ -113,7 +114,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
         return;
     }
     int flag = 1;
-    int result = setsockopt(m_serverSocket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&flag), sizeof(flag));
+    setsockopt(m_serverSocket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&flag), sizeof(flag));
     scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, "*imp-envs*"), m_scheme->NIL);
     scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, "*callback*"),
             mk_cptr(m_scheme, mk_cb(this, SchemeProcess, schemeCallback)));
@@ -220,7 +221,6 @@ void* SchemeProcess::taskImpl()
     sleep(1); // give time for NSApp etc. to init
 #endif
     // only load extempore.xtm in primary process
-    char sstr[EXT_INITEXPR_BUFLEN];
     if (m_name == "primary") {
         if (extemp::UNIV::EXT_LOADBASE) {
             EXTMonitor::ScopedLock lock(m_guard);
@@ -256,22 +256,8 @@ void* SchemeProcess::taskImpl()
                 {
                     auto evalString(reinterpret_cast<std::string*>(task.getPtr()));
                     if (evalString->length() > 2) {
-                        bool write_reply = false;
-                        if (!evalString->compare(0, 4, "(ipc")) {
-                            write_reply = false;
-                        }
-#if 0
-                        if (evalString->at(evalString->size()-1) == 10 && evalString->at(evalString->size()-2 == 13)) {
-                                //      evalString->erase(--evalString->end());
-                                evalString->erase(--evalString->end());
-                                evalString->erase(--evalString->end());
-                                                }else{
-                                                        // this should be the expected result!!  - i.e. do nothing
-                                                }
-#endif
                         uint64_t now(UNIV::TIME);
-                        scheme_load_string(m_scheme, (const char*) evalString->c_str(), now,
-                                now + task.getMaxDuration());
+                        scheme_load_string(m_scheme, evalString->c_str(), now, now + task.getMaxDuration());
                         if (unlikely(m_scheme->retcode)) { //scheme error
                             resetOutportString();
                         }
@@ -439,7 +425,7 @@ void* SchemeProcess::serverImpl()
                 continue;
             }
         }
-        for (int index = 0; index < clientSockets.size(); ++index) {
+        for (unsigned index = 0; index < clientSockets.size(); ++index) {
             auto sock(clientSockets[index]);
             int BUFLEN = 1024;
             char buf[BUFLEN + 1];
@@ -513,17 +499,17 @@ void* SchemeProcess::serverImpl()
 
 SchemeObj::SchemeObj(scheme* Scheme, pointer Values, pointer Env): m_scheme(Scheme), m_values(Values), m_env(Env)
 {
-        if (unlikely(!Env)) {
-                std::cout << "BANG CRASH SHEBANG" << std::endl;
-                fflush(stdout);
-                abort();
-        }
-        m_scheme->imp_env.insert(Env);
+    if (unlikely(!Env)) {
+        std::cout << "BANG CRASH SHEBANG" << std::endl;
+        fflush(stdout);
+        abort();
+    }
+    m_scheme->imp_env.insert(Env);
 }
 
 SchemeObj::~SchemeObj()
 {
-    if (m_env != NULL) { // impossible?
+    if (likely(m_env)) { // impossible to be null?
         m_scheme->m_process->createSchemeTask(m_env, "destroy SchemeObj", SchemeTask::Type::DESTROY_ENV);
     }
 }

@@ -372,7 +372,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
     if (likely(AudioDevice::I()->getDSPWrapper() && !AudioDevice::I()->getDSPSUMWrapper())) { // sample by sample
         auto dsp_wrapper(AudioDevice::I()->getDSPWrapper());
         auto cache_wrapper(dsp_wrapper);
-        SAMPLE (*closure) (SAMPLE,uint64_t,uint64_t,SAMPLE*) = * ((SAMPLE(**)(SAMPLE, uint64_t, uint64_t,SAMPLE*)) cache_closure);
+        SAMPLE (*closure) (SAMPLE,uint64_t,uint64_t,SAMPLE*) = *((SAMPLE(**)(SAMPLE, uint64_t, uint64_t,SAMPLE*)) cache_closure);
         SAMPLE* data = 0;
         llvm_zone_t* zone = llvm_peek_zone_stack();
         auto dat(reinterpret_cast<float*>(OutputBuffer));
@@ -634,7 +634,7 @@ void AudioDevice::start()
         paout.channelCount= UNIV::CHANNELS;
         paout.device= UNIV::AUDIO_DEVICE;
         paout.sampleFormat = paFloat32; //|((UNIV::INTERLEAVED==0) ? 0 : paNonInterleaved);
-        paout.suggestedLatency = deviceInfo->defaultLowOutputLatency;
+        paout.suggestedLatency = deviceInfo->defaultLowOutputLatency * 5;
         paout.hostApiSpecificStreamInfo = nullptr;
         PaStreamParameters* paoutptr = (UNIV::CHANNELS < 1) ? nullptr : &paout;
         err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLERATE, UNIV::FRAMES, paNoFlag, audioCallback,

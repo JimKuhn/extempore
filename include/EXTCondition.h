@@ -110,7 +110,7 @@ inline void EXTCondition::destroy()
     if (m_initialised)
     {
         m_initialised = false;
-        auto result(pthread_cond_destroy(&m_cond));
+        auto __attribute__((unused)) result(pthread_cond_destroy(&m_cond));
 #ifdef _EXTCONDITION_DEBUG_
         if (result)
         {
@@ -122,7 +122,7 @@ inline void EXTCondition::destroy()
 
 inline void EXTCondition::wait(EXTMutex* Mutex)
 {
-    auto result(pthread_cond_wait(&m_cond, &Mutex->m_mutex));
+    auto __attribute__((unused)) result(pthread_cond_wait(&m_cond, &Mutex->m_mutex));
 #ifdef _EXTCONDITION_DEBUG_
     if (result)
     {
@@ -133,7 +133,7 @@ inline void EXTCondition::wait(EXTMutex* Mutex)
 
 inline void EXTCondition::signal()
 {
-    auto result(pthread_cond_signal(&m_cond));
+    auto __attribute__((unused)) result(pthread_cond_signal(&m_cond));
 #ifdef _EXTCONDITION_DEBUG_
     if (result)
     {

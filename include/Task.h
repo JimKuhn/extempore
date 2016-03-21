@@ -49,8 +49,8 @@ private:
     uint64_t m_duration;
     CM*      m_classMember;
     int      m_tag;
-    bool     m_active;
     bool     m_isCallback;
+    bool     m_active;
     bool     m_isAumidi;
 protected:
     TaskI(uint64_t StartTime, uint64_t Duration, CM* ClassMember, int Tag, bool Callback = false):

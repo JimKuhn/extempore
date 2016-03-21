@@ -1,34 +1,34 @@
 /*
- * Copyright (c) 2011, Andrew Sorensen 
+ * Copyright (c) 2011, Andrew Sorensen
  *
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -55,7 +55,7 @@ namespace extemp
 thread_local EXTThread* EXTThread::sm_current = 0;
 
 EXTThread::~EXTThread()
-{           
+{
 #ifdef _EXTTHREAD_DEBUG_
     if (m_initialised && !m_detached && !m_joined) {
         dprintf(2, "Resource leak destroying EXTThread: creator has not joined nor detached thread.\n");
@@ -156,21 +156,21 @@ int EXTThread::setPriority(int Priority, bool Realtime)
     param.sched_priority = Priority;
     if (Realtime) { // for realtime threads, use SCHED_RR policy
         policy = SCHED_RR;
-    }  
-    int result = pthread_setschedparam(m_thread, policy, &param);
+    }
+    int result = pthread_setschedparam(thread, policy, &param);
     if (result) {
       dprintf(2, "Error: failed to set thread priority: %s\n", strerror(result));
       return 0;
     }
     return 1;
-#elif __APPLE__    
+#elif __APPLE__
     struct thread_time_constraint_policy ttcpolicy;
     int result;
     // OSX magic numbers
     ttcpolicy.period = uint32_t(UNIV::SAMPLERATE / 100); // HZ/160
     ttcpolicy.computation = uint32_t(UNIV::SAMPLERATE / 143); // HZ/3300;
     ttcpolicy.constraint = uint32_t(UNIV::SAMPLERATE / 143); // HZ/2200;
-    ttcpolicy.preemptible = 1; // 1 
+    ttcpolicy.preemptible = 1; // 1
     result = thread_policy_set(pthread_mach_thread_np(thread),
                                THREAD_TIME_CONSTRAINT_POLICY,
                                (thread_policy_t)&ttcpolicy,
@@ -184,17 +184,17 @@ int EXTThread::setPriority(int Priority, bool Realtime)
     dprintf(2, "Error: cannot set thread priority on Windows\n");
     return 0;
 #endif
-}     
+}
 
 int EXTThread::getPriority() const
 {
-#ifdef __linux__ 
+#ifdef __linux__
     int policy;
     sched_param param;
     pthread_getschedparam(m_thread, &policy, &param);
     return param.sched_priority;
 #endif
-    // fprintf(stderr, "Error: thread priority only available Linux\n");    
+    // fprintf(stderr, "Error: thread priority only available Linux\n");
     return 0;
 }
 
