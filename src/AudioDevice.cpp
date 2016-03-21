@@ -149,19 +149,16 @@ static inline float audio_sanity_f(float x)
 //   else return x;
 // }
 
-namespace extemp {
+namespace extemp
+{
 
-  AudioDevice AudioDevice::SINGLETON;
-  double AudioDevice::REALTIME = 0.0;
-  double AudioDevice::CLOCKBASE = 0.0;
-  double AudioDevice::CLOCKOFFSET = 0.0;
+AudioDevice AudioDevice::SINGLETON;
 
-  bool first_callback = true;
-
-  uint64_t start_time = 0;
-  uint64_t device_time = 0;
-
-  bool RUNNING = true;
+double AudioDevice::REALTIME = 0.0;
+double AudioDevice::CLOCKBASE = 0.0;
+double AudioDevice::CLOCKOFFSET = 0.0;
+bool first_callback = true;
+uint64_t start_time = 0;
 
   //-----------------------------------
   //  PORT AUDIO
@@ -216,7 +213,7 @@ namespace extemp {
       SAMPLE (*closure) (SAMPLE,uint64_t,uint64_t,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,uint64_t,uint64_t,SAMPLE*)) cache_closure);
       int cnt = 0;
 #ifdef _WIN32
-	  printf("MT Audio on Windows NOT Implemented!\n");
+          printf("MT Audio on Windows NOT Implemented!\n");
         while(_signal_cnt <= lcount) {
           //sleep??
           cnt++;
@@ -306,7 +303,7 @@ namespace extemp {
       void (*closure) (float*,float*,uint64_t,void*) = *((void(**)(float*,float*,uint64_t,void*)) cache_closure);
       int cnt = 0;
 #ifdef _WIN32
-	  printf("MT Audio on Windows NOT Implemented!\n");
+          printf("MT Audio on Windows NOT Implemented!\n");
         while(_signal_cnt <= lcount) {
           //sleep??
           cnt++;
@@ -338,85 +335,84 @@ namespace extemp {
   }
 
 
-  int audioCallback(const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
-  {
-    TaskScheduler* sched = static_cast<TaskScheduler*>(userData);
-    UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + framesPerBuffer;
-    if(UNIV::TIME_DIVISION == 1) UNIV::TIME = UNIV::DEVICE_TIME;
-
-    if(AudioDevice::CLOCKBASE < 1.0) {
-      AudioDevice::CLOCKBASE = getRealTime();
-      UNIV::AUDIO_CLOCK_BASE = AudioDevice::CLOCKBASE;
+int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long FramesPerBuffer,
+        const PaStreamCallbackTimeInfo* TimeInfo, PaStreamCallbackFlags StatusFlags, void* UserData)
+{
+    auto sched(reinterpret_cast<TaskScheduler*>(UserData));
+    UNIV::DEVICE_TIME += FramesPerBuffer;
+    if (likely(UNIV::TIME_DIVISION == 1)) {
+        UNIV::TIME = UNIV::DEVICE_TIME;
+    }
+    if (unlikely(AudioDevice::CLOCKBASE < 1.0)) {
+        AudioDevice::CLOCKBASE = getRealTime();
+        UNIV::AUDIO_CLOCK_BASE = AudioDevice::CLOCKBASE;
     }
     AudioDevice::REALTIME = getRealTime();
     UNIV::AUDIO_CLOCK_NOW = AudioDevice::REALTIME;
-
-    device_time = UNIV::DEVICE_TIME;
-
-    int channels = 2;
-    uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
-    sched->setFrames(framesPerBuffer);
+    sched->setFrames(FramesPerBuffer);
     sched->getGuard().signal();
     void* dsp_closure = AudioDevice::I()->getDSPClosure();
     void* cache_closure = 0;
-    if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*framesPerBuffer*sizeof(float))); return 0; }
-    cache_closure = ((void*(*)()) dsp_closure)();
+    if (unlikely(!dsp_closure)) {
+        memset(OutputBuffer, 0, UNIV::CHANNELS * FramesPerBuffer * sizeof(float));
+        return 0;
+    }
+    cache_closure = reinterpret_cast<void* (*)()>(dsp_closure)();
 
     SAMPLE indata[256]; // 256 channels MAX!
 
-    // print underflow/overflow
-    if(statusFlags & 0x00000004)
-      printf("Audio underflow: are you pushing extempore too hard?\n");
-    if(statusFlags & 0x00000008)
-      printf("Audio output overflow\n");
-
-    if(AudioDevice::I()->getDSPWrapper() && !AudioDevice::I()->getDSPSUMWrapper()) { // if true then we must be sample by sample
-	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
-	    dsp_f_ptr cache_wrapper = dsp_wrapper;
-	    SAMPLE (*closure) (SAMPLE,uint64_t,uint64_t,SAMPLE*) = * ((SAMPLE(**)(SAMPLE, uint64_t, uint64_t,SAMPLE*)) cache_closure);
-	    SAMPLE* data = 0;
-	    //llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
-	    llvm_zone_t* zone = llvm_peek_zone_stack();
-	    //llvm_push_zone_stack(zone);
-	    for(uint64_t i=0;i<framesPerBuffer;i++)
-        {
-          uint32_t iout = i*UNIV::CHANNELS;
-          uint32_t iin = i*UNIV::IN_CHANNELS;
-          float* dat = (float*) outputBuffer;
-          float* in = (float*) inputBuffer;
-          for(int k=0;k<UNIV::IN_CHANNELS;k++) indata[k]=(SAMPLE)in[iin+k];
-
-          if(UNIV::IN_CHANNELS==UNIV::CHANNELS) {
-            for(uint64_t k=0; k<UNIV::CHANNELS; k++)
-              {
-                dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, (SAMPLE)in[iin+k], (i+UNIV::DEVICE_TIME),k,&(indata[0])));
-                llvm_zone_reset(zone);
-              }
-          }else if(UNIV::IN_CHANNELS==1){
-            for(uint64_t k=0; k<UNIV::CHANNELS; k++)
-              {
-                dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, (SAMPLE)in[iin], (i+UNIV::DEVICE_TIME),k,&(indata[0])));
-                llvm_zone_reset(zone);
-              }
-          }else{
-            for(uint64_t k=0; k<UNIV::CHANNELS; k++)
-              {
-                dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, 0.0, (i+UNIV::DEVICE_TIME),k,&(indata[0])));
-                llvm_zone_reset(zone);
-              }
-          }
+    if (unlikely(StatusFlags & (paOutputUnderflow | paOutputOverflow))) {
+        if (StatusFlags & paOutputUnderflow) {
+            printf("Audio underflow: are you pushing extempore too hard?\n");
         }
-	    //llvm_pop_zone_stack();
-	    //llvm_zone_destroy(zone);
-    }else if(AudioDevice::I()->getDSPWrapperArray() && !AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then we must be buffer by buffer
-	    dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
-	    dsp_f_ptr_array cache_wrapper = dsp_wrapper;
-	    void (*closure) (float*,float*,uint64_t,void*) = * ((void(**)(float*,float*,uint64_t,void*)) cache_closure);
-	    llvm_zone_t* zone = llvm_peek_zone_stack();
-	    float* indat = (float*) inputBuffer;
-	    float* outdat = (float*) outputBuffer;
-	    cache_wrapper(zone, (void*)closure, indat, outdat, UNIV::DEVICE_TIME, userData);
-	    llvm_zone_reset(zone);
+        if (StatusFlags & paOutputOverflow) {
+            printf("Audio output overflow\n");
+        }
+    }
+    if (likely(AudioDevice::I()->getDSPWrapper() && !AudioDevice::I()->getDSPSUMWrapper())) { // sample by sample
+        auto dsp_wrapper(AudioDevice::I()->getDSPWrapper());
+        auto cache_wrapper(dsp_wrapper);
+        SAMPLE (*closure) (SAMPLE,uint64_t,uint64_t,SAMPLE*) = * ((SAMPLE(**)(SAMPLE, uint64_t, uint64_t,SAMPLE*)) cache_closure);
+        SAMPLE* data = 0;
+        llvm_zone_t* zone = llvm_peek_zone_stack();
+        auto dat(reinterpret_cast<float*>(OutputBuffer));
+        auto in(reinterpret_cast<const float*>(InputBuffer));
+        auto time(UNIV::DEVICE_TIME);
+        for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time)
+        {
+            if (likely(!UNIV::IN_CHANNELS)) {
+                for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
+                    *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), 0.0, time, k,
+                            indata))); // why indata (can't be null?)
+                    llvm_zone_reset(zone);
+                }
+                continue;
+            }
+            std::copy(in, in + UNIV::IN_CHANNELS, indata);
+            if (UNIV::IN_CHANNELS == UNIV::CHANNELS) {
+                for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
+                    *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), *(in++),
+                            time, k, indata))); // indata??
+                    llvm_zone_reset(zone);
+                }
+            } else if (UNIV::IN_CHANNELS == 1) {
+                for (uint64_t k=0; k <UNIV::CHANNELS; k++) {
+                    *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), *(in++),
+                            time, k, indata))); // indata??
+                    llvm_zone_reset(zone);
+                }
+            } // what about other values (between 1 and UNIV_CHANNELS?)
+        }
+        return 0;
+    } else if (AudioDevice::I()->getDSPWrapperArray() && !AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then we must be buffer by buffer
+        dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
+        dsp_f_ptr_array cache_wrapper = dsp_wrapper;
+        void (*closure) (float*,float*,uint64_t,void*) = * ((void(**)(float*,float*,uint64_t,void*)) cache_closure);
+        llvm_zone_t* zone = llvm_peek_zone_stack();
+        float* indat = (float*) InputBuffer;
+        float* outdat = (float*) OutputBuffer;
+        cache_wrapper(zone, (void*)closure, indat, outdat, UNIV::DEVICE_TIME, UserData);
+        llvm_zone_reset(zone);
     }else if(AudioDevice::I()->getDSPSUMWrapper()) { // if true then multichannel
       //printf("main in\n");
       int numthreads = AudioDevice::I()->getNumThreads();
@@ -424,7 +420,7 @@ namespace extemp {
 
       SAMPLE in[32];
       SAMPLE* inb = AudioDevice::I()->getDSPMTInBuffer();
-      float* input = (float*) inputBuffer;
+      float* input = (float*) InputBuffer;
       for(int i=0;i<UNIV::IN_CHANNELS*UNIV::FRAMES;i++) inb[i] = (SAMPLE) input[i];
       // start computing in all audio threads
       _atomic_thread_done_cnt = 0;
@@ -457,7 +453,7 @@ namespace extemp {
       SAMPLE (*closure) (SAMPLE*,uint64_t,uint64_t,SAMPLE*) = * ((SAMPLE(**)(SAMPLE*,uint64_t,uint64_t,SAMPLE*)) cache_closure);
       llvm_zone_t* zone = llvm_peek_zone_stack();
       bool toggle = AudioDevice::I()->getToggle();
-	  SAMPLE* indats[MAX_RT_AUDIO_THREADS];
+          SAMPLE* indats[MAX_RT_AUDIO_THREADS];
       indats[0] = AudioDevice::I()->getDSPMTOutBuffer();
       // if we are NOT running zerolatency
       // and toggle is FALSE then use alternate buffers
@@ -470,7 +466,7 @@ namespace extemp {
       for(uint64_t i=0;i<UNIV::FRAMES;i++) {
         uint32_t iout = i*UNIV::CHANNELS;
         uint32_t iin = i*UNIV::IN_CHANNELS;
-        float* dat = (float*) outputBuffer;
+        float* dat = (float*) OutputBuffer;
 
         for(uint64_t k=0; k<UNIV::CHANNELS; k++)
           {
@@ -507,9 +503,9 @@ namespace extemp {
     }else if(AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then both MT and buffer based
       int numthreads = AudioDevice::I()->getNumThreads();
 
-	  double in[MAX_RT_AUDIO_THREADS];
+          double in[MAX_RT_AUDIO_THREADS];
       float* inb = AudioDevice::I()->getDSPMTInBufferArray();
-      float* input = (float*) inputBuffer;
+      float* input = (float*) InputBuffer;
       for(int i=0;i<UNIV::IN_CHANNELS*UNIV::FRAMES;i++) inb[i] = input[i];
       // start computing in all audio threads
       _atomic_thread_done_cnt = 0;
@@ -536,180 +532,150 @@ namespace extemp {
       void (*closure) (float**,float*,uint64_t,void*) = * ((void(**)(float**,float*,uint64_t,void*)) cache_closure);
       llvm_zone_t* zone = llvm_peek_zone_stack();
       //float** indat = (float**)
-	  float* indats[MAX_RT_AUDIO_THREADS];
-      float* outdat = (float*) outputBuffer;
+          float* indats[MAX_RT_AUDIO_THREADS];
+      float* outdat = (float*) OutputBuffer;
       indats[0] = AudioDevice::I()->getDSPMTOutBufferArray();
       for(int jj=1;jj<numthreads;jj++) {
         indats[jj] = indats[0]+(UNIV::FRAMES*UNIV::CHANNELS*jj);
       }
-      cache_wrapper(zone, (void*)closure, indats, outdat, UNIV::DEVICE_TIME, userData);
+      cache_wrapper(zone, (void*)closure, indats, outdat, UNIV::DEVICE_TIME, UserData);
       llvm_zone_reset(zone);
       //printf("main out\n");
     }else{
-	    //zero out audiobuffer
-	    memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(float)));
-	    //nothin to do
+            //zero out audiobuffer
+            memset(OutputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(float)));
+            //nothin to do
     }
     return 0;
   }
 
-  AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
-  {
-  }
+AudioDevice::AudioDevice(): m_started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
+{
+}
 
-  AudioDevice::~AudioDevice()
-  {
-    if (!UNIV::AUDIO_NONE)
-      {
+AudioDevice::~AudioDevice()
+{
+    if (!UNIV::AUDIO_NONE) {
         PaError err;
         err = Pa_StopStream(stream);
-        if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+        if (err != paNoError) {
+            std::cout << Pa_GetErrorText(err) << std::endl;
+        }
         err = Pa_CloseStream(stream);
-        if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+        if (err != paNoError) {
+            std::cout << Pa_GetErrorText(err) << std::endl;
+        }
         err = Pa_Terminate();
-        if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
-      }
-  }
+        if (err != paNoError) {
+            std::cout << Pa_GetErrorText(err) << std::endl;
+        }
+    }
+}
 
-  void AudioDevice::start()
-  {
-    // if running in --noaudio mode, bail out
-
-    if (UNIV::AUDIO_NONE)
-      {
+void AudioDevice::start()
+{
+    if (m_started) {
+        return;
+    }
+    if (UNIV::AUDIO_NONE) {
         ascii_error();
         fprintf(stderr, "Error: cannot set the audio device in --noaudio mode\n");
         ascii_normal();
         return;
-      }
-
+    }
     Pa_Initialize();
-    //printf("\n-----Available Audio Drivers-------\n");
     PaError err;
-
     int numDevices = Pa_GetDeviceCount();
-    if( numDevices < 0 ) {
-   	  printf("No audio devices found!\n");
-      printf( "ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
-      exit(1);
+    if (numDevices < 0) {
+        printf("No audio devices found!\n");
+        printf( "ERROR: Pa_CountDevices returned 0x%x\n", numDevices);
+        exit(1);
     }
-
-    if((int)UNIV::AUDIO_DEVICE < -1 || (int)UNIV::AUDIO_DEVICE >= numDevices) {
-      ascii_error();
-      printf("Output device not valid! %d\n",(int)UNIV::AUDIO_DEVICE);
-      ascii_normal();
-      printf("\n");
-      exit(1);
+    if (int(UNIV::AUDIO_DEVICE) < -1 || int(UNIV::AUDIO_DEVICE) >= numDevices) {
+        ascii_error();
+        printf("Output device not valid! %d\n", int(UNIV::AUDIO_DEVICE));
+        ascii_normal();
+        printf("\n");
+        exit(1);
     }
-    if((int)UNIV::AUDIO_IN_DEVICE < -1 || (int)UNIV::AUDIO_IN_DEVICE >= numDevices) {
-      ascii_error();
-      printf("Input device not valid! %d\n",(int)UNIV::AUDIO_IN_DEVICE);
-      ascii_normal();
-      printf("\n");
-      exit(1);
+    if (int(UNIV::AUDIO_IN_DEVICE) < -1 || int(UNIV::AUDIO_IN_DEVICE) >= numDevices) {
+        ascii_error();
+        printf("Input device not valid! %d\n",(int)UNIV::AUDIO_IN_DEVICE);
+        ascii_normal();
+        printf("\n");
+        exit(1);
     }
-
-    if( (UNIV::IN_CHANNELS != UNIV::CHANNELS) &&
-        (UNIV::IN_CHANNELS != 1) &&
-        (UNIV::IN_CHANNELS > 0)) {
-      ascii_warning();
-      printf("Warning: dsp input will be 0.0, use data* for channel data\n");
-      ascii_normal();
-      printf("\n");
+    if (UNIV::IN_CHANNELS != UNIV::CHANNELS && UNIV::IN_CHANNELS != 1 && UNIV::IN_CHANNELS > 0) {
+        ascii_warning();
+        printf("Warning: dsp input will be 0.0, use data* for channel data\n");
+        ascii_normal();
+        printf("\n");
     }
-
-    const   PaDeviceInfo *deviceInfo;
-    const   PaHostApiInfo* apiInfo;
-    /*
-      for( int i=0; i<numDevices; i++ ) {
-      deviceInfo = Pa_GetDeviceInfo( i );
-      apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
-      printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
-      }
-    */
-    //printf("-----------------------------------\n\n");
     int inputDevice = Pa_GetDefaultInputDevice();
     int outputDevice = Pa_GetDefaultOutputDevice();
-
-    if(UNIV::AUDIO_DEVICE != -1) {
-      PaStreamParameters pain;
-      PaStreamParameters paout;
-
-      //std::cout << "INC: " << UNIV::IN_CHANNELS << "  OUTC: " << UNIV::CHANNELS << "  name: " << deviceInfo->name <<  std::endl;
-      deviceInfo = Pa_GetDeviceInfo( UNIV::AUDIO_DEVICE );
-      pain.device=UNIV::AUDIO_DEVICE;
-      if(UNIV::AUDIO_IN_DEVICE != -1) {
-        deviceInfo = Pa_GetDeviceInfo( UNIV::AUDIO_IN_DEVICE );
-        inputDevice = UNIV::AUDIO_IN_DEVICE;
-        pain.device=UNIV::AUDIO_IN_DEVICE;
-      }
-      pain.channelCount=UNIV::IN_CHANNELS;
-      pain.hostApiSpecificStreamInfo=NULL;
-      pain.sampleFormat=paFloat32; //|((UNIV::INTERLEAVED==0) ? 0 : paNonInterleaved);
-      pain.suggestedLatency = deviceInfo->defaultLowInputLatency;
-      pain.hostApiSpecificStreamInfo = NULL;
-      PaStreamParameters* painptr = &pain;
-      if(UNIV::IN_CHANNELS<1) painptr=NULL;
-
-      deviceInfo = Pa_GetDeviceInfo( UNIV::AUDIO_DEVICE );
-      outputDevice = UNIV::AUDIO_DEVICE;
-      paout.channelCount=UNIV::CHANNELS;
-      paout.device=UNIV::AUDIO_DEVICE;
-      paout.sampleFormat=paFloat32; //|((UNIV::INTERLEAVED==0) ? 0 : paNonInterleaved);
-      paout.suggestedLatency = deviceInfo->defaultLowOutputLatency;
-      paout.hostApiSpecificStreamInfo = NULL;
-      PaStreamParameters* paoutptr = &paout;
-      if(UNIV::CHANNELS<1) paoutptr=NULL;
-
-      err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLERATE, UNIV::FRAMES, paNoFlag, audioCallback, (void*)TaskScheduler::I());
-    }else{
-      err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
+    const PaDeviceInfo* deviceInfo;
+    if (UNIV::AUDIO_DEVICE != -1) { // not default
+        PaStreamParameters pain;
+        PaStreamParameters paout;
+        deviceInfo = Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE);
+        pain.device = UNIV::AUDIO_DEVICE;
+        if (UNIV::AUDIO_IN_DEVICE != -1) {
+            deviceInfo = Pa_GetDeviceInfo(UNIV::AUDIO_IN_DEVICE);
+            inputDevice = UNIV::AUDIO_IN_DEVICE;
+            pain.device = UNIV::AUDIO_IN_DEVICE;
+        }
+        pain.channelCount = UNIV::IN_CHANNELS;
+        pain.hostApiSpecificStreamInfo = nullptr;
+        pain.sampleFormat = paFloat32; //|((UNIV::INTERLEAVED==0) ? 0 : paNonInterleaved);
+        pain.suggestedLatency = deviceInfo->defaultLowInputLatency;
+        PaStreamParameters* painptr = (UNIV::IN_CHANNELS < 1) ? nullptr : &pain;
+        deviceInfo = Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE );
+        outputDevice = UNIV::AUDIO_DEVICE;
+        paout.channelCount= UNIV::CHANNELS;
+        paout.device= UNIV::AUDIO_DEVICE;
+        paout.sampleFormat = paFloat32; //|((UNIV::INTERLEAVED==0) ? 0 : paNonInterleaved);
+        paout.suggestedLatency = deviceInfo->defaultLowOutputLatency;
+        paout.hostApiSpecificStreamInfo = nullptr;
+        PaStreamParameters* paoutptr = (UNIV::CHANNELS < 1) ? nullptr : &paout;
+        err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLERATE, UNIV::FRAMES, paNoFlag, audioCallback,
+                TaskScheduler::I());
+    } else {
+      err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback,
+                TaskScheduler::I());
     }
-    // std::cout << "Input Device: " << inputDevice << std::endl;
-    // std::cout << "Output Device: " << outputDevice << std::endl;
-
-    if(err != paNoError) {
-      ascii_error();
-	    std::cerr << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
-	    std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
-	    ascii_normal();
-	    exit(1);
+    if (err != paNoError) {
+        ascii_error();
+        std::cerr << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
+        std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
+        ascii_normal();
+        exit(1);
     }
-    //UNIV::CHANNELS = 2;
-    //UNIV::SAMPLERATE = 44100;
-
-    if(started) return;
     UNIV::initRand();
-
     err = Pa_StartStream(stream);
 
     if(err != paNoError) {
-      ascii_error();
-      std::cout << "ERROR: " << Pa_GetErrorText(err) << std::endl;
-      std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
-      ascii_normal();
-      exit(1);
+        ascii_error();
+        std::cout << "ERROR: " << Pa_GetErrorText(err) << std::endl;
+        std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo(outputDevice))->name << std::endl;
+        ascii_normal();
+        exit(1);
     }
 
+    m_started = true;
+
     const PaStreamInfo* info = Pa_GetStreamInfo(stream);
-    //std::cout << "Stream latency: " << info->outputLatency << std::endl;
-
-    ascii_default();
-    RUNNING = true;
-    //queueThread->Start();
-    started = true;
-
     ascii_normal();
+    std::cout << "Stream latency: " << info->outputLatency << std::endl;
     std::cout << "Output Device  : " << std::flush;
     ascii_info();
-    std::cout << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
+    std::cout << Pa_GetDeviceInfo(outputDevice)->name << std::endl;
     ascii_normal();
     std::cout << "Input Device   : " << std::flush;
     ascii_info();
-    if(UNIV::AUDIO_IN_DEVICE != -1) {
-      std::cout << (Pa_GetDeviceInfo( inputDevice ))->name << std::endl;
-    }else{
-      std::cout << std::endl;
+    if (UNIV::AUDIO_IN_DEVICE != -1) {
+        std::cout << Pa_GetDeviceInfo(inputDevice)->name << std::endl;
+    } else {
+        std::cout << std::endl;
     }
     ascii_normal();
     std::cout << "SampleRate     : " << std::flush;
@@ -732,29 +698,26 @@ namespace extemp {
     ascii_info();
     std::cout << info->outputLatency << std::flush;
     std::cout << " sec" << std::endl << std::flush;
-    // ascii_normal();
-    // std::cout << "Interleaved\t: " << std::flush;
-    // ascii_info();
-    // std::cout << ((UNIV::INTERLEAVED==0) ? "TRUE" : "FALSE") << std::endl << std::flush;
-    // ascii_normal();
-    //ascii_normal();
+}
 
-  }
-
-  void AudioDevice::stop()
-  {
-    if(!started) return;
+void AudioDevice::stop()
+{
+    if (!m_started) {
+        return;
+    }
     PaError err = Pa_StopStream(stream);
-    if(err != paNoError) std::cout << "PA Error: " << Pa_GetErrorText(err) << std::endl;
-    started = false;
-  }
+    if (err != paNoError) {
+        std::cout << "PA Error: " << Pa_GetErrorText(err) << std::endl;
+    }
+    m_started = false;
+}
 
-  void AudioDevice::initMTAudio(int num,bool _zerolatency)
-  {
-	  if (num > MAX_RT_AUDIO_THREADS) {
-		  printf("HARD CEILING of %d RT AUDIO THREADS .. aborting!\n", MAX_RT_AUDIO_THREADS);
-		  exit(1);
-	  }
+void AudioDevice::initMTAudio(int num,bool _zerolatency)
+{
+          if (num > MAX_RT_AUDIO_THREADS) {
+                  printf("HARD CEILING of %d RT AUDIO THREADS .. aborting!\n", MAX_RT_AUDIO_THREADS);
+                  exit(1);
+          }
     numthreads = num;
     zerolatency = _zerolatency;
     toggle = true;
@@ -795,7 +758,7 @@ namespace extemp {
 
     int numDevices = Pa_GetDeviceCount();
     if( numDevices <= 0 ) {
-   	  printf("Error: no audio devices found! Exiting...\n");
+          printf("Error: no audio devices found! Exiting...\n");
       // printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
       exit(1);
     }
@@ -834,8 +797,8 @@ namespace extemp {
     printf("Code will run fine, but there will be no audio output.\n");
 
 #ifdef _WIN32
-	printf("--noaudio option not supported on Windows OS ... aborting!\n");
-	exit(1);
+        printf("--noaudio option not supported on Windows OS ... aborting!\n");
+        exit(1);
 #endif
 
 #ifdef __linux__
@@ -861,8 +824,6 @@ namespace extemp {
 
       if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime();
       AudioDevice::REALTIME = getRealTime();
-
-      device_time = UNIV::DEVICE_TIME;
 
       // sleep until the next time mod UNIV::FRAMES
       double dur = sec_per_frame - fmod(current_thread_time, sec_per_frame);
