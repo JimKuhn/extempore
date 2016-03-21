@@ -612,63 +612,60 @@ void AudioDevice::start()
         printf("\n");
     }
     int inputDevice = Pa_GetDefaultInputDevice();
-    int outputDevice = Pa_GetDefaultOutputDevice();
     const PaDeviceInfo* deviceInfo;
-    if (UNIV::AUDIO_DEVICE != -1) { // not default
-        PaStreamParameters pain;
-        PaStreamParameters paout;
-        deviceInfo = Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE);
-        pain.device = UNIV::AUDIO_DEVICE;
-        if (UNIV::AUDIO_IN_DEVICE != -1) {
-            deviceInfo = Pa_GetDeviceInfo(UNIV::AUDIO_IN_DEVICE);
-            inputDevice = UNIV::AUDIO_IN_DEVICE;
-            pain.device = UNIV::AUDIO_IN_DEVICE;
-        }
-        pain.channelCount = UNIV::IN_CHANNELS;
-        pain.hostApiSpecificStreamInfo = nullptr;
-        pain.sampleFormat = paFloat32; //|((UNIV::INTERLEAVED==0) ? 0 : paNonInterleaved);
-        pain.suggestedLatency = deviceInfo->defaultLowInputLatency;
-        PaStreamParameters* painptr = (UNIV::IN_CHANNELS < 1) ? nullptr : &pain;
-        deviceInfo = Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE );
-        outputDevice = UNIV::AUDIO_DEVICE;
-        paout.channelCount= UNIV::CHANNELS;
-        paout.device= UNIV::AUDIO_DEVICE;
-        paout.sampleFormat = paFloat32; //|((UNIV::INTERLEAVED==0) ? 0 : paNonInterleaved);
-        paout.suggestedLatency = deviceInfo->defaultLowOutputLatency * 5;
-        paout.hostApiSpecificStreamInfo = nullptr;
-        PaStreamParameters* paoutptr = (UNIV::CHANNELS < 1) ? nullptr : &paout;
-        err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLERATE, UNIV::FRAMES, paNoFlag, audioCallback,
-                TaskScheduler::I());
-    } else {
-      err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback,
-                TaskScheduler::I());
+    if (UNIV::AUDIO_DEVICE == -1) {
+        UNIV::AUDIO_DEVICE = Pa_GetDefaultOutputDevice();
     }
+    PaStreamParameters pain;
+    PaStreamParameters paout;
+    deviceInfo = Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE);
+    pain.device = UNIV::AUDIO_DEVICE;
+    if (UNIV::AUDIO_IN_DEVICE != -1) {
+        deviceInfo = Pa_GetDeviceInfo(UNIV::AUDIO_IN_DEVICE);
+        inputDevice = UNIV::AUDIO_IN_DEVICE;
+        pain.device = UNIV::AUDIO_IN_DEVICE;
+    }
+    pain.channelCount = UNIV::IN_CHANNELS;
+    pain.hostApiSpecificStreamInfo = nullptr;
+    pain.sampleFormat = paFloat32; //|((UNIV::INTERLEAVED==0) ? 0 : paNonInterleaved);
+    pain.suggestedLatency = deviceInfo->defaultLowInputLatency;
+    PaStreamParameters* painptr = (UNIV::IN_CHANNELS < 1) ? nullptr : &pain;
+    deviceInfo = Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE);
+    paout.channelCount= UNIV::CHANNELS;
+    paout.device= UNIV::AUDIO_DEVICE;
+    paout.sampleFormat = paFloat32; //|((UNIV::INTERLEAVED==0) ? 0 : paNonInterleaved);
+    paout.suggestedLatency = std::max(UNIV::AUDIO_OUTPUT_LATENCY, deviceInfo->defaultLowOutputLatency);
+    paout.hostApiSpecificStreamInfo = nullptr;
+    PaStreamParameters* paoutptr = (UNIV::CHANNELS < 1) ? nullptr : &paout;
+    err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLERATE, UNIV::FRAMES, paNoFlag, audioCallback,
+            TaskScheduler::I());
     if (err != paNoError) {
         ascii_error();
         std::cerr << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
-        std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
+        std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
         ascii_normal();
         exit(1);
     }
+
     UNIV::initRand();
     err = Pa_StartStream(stream);
 
     if(err != paNoError) {
         ascii_error();
         std::cout << "ERROR: " << Pa_GetErrorText(err) << std::endl;
-        std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo(outputDevice))->name << std::endl;
+        std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
         ascii_normal();
         exit(1);
     }
 
     m_started = true;
 
-    const PaStreamInfo* info = Pa_GetStreamInfo(stream);
+    auto info(Pa_GetStreamInfo(stream));
     ascii_normal();
     std::cout << "Stream latency: " << info->outputLatency << std::endl;
     std::cout << "Output Device  : " << std::flush;
     ascii_info();
-    std::cout << Pa_GetDeviceInfo(outputDevice)->name << std::endl;
+    std::cout << Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE)->name << std::endl;
     ascii_normal();
     std::cout << "Input Device   : " << std::flush;
     ascii_info();

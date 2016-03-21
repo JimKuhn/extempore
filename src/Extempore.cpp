@@ -94,8 +94,9 @@ enum { OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE,
        OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_TIME_DIV, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
+       OPT_LATENCY,
        OPT_HELP
-     };
+    };
 
 CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT               TYPE
@@ -114,6 +115,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_TIME_DIV,    "--timediv",       SO_REQ_SEP    },
     { OPT_DEVICE,      "--device",        SO_REQ_SEP    },
     { OPT_IN_DEVICE,   "--indevice",      SO_REQ_SEP    },
+    { OPT_LATENCY,     "--latency",       SO_REQ_SEP    },
     { OPT_PRT_DEVICES, "--print-devices", SO_NONE       },
     { OPT_REALTIME,    "--realtime",      SO_NONE       },
     { OPT_ARCH,        "--arch",          SO_REQ_SEP    },
@@ -205,6 +207,9 @@ int main(int argc, char** argv)
             case OPT_IN_DEVICE:
                 extemp::UNIV::AUDIO_IN_DEVICE = atoi(args.OptionArg());
                 break;
+            case OPT_LATENCY:
+                extemp::UNIV::AUDIO_OUTPUT_LATENCY = atoi(args.OptionArg()) / 1000.0;
+                break;
 #if !( defined (___ALSA_AUDIO___) || defined (COREAUDIO))
             case OPT_PRT_DEVICES:
                 extemp::AudioDevice::printDevices();
@@ -243,6 +248,7 @@ int main(int argc, char** argv)
                 std::cout << "         --noaudio: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
                 std::cout << "         --timediv: timed sub divisions of FRAMES for scheduling engine (1 = no division which is the defaul)" << std::endl;
                 std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
+                std::cout << "         --latency: attempts to force audio output latency" << std::endl;
                 std::cout << "        --indevice: the index of the audio input device to use" << std::endl;
                 std::cout << "            --arch: the target architecture [current host]" << std::endl;
                 std::cout << "             --cpu: the target cpu [current host]" << std::endl;

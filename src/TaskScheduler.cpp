@@ -55,7 +55,7 @@ static double LAST_REALTIME_STAMP = 0.0;
 void TaskScheduler::timeSlice()
 {
     uint32_t frames = m_numFrames / UNIV::TIME_DIVISION;
-    uint64_t nanosecs = double(frames) / UNIV::SAMPLERATE * BILLION;
+    uint64_t nanosecs = double(frames) / UNIV::SAMPLERATE * D_BILLION;
     timespec remain { 0, 0 };
     if (unlikely(UNIV::AUDIO_NONE)) { // i.e. if no audio device
         AudioDevice::CLOCKBASE = getRealTime();
@@ -121,7 +121,7 @@ void* TaskScheduler::queueThreadImpl()
         }
         return this;
     }
-    timeSlice();
+    timeSlice(); // will never return
     return nullptr;
 }
 

@@ -58,17 +58,17 @@
 
 enum Windows_Color_Convert
 {
-        Black       = 0,
-        Red         = FOREGROUND_RED,
-        Green       = FOREGROUND_GREEN,
-        Yellow      = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
-        Blue        = FOREGROUND_BLUE,
-        Magenta     = FOREGROUND_RED   | FOREGROUND_BLUE,
-        Cyan        = FOREGROUND_GREEN | FOREGROUND_BLUE,
-        White       = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY,
+    Black   = 0,
+    Red     = FOREGROUND_RED,
+    Green   = FOREGROUND_GREEN,
+    Yellow  = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
+    Blue    = FOREGROUND_BLUE,
+    Magenta = FOREGROUND_RED   | FOREGROUND_BLUE,
+    Cyan    = FOREGROUND_GREEN | FOREGROUND_BLUE,
+    White   = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY,
 };
 
-int WINDOWS_COLORS[8] = { Black, Red, Green, Yellow, Blue, Magenta, Cyan, White };
+int WINDOWS_COLORS[] = { Black, Red, Green, Yellow, Blue, Magenta, Cyan, White };
 
 #endif
 
@@ -573,6 +573,7 @@ uint64_t TIME_DIVISION = 1;
 bool AUDIO_NONE = false;
 uint32_t AUDIO_DEVICE = -1;
 uint32_t AUDIO_IN_DEVICE = -1;
+double AUDIO_OUTPUT_LATENCY = 0.0;
 double CLOCK_OFFSET = 0.0;
 std::map<std::string, std::string> CMDPARAMS;
 std::string ARCH;
