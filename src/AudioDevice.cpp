@@ -662,7 +662,6 @@ void AudioDevice::start()
 
     auto info(Pa_GetStreamInfo(stream));
     ascii_normal();
-    std::cout << "Stream latency: " << info->outputLatency << std::endl;
     std::cout << "Output Device  : " << std::flush;
     ascii_info();
     std::cout << Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE)->name << std::endl;

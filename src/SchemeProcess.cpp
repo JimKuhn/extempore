@@ -146,7 +146,6 @@ bool SchemeProcess::start()
     m_threadTask.start();
     m_threadServer.start();
     m_guard.init();
-    sm_current = this;
     sm_nameMap[m_name] = this;
     return true;
 }
@@ -202,6 +201,7 @@ bool SchemeProcess::loadFile(const std::string& File, const std::string& Path)
 
 void* SchemeProcess::taskImpl()
 {
+    sm_current = this;
     OSC::schemeInit(this);
     std::stringstream ss;
 #ifdef _WIN32
