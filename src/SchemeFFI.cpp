@@ -36,6 +36,8 @@
 // LLVM includes //
 ///////////////////
 
+#include <fstream>
+
 // must be included before anything which pulls in <Windows.h>
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/AsmParser/Parser.h"
@@ -1621,7 +1623,14 @@ namespace extemp {
       }
 
 #else
-    std::string asmcode(assm);
+    static std::string sInitString; // This is a hack for now, but it *WORKS*
+    if (sInitString.empty()) {
+        std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/init.ll");
+        std::stringstream inString;
+        inString << inStream.rdbuf();
+        sInitString = inString.str();
+    }
+    std::string asmcode(sInitString + assm);
     int cnt = 0;
 
     std::unique_ptr<llvm::Module> newModule;

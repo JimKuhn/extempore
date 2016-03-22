@@ -1,36 +1,36 @@
 ;;
 ;; Copyright (c) 2011, Andrew Sorensen
-;; 
+;;
 ;; All rights reserved
 ;;
-;; Redistribution and use in source and binary forms, with or without 
+;; Redistribution and use in source and binary forms, with or without
 ;; modification, are permitted provided that the following conditions are met:
-;; 
-;; 1. Redistributions of source code must retain the above copyright notice, 
+;;
+;; 1. Redistributions of source code must retain the above copyright notice,
 ;;    this list of conditions and the following disclaimer.
-;; 
+;;
 ;; 2. Redistributions in binary form must reproduce the above copyright notice,
-;;    this list of conditions and the following disclaimer in the documentation 
+;;    this list of conditions and the following disclaimer in the documentation
 ;;    and/or other materials provided with the distribution.
-;; 
+;;
 ;; Neither the name of the authors nor other contributors may be used to endorse
-;; or promote products derived from this software without specific prior written 
+;; or promote products derived from this software without specific prior written
 ;; permission.
-;; 
-;; 
-;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
-;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
-;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
-;; ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
-;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
-;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
-;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
-;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
-;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+;;
+;;
+;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+;; ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;; POSSIBILITY OF SUCH DAMAGE.
-;; 
-;; 
+;;
+;;
 
 ;; regex stuff
 declare i1 @rmatch(i8*,i8*)
@@ -75,10 +75,6 @@ declare i32 @mutex_destroy(i8*)
 declare i32 @mutex_lock(i8*)
 declare i32 @mutex_unlock(i8*)
 declare i32 @mutex_trylock(i8*)
-
-;; malloc zone structures
-%mzone = type {i8*, i64, i64, i64, i8*, %mzone*}
-%clsvar = type {i8*, i32, i8*, %clsvar*}
 
 declare %mzone* @llvm_threads_get_callback_zone() nounwind
 declare void @llvm_runtime_error(i64,i8*) nounwind
@@ -138,13 +134,13 @@ declare i8* @malloc16(i64) nounwind
 declare void @free16(i8*) nounwind
 
 declare i32 @system(i8*) nounwind
-declare i8* @getenv(i8*) nounwind 
-declare i32 @setenv(i8*, i8*, i32) nounwind 
-declare i32 @unsetenv(i8*) nounwind 
+declare i8* @getenv(i8*) nounwind
+declare i32 @setenv(i8*, i8*, i32) nounwind
+declare i32 @unsetenv(i8*) nounwind
 declare i8* @sys_sharedir() nounwind
 declare i8* @sys_slurp_file(i8*) nounwind
 
-;; 
+;;
 declare i32 @abs(i32)
 declare i64 @llabs(i64)
 
@@ -545,11 +541,11 @@ declare void @free_after_delay(i8*, double)
 declare i8* @llvm_disassemble(i8*,i32)
 
 
-define dllexport double @imp_dsp_wrapper(i8* %_impz, i8* %closure, double %sample, i64 %time, i64 %channel, double* %data) 
+define dllexport double @imp_dsp_wrapper(i8* %_impz, i8* %closure, double %sample, i64 %time, i64 %channel, double* %data)
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, double (i8*,i8*,double,i64,i64,double*)*}*
-; apply closure 
+; apply closure
 %fPtr = getelementptr {i8*, i8*, double (i8*, i8*, double, i64, i64, double*)*}, {i8*, i8*, double (i8*, i8*, double, i64, i64, double*)*}* %closureVal, i32 0, i32 2
 %ePtr = getelementptr {i8*, i8*, double (i8*, i8*, double, i64, i64, double*)*}, {i8*, i8*, double (i8*, i8*, double, i64, i64, double*)*}* %closureVal, i32 0, i32 1
 %f = load double (i8*, i8*, double,i64,i64,double*)*, double (i8*, i8*, double,i64,i64,double*)** %fPtr
@@ -558,11 +554,11 @@ entry:
 ret double %result
 }
 
-define dllexport double @imp_dsp_sum_wrapper(i8* %_impz, i8* %closure, double* %sample, i64 %time, i64 %channel, double* %data) 
+define dllexport double @imp_dsp_sum_wrapper(i8* %_impz, i8* %closure, double* %sample, i64 %time, i64 %channel, double* %data)
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, double (i8*,i8*,double*,i64,i64,double*)*}*
-; apply closure 
+; apply closure
 %fPtr = getelementptr {i8*, i8*, double (i8*, i8*, double*, i64, i64, double*)*}, {i8*, i8*, double (i8*, i8*, double*, i64, i64, double*)*}* %closureVal, i32 0, i32 2
 %ePtr = getelementptr {i8*, i8*, double (i8*, i8*, double*, i64, i64, double*)*}, {i8*, i8*, double (i8*, i8*, double*, i64, i64, double*)*}* %closureVal, i32 0, i32 1
 %f = load double (i8*, i8*, double*,i64,i64,double*)*, double (i8*, i8*, double*,i64,i64,double*)** %fPtr
@@ -571,11 +567,11 @@ entry:
 ret double %result
 }
 
-define dllexport float @imp_dspf_wrapper(i8* %_impz, i8* %closure, float %sample, i64 %time, i64 %channel, float* %data) 
+define dllexport float @imp_dspf_wrapper(i8* %_impz, i8* %closure, float %sample, i64 %time, i64 %channel, float* %data)
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, float (i8*,i8*,float,i64,i64,float*)*}*
-; apply closure 
+; apply closure
 %fPtr = getelementptr {i8*, i8*, float (i8*, i8*, float, i64, i64, float*)*}, {i8*, i8*, float (i8*, i8*, float, i64, i64, float*)*}* %closureVal, i32 0, i32 2
 %ePtr = getelementptr {i8*, i8*, float (i8*, i8*, float, i64, i64, float*)*}, {i8*, i8*, float (i8*, i8*, float, i64, i64, float*)*}* %closureVal, i32 0, i32 1
 %f = load float (i8*, i8*, float,i64,i64,float*)*, float (i8*, i8*, float,i64,i64,float*)** %fPtr
@@ -584,11 +580,11 @@ entry:
 ret float %result
 }
 
-define dllexport float @imp_dspf_sum_wrapper(i8* %_impz, i8* %closure, float* %sample, i64 %time, i64 %channel, float* %data) 
+define dllexport float @imp_dspf_sum_wrapper(i8* %_impz, i8* %closure, float* %sample, i64 %time, i64 %channel, float* %data)
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, float (i8*,i8*,float*,i64,i64,float*)*}*
-; apply closure 
+; apply closure
 %fPtr = getelementptr {i8*, i8*, float (i8*, i8*, float*, i64, i64, float*)*}, {i8*, i8*, float (i8*, i8*, float*, i64, i64, float*)*}* %closureVal, i32 0, i32 2
 %ePtr = getelementptr {i8*, i8*, float (i8*, i8*, float*, i64, i64, float*)*}, {i8*, i8*, float (i8*, i8*, float*, i64, i64, float*)*}* %closureVal, i32 0, i32 1
 %f = load float (i8*, i8*, float*,i64,i64,float*)*, float (i8*, i8*, float*,i64,i64,float*)** %fPtr
@@ -597,11 +593,11 @@ entry:
 ret float %result
 }
 
-define dllexport void @imp_dsp_wrapper_array(i8* %_impz, i8* %closure, float* %datain, float* %dataout, i64 %time, i8* %data) 
+define dllexport void @imp_dsp_wrapper_array(i8* %_impz, i8* %closure, float* %datain, float* %dataout, i64 %time, i8* %data)
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, void (i8*,i8*,float*,float*,i64,i8*)*}*
-; apply closure 
+; apply closure
 %fPtr = getelementptr {i8*, i8*, void (i8*, i8*, float*, float*, i64, i8*)*}, {i8*, i8*, void (i8*, i8*, float*, float*, i64, i8*)*}* %closureVal, i32 0, i32 2
 %ePtr = getelementptr {i8*, i8*, void (i8*, i8*, float*, float*, i64, i8*)*}, {i8*, i8*, void (i8*, i8*, float*, float*, i64, i8*)*}* %closureVal, i32 0, i32 1
 %f = load void (i8*, i8*, float*,float*,i64,i8*)*, void (i8*, i8*, float*,float*,i64,i8*)** %fPtr
@@ -610,11 +606,11 @@ tail call fastcc void %f(i8* %_impz, i8* %e, float* %datain, float* %dataout, i6
 ret void
 }
 
-define dllexport void @imp_dsp_sum_wrapper_array(i8* %_impz, i8* %closure, float** %datain, float* %dataout, i64 %time, i8* %data) 
+define dllexport void @imp_dsp_sum_wrapper_array(i8* %_impz, i8* %closure, float** %datain, float* %dataout, i64 %time, i8* %data)
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, void (i8*,i8*,float**,float*,i64,i8*)*}*
-; apply closure 
+; apply closure
 %fPtr = getelementptr {i8*, i8*, void (i8*, i8*, float**, float*, i64, i8*)*}, {i8*, i8*, void (i8*, i8*, float**, float*, i64, i8*)*}* %closureVal, i32 0, i32 2
 %ePtr = getelementptr {i8*, i8*, void (i8*, i8*, float**, float*, i64, i8*)*}, {i8*, i8*, void (i8*, i8*, float**, float*, i64, i8*)*}* %closureVal, i32 0, i32 1
 %f = load void (i8*, i8*, float**,float*,i64,i8*)*, void (i8*, i8*, float**,float*,i64,i8*)** %fPtr
@@ -648,7 +644,7 @@ entry:
 ret i8* null
 }
 
-define dllexport i1 @impc_true() alwaysinline 
+define dllexport i1 @impc_true() alwaysinline
 {
 entry:
 ret i1 1
@@ -668,28 +664,28 @@ define dllexport i64 @i1toi64(i1 %a) alwaysinline
 {
 entry:
 %return = zext i1 %a to i64
-ret i64 %return 
+ret i64 %return
 }
 
-define dllexport i32 @i1toi32(i1 %a) 
+define dllexport i32 @i1toi32(i1 %a)
 {
 entry:
 %return = zext i1 %a to i32
-ret i32 %return 
+ret i32 %return
 }
 
 define dllexport i16 @i1toi16(i1 %a) alwaysinline
 {
 entry:
 %return = zext i1 %a to i16
-ret i16 %return 
+ret i16 %return
 }
 
 define dllexport i8 @i1toi8(i1 %a) alwaysinline
 {
 entry:
 %return = zext i1 %a to i8
-ret i8 %return 
+ret i8 %return
 }
 
 define dllexport i1 @i64toi1(i64 %a) alwaysinline
@@ -726,35 +722,35 @@ define dllexport i64 @i8toi64(i8 %a) alwaysinline
 {
 entry:
 %return = sext i8 %a to i64
-ret i64 %return 
+ret i64 %return
 }
 
 define dllexport i64 @i8toui64(i8 %a) alwaysinline
 {
 entry:
 %return = zext i8 %a to i64
-ret i64 %return 
+ret i64 %return
 }
 
 define dllexport i32 @i8toi32(i8 %a) alwaysinline
 {
 entry:
 %return = sext i8 %a to i32
-ret i32 %return 
+ret i32 %return
 }
 
 define dllexport i16 @i8toi16(i8 %a) alwaysinline
 {
 entry:
 %return = sext i8 %a to i16
-ret i16 %return 
+ret i16 %return
 }
 
 define dllexport i32 @i8toui32(i8 %a) alwaysinline
 {
 entry:
 %return = zext i8 %a to i32
-ret i32 %return 
+ret i32 %return
 }
 
 define dllexport i8 @i64toi8(i64 %a) alwaysinline
@@ -783,28 +779,28 @@ define dllexport i64 @i16toi64(i16 %a) alwaysinline
 {
 entry:
 %return = sext i16 %a to i64
-ret i64 %return 
+ret i64 %return
 }
 
 define dllexport i64 @i16toui64(i16 %a) alwaysinline
 {
 entry:
 %return = zext i16 %a to i64
-ret i64 %return 
+ret i64 %return
 }
 
 define dllexport i32 @i16toi32(i16 %a) alwaysinline
 {
 entry:
 %return = sext i16 %a to i32
-ret i32 %return 
+ret i32 %return
 }
 
 define dllexport i32 @i16toui32(i16 %a) alwaysinline
 {
 entry:
 %return = zext i16 %a to i32
-ret i32 %return 
+ret i32 %return
 }
 
 define dllexport i16 @i64toi16(i64 %a) alwaysinline
@@ -826,14 +822,14 @@ define dllexport i64 @i32toi64(i32 %a) alwaysinline
 {
 entry:
 %return = sext i32 %a to i64
-ret i64 %return 
+ret i64 %return
 }
 
 define dllexport i64 @i32toui64(i32 %a) alwaysinline
 {
 entry:
 %return = zext i32 %a to i64
-ret i64 %return 
+ret i64 %return
 }
 
 define dllexport i32 @i64toi32(i64 %a) alwaysinline
@@ -1193,7 +1189,7 @@ declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1)
 ;declare void @llvm.memset.p0i8.i64(i8*, i8, i64, i32, i1)
 ;
 ; TODO - fix the incorrect signature
-;define hidden dllexport i8* @memset(i8* %dest, i32 %val, i64 %len) alwaysinline 
+;define hidden dllexport i8* @memset(i8* %dest, i32 %val, i64 %len) alwaysinline
 ;{
 ;  %1 = trunc i32 %val to i8
 ;  call void @llvm.memset.p0i8.i64(i8* %dest, i8 %1, i64 %len, i32 1, i1 0)

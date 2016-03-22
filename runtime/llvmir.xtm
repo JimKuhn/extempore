@@ -85,7 +85,7 @@
                 (if print?
                     (begin
                       (print "\nCompiling ")
-                      (print-with-colors 'blue 'default #t (print "init.ll"))
+                      (print-with-colors 'blue 'default #t (print name))
                       (print "... ")
                       (print-with-colors 'green 'default #t (print "done"))
                       (print "\n\n"))
@@ -98,6 +98,10 @@
 (define sys:compile-init-ll
   (lambda ()
     (sys:compile-ll "init.ll")))
+
+(define sys:compile-types-ll
+  (lambda ()
+    (sys:compile-ll "types.ll")))
 
 ;; GCHANGE
 ;; removes %b when returning base types (i.e. !head%b returns !head)
@@ -738,7 +742,7 @@
                  ((impc:ir:tuple? (car type)) (car type))
                  ((impc:ir:array? (car type)) (car type))
                  ((impc:ir:vector? (car type)) (car type))
-                 (else *impc:ir:badtype*))) 
+                 (else *impc:ir:badtype*)))
           (else type))))
 
 
@@ -2331,7 +2335,7 @@
                             (make-list (length (cdr ast)) #f))))
              (num-elts (length elts))
              (fullt (string-append "[" (number->string num-elts) " x " (cadr (cdar elts)) "]")))
-        (emit "; stack alloc array literal")        
+        (emit "; stack alloc array literal")
         (emit (caar elts) os)
         (emit (impc:ir:gname "arrayl" fullt) " = insertvalue " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", 0\n" os)
         (emit "; set array literal elts")
@@ -2530,7 +2534,7 @@
       ;;         (if (impc:ir:array? ttype)
       ;;             (impc:compiler:print-bad-type-error-with-ast (cadr var) (string-append "cannot be an array type, maybe you want " (cadr var) "*") ast)
       ;;             (impc:compiler:print-bad-type-error-with-ast (cadr var) (string-append "cannot be a closure type, maybe you want " (cadr var) "*") ast))))
-               
+
       (if (not (equal? (impc:ir:get-type-from-str (cadr val))
                        (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var)))))
           (impc:compiler:print-type-mismatch-error
@@ -2570,7 +2574,7 @@
                             (make-list (length (cdr ast)) #f))))
              (num-elts (length elts))
              (fullt (string-append "<" (number->string num-elts) " x " (cadr (cdar elts)) ">")))
-        (emit "; stack alloc vector literal")        
+        (emit "; stack alloc vector literal")
         (emit (caar elts) os)
         (emit (impc:ir:gname "vecl" fullt) " = insertelement " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", i32 0\n" os)
         (emit "; set array literal elts")
@@ -2753,7 +2757,7 @@
         ;;
         ;; (emit (impc:ir:gname "zonesize" "i64") " = mul "
         ;;       (cadr (impc:ir:gname "typesize")) " " (car (impc:ir:gname "typesize")) ", "
-        ;;       (car idx) "\n" os)        
+        ;;       (car idx) "\n" os)
         (emit (impc:ir:gname "zonesize" "i64") " = mul " (cadr idx) " " typesize ", " (car idx) "\n" os)
 
         (emit (impc:ir:gname "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
@@ -2795,7 +2799,7 @@
     (let* ((os (make-string 0)))
       (let* ((idx-str (impc:ir:compiler (cadr ast) types))
              (idx (impc:ir:gname))
-             (t (impc:ir:get-type-from-str (cadr idx)))        
+             (t (impc:ir:get-type-from-str (cadr idx)))
              (tt (impc:ir:pointer-- (car hint?)))
              (typesize (number->string (impc:ir:get-type-size tt))))
         ;;(impc:ir:convert-from-pretty-types (car hint?)))))
@@ -2875,7 +2879,7 @@
 ;; makes a tuple 'literal'
 (define impc:ir:compiler:make-tuple
   (lambda (ast types hint?)
-    ;; (println 'make-tuple-ir hint?) 
+    ;; (println 'make-tuple-ir hint?)
     (let* ((os (make-string 0)))
       (let* ((elts (map (lambda (x t)
                           (cons (impc:ir:compiler x types t)
@@ -2891,7 +2895,7 @@
              (fullt (string-append "{" (caddr (car elts))
                                    (apply string-append (map (lambda (x) (string-append ", " (caddr x))) (cdr elts)))
                                    "}")))
-        (emit "; stack alloc tuple literal")        
+        (emit "; stack alloc tuple literal")
         (emit (caar elts) os)
         (emit (impc:ir:gname "tuplel" fullt) " = insertvalue " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", 0\n" os)
         (emit "; set tuple literal elts")
@@ -3291,7 +3295,7 @@
                        (impc:ir:compiler (cadddr ast) types (if (null? hint?) #f (car hint?)))
                        ""))
              (cval (if (< args 3) #f (impc:ir:gname)))
-             (os (make-string 0)))      
+             (os (make-string 0)))
         ;; (println 'intrinsice ast aval bval cval)
         ;; sanity checks
         (if (not (or (impc:ir:number? (cadr aval))
@@ -3971,7 +3975,7 @@
                               (if (= *impc:ir:fp32* (car hint?))
                                   (impc:ir:gname (llvm:convert-float (number->string ast)) (impc:ir:get-type-str (car hint?)))
                                   (impc:ir:gname (number->string ast) (impc:ir:get-type-str (car hint?))))
-                              (impc:ir:gname (number->string ast) (if (integer? ast) "i64" "double")))                    
+                              (impc:ir:gname (number->string ast) (if (integer? ast) "i64" "double")))
                         "")))
                    ((string? ast)
                     (impc:ir:make-const-string ast))

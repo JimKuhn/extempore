@@ -45,8 +45,8 @@
 
 (impc:aot:insert-header "xtmbase")
 
-(sys:compile-init-ll)
-(impc:aot:insert-forms (sys:compile-init-ll))
+(sys:compile-types-ll)
+(impc:aot:insert-forms (sys:compile-types-ll))
 
 ;; (suppress-compiler-messages #f)
 
@@ -206,7 +206,7 @@
   `(/ (log ,x) (log ,base)))
 
 (bind-macro
-  "convert angle in degrees to radians" 
+  "convert angle in degrees to radians"
   (deg2rad degrees)
   `(/ ,degrees 57.2957795))
 
@@ -376,7 +376,7 @@ into any further sexp arguments."
 ;; (bind-poly fabs llvm_fabs)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
-;; 
+;;
 ;; some zone helpers
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;

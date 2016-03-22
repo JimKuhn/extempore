@@ -2746,7 +2746,7 @@
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
              (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
-             (asm-path (string-append tmp-dir module-name (unix-or-Windows ".s" ".obj")))
+             (asm-path (string-append tmp-dir module-name (unix-or-Windows ".o" ".obj"))) ; could skip .o (straight to .so)
              (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/")))
              (output-shlib-path (string-append output-dir module-name
                                                (cond ((string=? platform "Linux") ".so")
@@ -2767,6 +2767,7 @@
                                 llc-path
                                 (if optimize-compiles? " -O3 -tailcallopt" "-O0")
                                 " -relocation-model=pic "
+                                " -filetype=obj "
                                 (if (and (string=? (sys:platform) "OSX")
                                          (not (string=? (sys:cmdarg "mcpu") "")))
                                     (string-append "-mcpu="

@@ -6,31 +6,31 @@
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -142,9 +142,9 @@ extemp::EXTMutex alloc_mutex("alloc mutex");
 // double (&sind)(double) = sin;
 // double (&coshd)(double) = cosh;
 // double (&tanhd)(double) = tanh;
-// double (&sinhd)(double) = sinh; 
+// double (&sinhd)(double) = sinh;
 // double (&acosd)(double) = acos;
-// double (&asind)(double) = asin; 
+// double (&asind)(double) = asin;
 // double (&atand)(double) = atan;
 // double (&atan2d)(double,double) = atan2;
 // double (&ceild)(double) = ceil;
@@ -174,12 +174,12 @@ void free16(void *p) {
   free (porig);                               // then free that
 }
 
-const char* llvm_scheme_ff_get_name(foreign_func ff) 
+const char* llvm_scheme_ff_get_name(foreign_func ff)
 {
    return (LLVM_SCHEME_FF_MAP[ff]).c_str();
 }
 
-void llvm_scheme_ff_set_name(foreign_func ff,const char* name) 
+void llvm_scheme_ff_set_name(foreign_func ff,const char* name)
 {
   LLVM_SCHEME_FF_MAP[ff] = std::string(name);
   return;
@@ -192,7 +192,7 @@ void llvm_runtime_error(int error,void* arg)
   switch(error){
   case 1:
     printf("LLVM zptr_copy - invalid zptr! %p\n",arg);
-    break;    
+    break;
   default:
     break;
   }
@@ -201,7 +201,7 @@ void llvm_runtime_error(int error,void* arg)
 }
 
 //////////////////////////////////////////////////////////////////
-// this whole zone section should 
+// this whole zone section should
 // all be thread safe of course
 // but currently isn't!
 // FIX ME!!
@@ -220,7 +220,7 @@ void llvm_push_zone_stack(llvm_zone_t* z)
     stack->tail = llvm_threads_get_zone_stack();
     llvm_threads_set_zone_stack(stack);
 
-#if DEBUG_ZONE_STACK          
+#if DEBUG_ZONE_STACK
     llvm_threads_inc_zone_stacksize();
     if(stack->tail) {
         printf("%p: push new zone %p: %" PRIu64 " onto old zone %p:%lld stacksize:%lld\n",stack,z,z->size,stack->tail->head,stack->tail->head->size,llvm_threads_get_zone_stacksize());
@@ -237,19 +237,19 @@ llvm_zone_t* llvm_peek_zone_stack()
     llvm_zone_t* z = 0;
     llvm_zone_stack* stack = llvm_threads_get_zone_stack();
     if (unlikely(!stack)) {  // for the moment create a "DEFAULT" zone if stack is NULL
-#if DEBUG_ZONE_STACK      
+#if DEBUG_ZONE_STACK
         printf("TRYING TO PEEK AT A NULL ZONE STACK\n");
 #endif
         llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1); // default root zone is 1M
         llvm_push_zone_stack(z);
         stack = llvm_threads_get_zone_stack();
-#if DEBUG_ZONE_STACK      
+#if DEBUG_ZONE_STACK
         printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
-#endif      
+#endif
         return z;
     }
     z = stack->head;
-#if DEBUG_ZONE_STACK      
+#if DEBUG_ZONE_STACK
     printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
 #endif
     return z;
@@ -259,14 +259,14 @@ llvm_zone_t* llvm_pop_zone_stack()
 {
     llvm_zone_stack* stack = llvm_threads_get_zone_stack();
     if (unlikely(!stack)) {
-#if DEBUG_ZONE_STACK      
+#if DEBUG_ZONE_STACK
       printf("TRYING TO POP A ZONE FROM AN EMPTY ZONE STACK\n");
 #endif
       return nullptr;
     }
     llvm_zone_t* head = stack->head;
     llvm_zone_stack* tail = stack->tail;
-#if DEBUG_ZONE_STACK    
+#if DEBUG_ZONE_STACK
     llvm_threads_dec_zone_stacksize();
     if (!tail) {
         printf("%p: popping zone %p:%lld from stack with no tail\n",stack,head,head->size);
@@ -302,7 +302,7 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
     zone->size = size;
     zone->cleanup_hooks = nullptr;
     zone->memories = nullptr;
-    #if DEBUG_ZONE_ALLOC    
+    #if DEBUG_ZONE_ALLOC
     printf("CreateZone: %x:%x:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
     #endif
     return zone;
@@ -310,13 +310,13 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
 
 void llvm_zone_destroy(llvm_zone_t* zone)
 {
-  #if DEBUG_ZONE_ALLOC  
+  #if DEBUG_ZONE_ALLOC
     printf("DestroyZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
   #endif
     if(zone->memories != NULL) llvm_zone_destroy(zone->memories);
     // immediate zeroing for debug purposes!
     memset(zone->memory,0,zone->size);
-    free(zone->memory);    
+    free(zone->memory);
     free(zone);
     return;
 }
@@ -412,11 +412,11 @@ bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
     uint64_t size2 = llvm_zone_ptr_size(ptr2);
 
     if (unlikely(size1 != size2)) {
-  //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2); 
+  //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2);
         return 1;
     }
     if (unlikely(!size1)) {
-  //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2); 
+  //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2);
         return 1;
     }
     //printf("zone_copy_ptr: %p,%p,%lld,%lld\n",ptr2,ptr1,size1,size2);
@@ -441,7 +441,7 @@ extemp::CM* FreeWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,fre
 void free_after_delay(char* dat, double delay)
 {
     //printf("freeWithDelay %p\n",zone);
-    extemp::CM* cb = FreeWithDelayCM; 
+    extemp::CM* cb = FreeWithDelayCM;
     extemp::Task<char*>* task = new extemp::Task<char*>(extemp::UNIV::TIME+delay,44100,cb,dat);
     extemp::TaskScheduler::I()->add(task);
 }
@@ -469,8 +469,8 @@ void llvm_schedule_callback(long long time, void* dat)
 void* llvm_get_function_ptr(char* fname)
 {
   using namespace llvm;
-  
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(fname);        
+
+  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(fname);
   if(func == NULL)
     {
       return NULL;
@@ -488,14 +488,14 @@ void* llvm_get_function_ptr(char* fname)
 char* extitoa(int64_t val) {
         /*
   int base = 10;
-  static char buf[32] = {0};        
-  int i = 30;        
-  for(; val && i ; --i, val /= base)        
-    buf[i] = "0123456789abcdef"[val % base]; 
+  static char buf[32] = {0};
+  int i = 30;
+  for(; val && i ; --i, val /= base)
+    buf[i] = "0123456789abcdef"[val % base];
         */
   static char buf[32] = {0};
   sprintf(buf,"%" PRId64,val);
-  return buf;//&buf[i+1];        
+  return buf;//&buf[i+1];
 }
 
 int llvm_printf(char* format, ...)
@@ -708,7 +708,7 @@ int64_t thread_sleep(int64_t secs, int64_t nanosecs) {
   } else {
     return -1;
   }
-#endif  
+#endif
 }
 
 void* mutex_create() {
@@ -941,7 +941,7 @@ float imp_rand2_f(float a, float b)
 // This is temporary and needs to replaced with something sensible!
 struct closure_address_table
 {
-    uint64_t id; 
+    uint64_t id;
     char* name;
     uint32_t offset;
     char* type;
@@ -985,7 +985,7 @@ char* get_address_type(uint64_t id, closure_address_table* table)
       table = table->next;
     }
     printf("Unable to locate id in closure environment c\n");
-    return 0;  
+    return 0;
 }
 
 bool check_address_exists(uint64_t id, closure_address_table* table)
@@ -997,7 +997,7 @@ bool check_address_exists(uint64_t id, closure_address_table* table)
       }
       table = table->next;
     }
-  return false;  
+  return false;
 }
 
 bool check_address_type(uint64_t id, closure_address_table* table, const char* type)
@@ -1022,7 +1022,7 @@ struct closure_address_table* new_address_table()
 {
     return 0; // NULL for empty table
 }
- 
+
 struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table)
 {
   struct closure_address_table* t = NULL;
@@ -1071,7 +1071,7 @@ bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
       return true;
     }else{
       //printf("Eval error: No compiler match for %s\n",symbol);
-      return false; 
+      return false;
     }
   }
   }
@@ -1080,19 +1080,19 @@ bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
 #define strvalue(p)      ((p)->_object._string._svalue)
 pointer llvm_scheme_env_set(scheme* _sc, char* sym)
 {
-  using namespace llvm; 
+  using namespace llvm;
   char fname[256];
   char tmp[256];
   char vname[256];
   char tname[256];
-  
+
   char c[1024];
   memset(c,0,1024);
   const char* d = "_xtlang_name";
-  
+
   if(!(rsplit((char*)"\\.",sym, (char*) fname, (char*) tmp))) {
     printf("Error attempting to set environment variable in closure bad split %s\n",sym);
-    return _sc->F;  
+    return _sc->F;
   }
   if(!rsplit((char*)":",tmp, (char*) vname,(char*) tname)) {
     memset(tname, 0, 256);
@@ -1112,9 +1112,9 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   llvm::Function* func = extemp::EXTLLVM::I()->getFunction((funcname+getter).c_str());
   if(func == 0) {
     printf("Error: no matching function for %s.%s\n",fname,vname);
-    return _sc->F; 
+    return _sc->F;
   }
-  
+
   void*(*p)() = (void*(*)()) extemp::EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
   if(p==NULL){
      p = (void*(*)()) extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
@@ -1122,7 +1122,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     printf("Error attempting to set environment variable in closure %s.%s\n",fname,vname);
     return _sc->F;
   }
-  
+
   size_t*** closur = (size_t***) p();
   size_t** closure = *closur;
   //uint32_t** closure = (uint32_t**) cptr_value(pair_car(args));
@@ -1150,7 +1150,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   if(_sc->args == _sc->NIL) {
     //value = 0;
     value = _sc->NIL;
-  } else {   
+  } else {
     value = pair_car(_sc->args);
   }
 
@@ -1169,7 +1169,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     } else {
       **ptr = ivalue(value);
       return _sc->T;
-    }        
+    }
   }else if(strcmp(type,"float") == 0){
     float** ptr = (float**) (eptr+offset);
     if(value == _sc->NIL) {
@@ -1177,7 +1177,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     } else {
       **ptr = rvalue(value);
       return _sc->T;
-    }            
+    }
   }else if(strcmp(type,"double")==0){
     double** ptr = (double**) (eptr+offset);
     if(value == _sc->NIL) {
@@ -1185,10 +1185,10 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     } else {
       **ptr = rvalue(value);
       return _sc->T;
-    }            
+    }
   }else{ // else pointer type
     char*** ptr = (char***) (eptr+offset);
-    if(value == _sc->NIL) {      
+    if(value == _sc->NIL) {
       return mk_cptr(_sc, (void*) **ptr);
     } else {
       **ptr = (char*) cptr_value(value);
@@ -1196,7 +1196,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
       return _sc->T;
     }
   }
-  // shouldn't get to here 
+  // shouldn't get to here
   return _sc->F;
 }
 
@@ -1210,7 +1210,7 @@ char* llvm_disassemble(const unsigned char* code,int syntax)
         //llvm::Triple Triple(TripleName);
         std::string Error;
         llvm::TargetMachine *TM = extemp::EXTLLVM::I()->EE->getTargetMachine();
-        llvm::Triple Triple = TM->getTargetTriple();                 
+        llvm::Triple Triple = TM->getTargetTriple();
         const llvm::Target TheTarget = TM->getTarget();
         std::string TripleName = Triple.getTriple();
 
@@ -1218,10 +1218,10 @@ char* llvm_disassemble(const unsigned char* code,int syntax)
         const llvm::MCRegisterInfo* MRI(TheTarget.createMCRegInfo(TripleName));
         const llvm::MCAsmInfo* AsmInfo(TheTarget.createMCAsmInfo(*MRI,TripleName));
         const llvm::MCSubtargetInfo* STI(TheTarget.createMCSubtargetInfo(TripleName,"",""));
-        const llvm::MCInstrInfo* MII(TheTarget.createMCInstrInfo());        
+        const llvm::MCInstrInfo* MII(TheTarget.createMCInstrInfo());
         //const llvm::MCInstrAnalysis* MIA(TheTarget->createMCInstrAnalysis(MII->get()));
         llvm::MCContext Ctx(AsmInfo, MRI, nullptr);
-        llvm::MCDisassembler* DisAsm(TheTarget.createMCDisassembler(*STI,Ctx));        
+        llvm::MCDisassembler* DisAsm(TheTarget.createMCDisassembler(*STI,Ctx));
         llvm::MCInstPrinter* IP(TheTarget.createMCInstPrinter(Triple,syntax,*AsmInfo,*MII,*MRI)); //,*STI));
         IP->setPrintImmHex(true);
         IP->setUseMarkup(true);
@@ -1270,8 +1270,8 @@ namespace extemp {
 
     EXTLLVM EXTLLVM::SINGLETON;
     int64_t EXTLLVM::LLVM_COUNT = 0l;
-    bool EXTLLVM::OPTIMIZE_COMPILES = 0;
-    bool EXTLLVM::VERIFY_COMPILES = 1;
+    bool EXTLLVM::OPTIMIZE_COMPILES = false;
+    bool EXTLLVM::VERIFY_COMPILES = true;
 
     EXTLLVM::EXTLLVM()
     {
@@ -1287,8 +1287,8 @@ namespace extemp {
     }
   EXTLLVM::~EXTLLVM() {}
 
-#ifdef EXT_MCJIT  
-    uint64_t EXTLLVM::getSymbolAddress(const std::string& name) {      
+#ifdef EXT_MCJIT
+    uint64_t EXTLLVM::getSymbolAddress(const std::string& name) {
       return MM->getSymbolAddress(name);
     }
 #endif
@@ -1311,8 +1311,8 @@ namespace extemp {
 
       llvm::InitializeNativeTarget();
       llvm::InitializeNativeTargetAsmPrinter();
-      LLVMInitializeX86Disassembler();      
-      
+      LLVMInitializeX86Disassembler();
+
       llvm::LLVMContext &context = llvm::getGlobalContext();
       //llvm::IRBuilder<> theBuilder(context);
 
@@ -1332,7 +1332,7 @@ namespace extemp {
 #ifdef EXT_MCJIT
       std::unique_ptr<llvm::SectionMemoryManager> MM = llvm::make_unique<llvm::SectionMemoryManager>();
       factory.setMCJITMemoryManager(std::move(MM));
-#else          
+#else
       factory.setUseMCJIT(false);
 #endif
       //if(!extemp::UNIV::ARCH.empty()) factory.setMArch(extemp::UNIV::ARCH.front());
@@ -1340,7 +1340,7 @@ namespace extemp {
       // if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
       factory.setOptLevel(llvm::CodeGenOpt::Aggressive);
       //factory.setOptLevel(llvm::CodeGenOpt::None);
-      llvm::Triple triple(llvm::sys::getProcessTriple());           
+      llvm::Triple triple(llvm::sys::getProcessTriple());
       std::string cpu = llvm::sys::getHostCPUName();
       if(!extemp::UNIV::CPU.empty()) cpu = extemp::UNIV::CPU.front();
       llvm::StringMap<bool> HostFeatures;
@@ -1357,8 +1357,8 @@ namespace extemp {
         for(int i=0;i<extemp::UNIV::ATTRS.size();i++) {
           lattrs.append(1, extemp::UNIV::ATTRS[i]);
         }
-      }          
-      
+      }
+
       llvm::TargetMachine* tm = factory.selectTarget(triple,"",cpu,lattrs);
       EE = factory.create(tm);
       EE->DisableLazyCompilation(true);
@@ -1408,9 +1408,9 @@ namespace extemp {
       std::cout << " MCJIT" << std::endl;
 #else
       std::cout << " JIT" << std::endl;
-#endif          
+#endif
       ascii_normal();
-          
+
 
 
             //EE = llvm::EngineBuilder(M).create();
@@ -1418,7 +1418,7 @@ namespace extemp {
             //PM->add(new llvm::TargetData(*EE->getTargetData()));
       // PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
 
-      PM->add(llvm::createBasicAliasAnalysisPass());   //new   
+      PM->add(llvm::createBasicAliasAnalysisPass());   //new
       // promote allocs to register
       PM->add(llvm::createPromoteMemoryToRegisterPass());
             // Do simple "peephole" optimizations and bit-twiddling optzns.
