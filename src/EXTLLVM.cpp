@@ -1,5 +1,3 @@
-#include <fstream>
-#include "llvm/AsmParser/Parser.h"
 /*
  * Copyright (c) 2011, Andrew Sorensen
  *
@@ -67,7 +65,7 @@
 #include "llvm/MC/MCInstPrinter.h"
 #include "llvm/MC/MCContext.h"
 
-
+#include <fstream>
 #include "stdarg.h"
 #include "EXTLLVM.h"
 #include "EXTThread.h"
@@ -1415,6 +1413,36 @@ namespace extemp {
 
             //EE = llvm::EngineBuilder(M).create();
             PM = new llvm::legacy::PassManager();
+#if 1
+            PM->add(llvm::createInstructionCombiningPass());  // Clean up after IPCP & DAE
+            PM->add(llvm::createCFGSimplificationPass());     // Clean up after IPCP & DAE
+            PM->add(llvm::createFunctionInliningPass());
+            PM->add(llvm::createAlwaysInlinerPass());
+            PM->add(llvm::createArgumentPromotionPass());   // Scalarize uninlined fn args
+            PM->add(llvm::createScalarReplAggregatesPass());  // Break up aggregate allocas
+            PM->add(llvm::createInstructionCombiningPass());  // Cleanup for scalarrepl.
+            PM->add(llvm::createJumpThreadingPass());         // Thread jumps.
+            PM->add(llvm::createCFGSimplificationPass());     // Merge & remove BBs
+            PM->add(llvm::createInstructionCombiningPass());  // Combine silly seq's
+            PM->add(llvm::createTailCallEliminationPass());   // Eliminate tail calls
+            PM->add(llvm::createCFGSimplificationPass());     // Merge & remove BBs
+            PM->add(llvm::createReassociatePass());           // Reassociate expressions
+            PM->add(llvm::createLoopRotatePass());            // Rotate Loop
+            PM->add(llvm::createLICMPass());                  // Hoist loop invariants
+            PM->add(llvm::createInstructionCombiningPass());
+            PM->add(llvm::createIndVarSimplifyPass());        // Canonicalize indvars
+            PM->add(llvm::createLoopDeletionPass());          // Delete dead loops
+            PM->add(llvm::createLoopUnrollPass());          // Unroll small loops
+            PM->add(llvm::createInstructionCombiningPass());  // Clean up after the unroller
+            PM->add(llvm::createGVNPass(true)); // Remove redundancies
+            PM->add(llvm::createMemCpyOptPass());             // Remove memcpy / form memset
+            PM->add(llvm::createSCCPPass());                  // Constant prop with SCCP
+            PM->add(llvm::createInstructionCombiningPass());
+            PM->add(llvm::createJumpThreadingPass());         // Thread jumps
+            PM->add(llvm::createDeadStoreEliminationPass());  // Delete dead stores
+            PM->add(llvm::createAggressiveDCEPass());         // Delete dead instructions
+            PM->add(llvm::createCFGSimplificationPass());     // Merge & remove BBs
+#else
             //PM->add(new llvm::TargetData(*EE->getTargetData()));
       // PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
 
@@ -1438,7 +1466,7 @@ namespace extemp {
             PM->add(llvm::createCFGSimplificationPass());
       //
             PM->add(llvm::createPromoteMemoryToRegisterPass());
-
+#endif
       // tell LLVM about some built-in functions
             EE->updateGlobalMapping("llvm_disassemble", (uint64_t)&llvm_disassemble);
             EE->updateGlobalMapping("llvm_destroy_zone_after_delay", (uint64_t)&llvm_destroy_zone_after_delay);

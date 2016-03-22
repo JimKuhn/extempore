@@ -1713,10 +1713,10 @@ namespace extemp {
         break;
       }
     }while (newModule == 0);
-
+// std::cout << asmcode;
         if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);
 
-    if(EXTLLVM::OPTIMIZE_COMPILES)
+    if(EXTLLVM::OPTIMIZE_COMPILES && newModule)
       {
         PM->run(*newModule);
       }

@@ -638,19 +638,19 @@ declare i64 @llvm_now()
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SCHEME STUFF
 
-define dllexport i8* @impc_null() alwaysinline
+define dllexport i8* @impc_null() nounwind alwaysinline
 {
 entry:
 ret i8* null
 }
 
-define dllexport i1 @impc_true() alwaysinline
+define dllexport i1 @impc_true() nounwind alwaysinline
 {
 entry:
 ret i1 1
 }
 
-define dllexport i1 @impc_false() alwaysinline
+define dllexport i1 @impc_false() nounwind alwaysinline
 {
 entry:
 ret i1 0

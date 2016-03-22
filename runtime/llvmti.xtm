@@ -2954,6 +2954,7 @@
                   (set! *impc:aot:func-defs-in-mod* '())
                   (if (impc:aot:currently-compiling?)
                       (begin
+                        (llvm:optimize #t); // should this be restored later?
                         ;; this is the 'success' branch
                         (set! *impc:aot:current-lib-name* libname-no-extension)
                         ;; (impc:aot:insert-header libname-no-extension)
