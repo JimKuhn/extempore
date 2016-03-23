@@ -1630,20 +1630,31 @@ namespace extemp {
         inString << inStream.rdbuf();
         sInitString = inString.str();
     }
-    std::string asmcode(sInitString + assm);
+    std::string asmcode(assm);
     int cnt = 0;
 
     std::unique_ptr<llvm::Module> newModule;
-    do {
+    auto context(LLVMContextCreate());
+    pa = SMDiagnostic();
+    newModule = parseAssemblyString(asmcode, pa, *unwrap(context));
+    bool built(newModule);
+    newModule.reset();
+    LLVMContextDispose(context);
+    if (!built) {
+        asmcode = sInitString + asmcode;
+    }
+    newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
+    while (!newModule) {
       newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
-
-      if(newModule != NULL) break;
+      if (built) {
+        break;
+      }
       std::string err = pa.getMessage().str();
       if(cnt > 1000) {
         std::cout << "MCJIT Compiler Error: could not resolve all external dependencies" << std::endl;
         break;
       }
-      if(err.find("use of undefined value") != std::string::npos) {
+      if (err.find("use of undefined value") != std::string::npos) {
         char symname[1024];
         const char* undef_value_string = "use of undefined value '@(.*)'";
         const char* match1_string = "$1";
@@ -1709,10 +1720,10 @@ namespace extemp {
         asmcode.clear();
         asmcode.append(exprr);
         cnt++;
-      }else{
-        break;
+      } else {
+        break; // going to die
       }
-    }while (newModule == 0);
+    }
 // std::cout << asmcode;
         if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);
 
