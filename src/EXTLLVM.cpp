@@ -496,50 +496,6 @@ char* extitoa(int64_t val) {
   return buf;//&buf[i+1];
 }
 
-int llvm_fprintf(FILE* stream, char* format, ...)
-{
-    va_list ap;
-    va_start(ap,format);
-    int returnval = vfprintf(stream, format, ap);
-    va_end(ap);
-    return returnval;
-}
-
-int llvm_sprintf(char* str, char* format, ...)
-{
-    va_list ap;
-    va_start(ap,format);
-    int returnval = vsprintf(str, format, ap);
-    //printf("in the wing: %s\n",str);
-    va_end(ap);
-    return returnval;
-}
-
-int llvm_sscanf(char* buffer, char* format, ...)
-{
-    va_list ap;
-    va_start(ap,format);
-#ifdef _WIN32
-    char* ret = (char*) _alloca(2048);
-#else
-    char* ret = (char*) alloca(2048);
-#endif
-    int returnval = sscanf(buffer, format, ap);
-    printf("%s",ret);
-    fflush(stdout);
-    va_end(ap);
-    return returnval;
-}
-
-int llvm_fscanf(FILE* stream, char* format, ...)
-{
-    va_list ap;
-    va_start(ap,format);
-    int returnval = vfscanf(stream, format, ap);
-    va_end(ap);
-    return returnval;
-}
-
 void llvm_send_udp(char* host, int port, void* message, int message_length)
 {
   int length = message_length;
@@ -1455,11 +1411,11 @@ namespace extemp {
             EE->updateGlobalMapping("llvm_destroy_zone_after_delay", (uint64_t)&llvm_destroy_zone_after_delay);
             EE->updateGlobalMapping("free_after_delay", (uint64_t)&free_after_delay);
             EE->updateGlobalMapping("llvm_get_next_prime", (uint64_t)&llvm_get_next_prime);
-            EE->updateGlobalMapping("llvm_printf", (uint64_t)&printf);
-            EE->updateGlobalMapping("llvm_fprintf", (uint64_t)&llvm_fprintf);
-            EE->updateGlobalMapping("llvm_sprintf", (uint64_t)&llvm_sprintf);
-            EE->updateGlobalMapping("llvm_sscanf", (uint64_t)&llvm_sscanf);
-            EE->updateGlobalMapping("llvm_fscanf", (uint64_t)&llvm_fscanf);
+            EE->updateGlobalMapping("llvm_printf", uintptr_t(&printf));
+            EE->updateGlobalMapping("llvm_fprintf", uintptr_t(&fprintf));
+            EE->updateGlobalMapping("llvm_sprintf", uintptr_t(&sprintf));
+            EE->updateGlobalMapping("llvm_sscanf", uintptr_t(&sscanf));
+            EE->updateGlobalMapping("llvm_fscanf", uintptr_t(&fscanf));
             EE->updateGlobalMapping("llvm_zone_create", (uint64_t)&llvm_zone_create);
             EE->updateGlobalMapping("llvm_zone_destroy", (uint64_t)&llvm_zone_destroy);
             EE->updateGlobalMapping("llvm_zone_print", (uint64_t)&llvm_zone_print);

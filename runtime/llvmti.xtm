@@ -3360,13 +3360,13 @@
         `(print_return)
         `(begin
            ,(if (string? (car ast))
-                (list 'llvm_printf "%s" (car ast))
+                (list 'printf "%s" (car ast))
                 (list 'print (car ast)))
            ,@(flatten-1 (map (lambda (x)
                                (if (string? x)
                                    (list
                                     (list 'print_space)
-                                    (list 'llvm_printf "%s" x))
+                                    (list 'printf "%s" x))
                                    (list
                                     (list 'print_space)
                                     (list 'print x))))
@@ -3379,13 +3379,13 @@
         `(print_return)
         `(begin
            ,(if (string? (car ast))
-                (list 'llvm_printf "%s" (car ast))
+                (list 'printf "%s" (car ast))
                 (list 'print (car ast)))
            ,@(flatten-1 (map (lambda (x)
                                (if (string? x)
                                    (list
                                     ;; (list 'print_space)
-                                    (list 'llvm_printf "%s" x))
+                                    (list 'printf "%s" x))
                                    (list
                                     ;; (list 'print_space)
                                     (list 'print x))))
@@ -3400,13 +3400,13 @@
            (cat
             ,(if (string? (car ast))
                  `(let ((x_t_mst:i8* (salloc 1024)))
-                    (llvm_sprintf x_t_mst "%s" ,(car ast))
+                    (sprintf x_t_mst "%s" ,(car ast))
                     (String x_t_mst))
                  (list 'toString (car ast)))
             ,@(flatten-1 (map (lambda (x)
                                 (if (string? x)
                                     (list `(let ((x_t_mst:i8* (salloc 1024)))
-                                             (llvm_sprintf x_t_mst " %s" ,x)
+                                             (sprintf x_t_mst " %s" ,x)
                                              (String x_t_mst)))
                                     (list
                                      (list 'toString_space)
@@ -3423,7 +3423,7 @@
             ,@(map (lambda (x)
                      (if (string? x)
                          `(let ((xx_t_mst:i8* (salloc 1024)))
-                            (llvm_sprintf xx_t_mst "%s" ,x)
+                            (sprintf xx_t_mst "%s" ,x)
                             (String xx_t_mst))
                          (list 'toString x)))
                    ast))))))

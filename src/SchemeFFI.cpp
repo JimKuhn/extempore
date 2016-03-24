@@ -1,3 +1,5 @@
+// #include <unistd.h>
+
 /*
  * Copyright (c) 2011, Andrew Sorensen
  *
@@ -1726,6 +1728,19 @@ namespace extemp {
     }
 // std::cout << asmcode;
         if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);
+
+// if (newModule) {
+//     char buf[] = "/tmp/pre.XXXXXX";
+//     auto fd(mkstemp(buf));
+//     auto data(asmcode.c_str());
+//     auto len(asmcode.length());
+//     while (len) {
+//         auto written(write(fd, data, len));
+//         len -= written;
+//         data += written;
+//     }
+//     close(fd);
+// }
 
     if(EXTLLVM::OPTIMIZE_COMPILES && newModule)
       {

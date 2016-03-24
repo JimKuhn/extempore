@@ -3132,7 +3132,7 @@
                          ")\n")
           (string-append (apply string-append (map (lambda (a) (car a)) args))
                          "\n" va " = call i32 (i8*,i8*, ...) @"
-                         (symbol->string (car ast)) "("
+                         (substring (symbol->string (car ast)) 5) "("
                          (caddr (car args)) " " (cadr (car args)) ", "
                          (caddr (cadr args)) " " (cadr (cadr args))
                          (apply string-append (map (lambda (a)
