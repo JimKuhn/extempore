@@ -1546,7 +1546,6 @@
     ("llvm_substring" . #((213 108 108 4 4) "" ()))
     ("llvm_tan" . #((213 0 0) "" ()))
     ("llvm_tanh" . #((213 0 0) "" ()))
-    ("llvm_threads_get_callback_zone" . #((213 "%mzone*") "" ()))
     ("llvm_zone_copy_ptr" . #((213 10 108 108) "" ()))
     ("llvm_zone_create" . #((213 "%mzone*" 2) "" ()))
     ("llvm_zone_destroy" . #((213 -1 "%mzone*") "" ()))
@@ -9345,9 +9344,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                                 '("%ap" "%bp" "%cp" "%dp" "%ep" "%fp" "%gp" "%hp" "%ip" "%jp" "%kp" "%lp" "%mp" "%np" "%op" "%pp" "%qp" "%rp" "%sp" "%tp")
                                                                                                                 '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
                                         ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                                                      "%_zone = call ccc %mzone* @llvm_threads_get_callback_zone()\n"
-                                                                                      "call ccc void @llvm_push_zone_stack(%mzone* %_zone)\n"
-                                                                                      "call ccc %mzone* @llvm_zone_reset(%mzone* %_zone)\n"
+                                                                                      "%_zone = call ccc %mzone* @llvm_zone_callback_setup()\n"
                                                                                       "%_impz = bitcast %mzone* %_zone to i8*\n"
                                                                                       "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
                                                                                       "%ptrvar = load i8*, i8** %ptr\n"

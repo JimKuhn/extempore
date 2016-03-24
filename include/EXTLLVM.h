@@ -103,7 +103,33 @@ char* llvm_disassemble(const unsigned char*,int syntax);
 void* malloc16(size_t s);
 void free16(void* p);
 
-llvm_zone_t* llvm_zone_create(uint64_t size);
+const unsigned LLVM_ZONE_ALIGN = 32; // MUST BE POWER OF 2!
+const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
+
+inline llvm_zone_t* llvm_zone_create(uint64_t size)
+{
+    llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
+    if (unlikely(!zone)) {
+        printf("Catastrophic memory failure!\n");
+        fflush(stdout);
+        abort();
+    }
+#ifdef _WIN32
+    zone->memory = malloc(size_t(size));
+#else
+    posix_memalign(&zone->memory, LLVM_ZONE_ALIGN, size_t(size));
+#endif
+    zone->mark = 0;
+    zone->offset = 0;
+    if (unlikely(!zone->memory)) {
+        size = 0;
+    }
+    zone->size = size;
+    zone->cleanup_hooks = nullptr;
+    zone->memories = nullptr;
+    return zone;
+}
+
 inline llvm_zone_t* llvm_threads_get_callback_zone()
 {
     if (unlikely(!tls_llvm_callback_zone)) {
@@ -150,7 +176,23 @@ void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay);
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
 llvm_zone_t* llvm_pop_zone_stack();
 llvm_zone_t* llvm_peek_zone_stack();
-void llvm_push_zone_stack(llvm_zone_t*);
+
+inline void llvm_push_zone_stack(llvm_zone_t* z)
+{
+    llvm_zone_stack* stack = (llvm_zone_stack*) malloc(sizeof(llvm_zone_stack));
+    stack->head = z;
+    stack->tail = llvm_threads_get_zone_stack();
+    llvm_threads_set_zone_stack(stack);
+    return;
+}
+
+inline llvm_zone_t* llvm_zone_callback_setup()
+{
+    auto zone(llvm_threads_get_callback_zone());
+    llvm_push_zone_stack(zone);
+    return llvm_zone_reset(zone);
+}
+
 bool llvm_ptr_in_zone(llvm_zone_t*, void*);
 bool llvm_ptr_in_current_zone(void*);
 

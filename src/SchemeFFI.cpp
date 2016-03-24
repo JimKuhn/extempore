@@ -1647,10 +1647,6 @@ namespace extemp {
     }
     newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
     while (!newModule) {
-      newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
-      if (built) {
-        break;
-      }
       std::string err = pa.getMessage().str();
       if(cnt > 1000) {
         std::cout << "MCJIT Compiler Error: could not resolve all external dependencies" << std::endl;
@@ -1725,6 +1721,7 @@ namespace extemp {
       } else {
         break; // going to die
       }
+      newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
     }
 // std::cout << asmcode;
         if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);

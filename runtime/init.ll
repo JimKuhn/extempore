@@ -76,7 +76,7 @@ declare i32 @mutex_lock(i8*)
 declare i32 @mutex_unlock(i8*)
 declare i32 @mutex_trylock(i8*)
 
-declare %mzone* @llvm_threads_get_callback_zone() nounwind
+declare %mzone* @llvm_zone_callback_setup() nounwind
 declare void @llvm_runtime_error(i64,i8*) nounwind
 declare %mzone* @llvm_zone_create(i64) nounwind
 declare %mzone* @llvm_peek_zone_stack() nounwind

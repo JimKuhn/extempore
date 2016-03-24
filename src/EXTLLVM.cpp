@@ -208,28 +208,6 @@ thread_local llvm_zone_stack* tls_llvm_zone_stack = 0;
 thread_local uint64_t tls_llvm_zone_stacksize = 0;
 thread_local llvm_zone_t* tls_llvm_callback_zone = 0;
 
-const unsigned LLVM_ZONE_ALIGN = 32; // MUST BE POWER OF 2!
-const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
-
-void llvm_push_zone_stack(llvm_zone_t* z)
-{
-    llvm_zone_stack* stack = (llvm_zone_stack*) malloc(sizeof(llvm_zone_stack));
-    stack->head = z;
-    stack->tail = llvm_threads_get_zone_stack();
-    llvm_threads_set_zone_stack(stack);
-
-#if DEBUG_ZONE_STACK
-    llvm_threads_inc_zone_stacksize();
-    if(stack->tail) {
-        printf("%p: push new zone %p: %" PRIu64 " onto old zone %p:%lld stacksize:%lld\n",stack,z,z->size,stack->tail->head,stack->tail->head->size,llvm_threads_get_zone_stacksize());
-    } else {
-        printf("%p: push new zone %p:%lld onto empty stack\n",stack,z,z->size);
-    }
-#endif
-    //printf("zones: %lld\n",llvm_threads_get_zone_stacksize());
-    return;
-}
-
 llvm_zone_t* llvm_peek_zone_stack()
 {
     llvm_zone_t* z = 0;
@@ -275,35 +253,6 @@ llvm_zone_t* llvm_pop_zone_stack()
     free(stack);
     llvm_threads_set_zone_stack(tail);
     return head;
-}
-
-llvm_zone_t* llvm_zone_create(uint64_t size)
-{
-    llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
-    if (unlikely(!zone)) {
-        ascii_error();
-        printf("Catastrophic memory failure!\n");
-        ascii_default();
-        exit(1);
-    }
-#ifdef _WIN32
-    zone->memory = malloc(size_t(size));
-#else
-    // zone->memory = malloc((size_t) size);
-    posix_memalign(&zone->memory, LLVM_ZONE_ALIGN, size_t(size));
-#endif
-    zone->mark = 0;
-    zone->offset = 0;
-    if (unlikely(!zone->memory)) {
-        size = 0;
-    }
-    zone->size = size;
-    zone->cleanup_hooks = nullptr;
-    zone->memories = nullptr;
-    #if DEBUG_ZONE_ALLOC
-    printf("CreateZone: %x:%x:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
-    #endif
-    return zone;
 }
 
 void llvm_zone_destroy(llvm_zone_t* zone)
@@ -1421,13 +1370,13 @@ namespace extemp {
             EE->updateGlobalMapping("llvm_zone_print", (uint64_t)&llvm_zone_print);
             EE->updateGlobalMapping("llvm_runtime_error", (uint64_t)&llvm_runtime_error);
             EE->updateGlobalMapping("llvm_send_udp", (uint64_t)&llvm_send_udp);
-            EE->updateGlobalMapping("llvm_threads_get_callback_zone", (uint64_t)&llvm_threads_get_callback_zone);
             EE->updateGlobalMapping("llvm_schedule_callback", (uint64_t)&llvm_schedule_callback);
             EE->updateGlobalMapping("llvm_get_function_ptr", (uint64_t)&llvm_get_function_ptr);
             EE->updateGlobalMapping("llvm_peek_zone_stack", (uint64_t)&llvm_peek_zone_stack);
             EE->updateGlobalMapping("llvm_pop_zone_stack", (uint64_t)&llvm_pop_zone_stack);
             EE->updateGlobalMapping("llvm_push_zone_stack", (uint64_t)&llvm_push_zone_stack);
             EE->updateGlobalMapping("llvm_zone_malloc", (uint64_t)&llvm_zone_malloc);
+            EE->updateGlobalMapping("llvm_zone_callback_setup", uintptr_t(&llvm_zone_callback_setup));
             EE->updateGlobalMapping("get_address_table", (uint64_t)&get_address_table);
             EE->updateGlobalMapping("check_address_type", (uint64_t)&check_address_type);
             EE->updateGlobalMapping("check_address_exists", (uint64_t)&check_address_exists);
