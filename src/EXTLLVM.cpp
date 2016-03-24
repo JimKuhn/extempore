@@ -496,16 +496,6 @@ char* extitoa(int64_t val) {
   return buf;//&buf[i+1];
 }
 
-int llvm_printf(char* format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    int returnval = vprintf(format, ap);
-    va_end(ap);
-    fflush(stdout); // TODO: really needed?
-    return returnval;
-}
-
 int llvm_fprintf(FILE* stream, char* format, ...)
 {
     va_list ap;
@@ -1414,34 +1404,27 @@ namespace extemp {
             //EE = llvm::EngineBuilder(M).create();
             PM = new llvm::legacy::PassManager();
 #if 1
-            PM->add(llvm::createInstructionCombiningPass());  // Clean up after IPCP & DAE
-            PM->add(llvm::createCFGSimplificationPass());     // Clean up after IPCP & DAE
-            PM->add(llvm::createFunctionInliningPass());
+            PM->add(llvm::createAggressiveDCEPass());
             PM->add(llvm::createAlwaysInlinerPass());
-            PM->add(llvm::createArgumentPromotionPass());   // Scalarize uninlined fn args
-            PM->add(llvm::createScalarReplAggregatesPass());  // Break up aggregate allocas
-            PM->add(llvm::createInstructionCombiningPass());  // Cleanup for scalarrepl.
-            PM->add(llvm::createJumpThreadingPass());         // Thread jumps.
-            PM->add(llvm::createCFGSimplificationPass());     // Merge & remove BBs
-            PM->add(llvm::createInstructionCombiningPass());  // Combine silly seq's
-            PM->add(llvm::createTailCallEliminationPass());   // Eliminate tail calls
-            PM->add(llvm::createCFGSimplificationPass());     // Merge & remove BBs
-            PM->add(llvm::createReassociatePass());           // Reassociate expressions
-            PM->add(llvm::createLoopRotatePass());            // Rotate Loop
-            PM->add(llvm::createLICMPass());                  // Hoist loop invariants
+            PM->add(llvm::createArgumentPromotionPass());
+            PM->add(llvm::createCFGSimplificationPass());
+            PM->add(llvm::createDeadStoreEliminationPass());
+            PM->add(llvm::createFunctionAttrsPass());
+            PM->add(llvm::createFunctionInliningPass());\
+            PM->add(llvm::createGVNPass(true));
+            PM->add(llvm::createIndVarSimplifyPass());
             PM->add(llvm::createInstructionCombiningPass());
-            PM->add(llvm::createIndVarSimplifyPass());        // Canonicalize indvars
-            PM->add(llvm::createLoopDeletionPass());          // Delete dead loops
-            PM->add(llvm::createLoopUnrollPass());          // Unroll small loops
-            PM->add(llvm::createInstructionCombiningPass());  // Clean up after the unroller
-            PM->add(llvm::createGVNPass(true)); // Remove redundancies
-            PM->add(llvm::createMemCpyOptPass());             // Remove memcpy / form memset
-            PM->add(llvm::createSCCPPass());                  // Constant prop with SCCP
-            PM->add(llvm::createInstructionCombiningPass());
-            PM->add(llvm::createJumpThreadingPass());         // Thread jumps
-            PM->add(llvm::createDeadStoreEliminationPass());  // Delete dead stores
-            PM->add(llvm::createAggressiveDCEPass());         // Delete dead instructions
-            PM->add(llvm::createCFGSimplificationPass());     // Merge & remove BBs
+            PM->add(llvm::createJumpThreadingPass());
+            PM->add(llvm::createLICMPass());
+            PM->add(llvm::createLoopDeletionPass());
+            PM->add(llvm::createLoopRotatePass());
+            PM->add(llvm::createLoopUnrollPass());
+            PM->add(llvm::createMemCpyOptPass());
+            PM->add(llvm::createPromoteMemoryToRegisterPass());
+            PM->add(llvm::createReassociatePass());
+            PM->add(llvm::createScalarReplAggregatesPass());
+            PM->add(llvm::createSCCPPass());
+            PM->add(llvm::createTailCallEliminationPass());
 #else
             //PM->add(new llvm::TargetData(*EE->getTargetData()));
       // PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
@@ -1472,7 +1455,7 @@ namespace extemp {
             EE->updateGlobalMapping("llvm_destroy_zone_after_delay", (uint64_t)&llvm_destroy_zone_after_delay);
             EE->updateGlobalMapping("free_after_delay", (uint64_t)&free_after_delay);
             EE->updateGlobalMapping("llvm_get_next_prime", (uint64_t)&llvm_get_next_prime);
-            EE->updateGlobalMapping("llvm_printf", (uint64_t)&llvm_printf);
+            EE->updateGlobalMapping("llvm_printf", (uint64_t)&printf);
             EE->updateGlobalMapping("llvm_fprintf", (uint64_t)&llvm_fprintf);
             EE->updateGlobalMapping("llvm_sprintf", (uint64_t)&llvm_sprintf);
             EE->updateGlobalMapping("llvm_sscanf", (uint64_t)&llvm_sscanf);

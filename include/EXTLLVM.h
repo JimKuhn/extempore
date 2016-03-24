@@ -170,7 +170,6 @@ static inline uint64_t string_hash(unsigned char* str)
     return result;
 }
 
-  int llvm_printf(char* format, ...);
   int llvm_fprintf(FILE* f, char* format, ...);
   int llvm_sprintf(char* str, char* format, ...);
   int llvm_sscanf(char* buffer, char* format, ...);

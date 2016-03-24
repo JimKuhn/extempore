@@ -3122,7 +3122,7 @@
             (else (impc:compiler:print-bad-type-error-with-ast "" "Bad VARARGS func!")))
       (if (equal? (car ast) 'llvm_printf)
           (string-append (apply string-append (map (lambda (a) (car a)) args))
-                         "\n" va " = call i32 (i8*, ...) @llvm_printf("
+                         "\n" va " = call i32 (i8*, ...) @printf("
                          (caddr (car args)) " " (cadr (car args))
                          (apply string-append (map (lambda (a)
                                                      (string-append ", "

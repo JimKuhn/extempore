@@ -475,7 +475,6 @@ declare i8* @tempnam( i8*,  i8*)
 declare i8* @tmpfile()
 declare i8* @tmpnam(i8*)
 declare i32 @ungetc(i32, i8*)
-declare i32 @llvm_printf(i8*, ...)
 declare i32 @llvm_fprintf(i8*, i8*, ...)
 declare i32 @llvm_sprintf(i8*, i8*, ...)
 declare i32 @llvm_sscanf(i8*, i8*, ...)
@@ -1195,4 +1194,11 @@ declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1)
 ;  call void @llvm.memset.p0i8.i64(i8* %dest, i8 %1, i64 %len, i32 1, i1 0)
 ;  ret i8* %dest
 ;}
+
+declare i32 @printf(i8* noalias nocapture, ...)
+define i32 @llvm_printf(i8* noalias nocapture %format, ...) alwaysinline "thunk"
+{
+  %1 = musttail call i32 (i8*, ...) @printf(i8* %format, ...)
+  ret i32 %1
+}
 
