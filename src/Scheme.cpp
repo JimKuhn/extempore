@@ -5,31 +5,31 @@
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -39,7 +39,7 @@
 //   Originally from TinyScheme v1.35 (2005) but subsequently reworked for use in impromptu
 //   Modified again before initial inclusion in Extempore project January 2011
 //
-//   Original TinyScheme Credits Below:   
+//   Original TinyScheme Credits Below:
 //   Dimitrios Souflis (dsouflis@acm.org)
 //   Based on MiniScheme (original credits follow)
 //   (MINISCM)               coded by Atsushi Moriwaki (11/5/1989)
@@ -50,7 +50,7 @@
 //   (MINISCM)
 //   (MINISCM) This is a revised and modified version by Akira KIDA.
 //   (MINISCM)  current version is 0.85k4 (15 May 1994)
-// 
+//
 //   TinyScheme v.1.35 released under MIT licence.  This file also released under MIT licence.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -136,7 +136,7 @@
 /*   } while (c1 != 0); */
 /*   return 0; */
 /* } */
-#endif 
+#endif
 
 #ifdef _WIN32
 #define atoll _atoi64
@@ -181,7 +181,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
 //#define TREADMILL_DEBUG 1
 //#define TREADMILL_CHECKS
 
-inline void unlink(pointer p) 
+inline void unlink(pointer p)
 {
     pointer cw = p->_cw;
     pointer ccw = p->_ccw;
@@ -218,11 +218,11 @@ inline void insert_treadmill(scheme* sc, pointer p)
     if ((actualptr > highptr) || (actualptr < lowptr)) {
       printf("Pointer not in Cell range!! %" PRIuPTR " != %" PRIuPTR ":%" PRIuPTR "\n",actualptr,lowptr,highptr);
     }
-#endif    
+#endif
 
 #ifdef TREADMILL_CHECKS
     if(p->_list_colour == 0)
-      {  
+      {
   std::cout << "ERROR[" << extemp::SchemeProcess::I(sc)->getName() <<"] should not be inserting a free cell on the grey list!!!" << p << std::endl;
   printf("last_call_to_insert_treadmill: %d\n",last_call_to_insert_treadmill);
     last_call_to_insert_treadmill = 0;
@@ -378,25 +378,6 @@ inline void insert_treadmill(scheme* sc, pointer p)
     return;
 }
 
-enum scheme_types {
-    T_STRING = 1,
-    T_NUMBER = 2,
-    T_SYMBOL = 3,
-    T_PROC = 4,
-    T_PAIR = 5,
-    T_CLOSURE = 6,
-    T_CONTINUATION = 7,
-    T_FOREIGN = 8,
-    T_CHARACTER = 9,
-    T_PORT = 10,
-    T_VECTOR = 11,
-    T_MACRO = 12,
-    T_PROMISE = 13,
-    T_ENVIRONMENT = 14,
-    T_CPTR = 15,
-    T_LAST_SYSTEM_TYPE = 15
-};
-
 /* ADJ is enough slack to align cells in a TYPE_BITS-bit boundary */
 #define ADJ 32 // this is the minimum cell size in bytes!
 static const unsigned TYPE_BITS = 5;
@@ -461,19 +442,19 @@ char*& strvalue(pointer Ptr) { return Ptr->_object._string._svalue; }
 auto strlength(pointer Ptr) -> decltype(cell::_object._string._length)& { return Ptr->_object._string._length; }
 
 char* string_value(pointer Ptr)
-{ 
+{
     if (unlikely(!is_string(Ptr))) {
       throw ScmRuntimeError("Attempting to return a string from a non-string obj", Ptr);
     }
     return strvalue(Ptr);
 }
 
-num nvalue(pointer p)       
-{ 
-    return ((p)->_object._number); 
+num nvalue(pointer p)
+{
+    return ((p)->_object._number);
 }
 
-long long ivalue(pointer p)      
+long long ivalue(pointer p)
 {
     switch(p->_object._number.num_type){
     case 0:
@@ -486,33 +467,33 @@ long long ivalue(pointer p)
     return 0;
 }
 
-long long i64value(pointer p)      
+long long i64value(pointer p)
 {
     return ivalue(p);
 }
 
-int i32value(pointer p)      
+int i32value(pointer p)
 {
     return (int) ivalue(p);
 }
 
-short i16value(pointer p)      
+short i16value(pointer p)
 {
     return (short) ivalue(p);
 }
 
-char i8value(pointer p)      
+char i8value(pointer p)
 {
   return (char) ivalue(p);
 }
 
-bool i1value(scheme* _sc, pointer p)      
-{   
+bool i1value(scheme* _sc, pointer p)
+{
     return (p == _sc->T) ? true : false;
 }
 
-double rvalue(pointer p)    
-{ 
+double rvalue(pointer p)
+{
     switch(p->_object._number.num_type){
     case 0:
         return (double)(p)->_object._number.value.ivalue;
@@ -524,13 +505,13 @@ double rvalue(pointer p)
     return 0.0;
 }
 
-double r64value(pointer p)    
-{ 
+double r64value(pointer p)
+{
   return (double) rvalue(p);
 }
 
-float r32value(pointer p)    
-{ 
+float r32value(pointer p)
+{
   return (float) rvalue(p);
 }
 
@@ -541,16 +522,16 @@ float r32value(pointer p)
 #define set_real(p)      (p)->_object._number.num_type=1;
 #define set_rational(p)      (p)->_object._number.num_type=3;
 
-long long charvalue(pointer p)  
-{ 
+long long charvalue(pointer p)
+{
     //if(!is_character(p)) _Error_1(sc, "Attempting to return a character from a non-character obj", p, sc->code->_debugger->_size);//[NSException raise:@"IncorrectSchemeOBJ" format:@"Attempting to return a character from a non-character obj"];
-    return ivalue_unchecked(p); 
+    return ivalue_unchecked(p);
 }
 
-long long charvalue_sc(scheme* sc, pointer p)  
+long long charvalue_sc(scheme* sc, pointer p)
 {
     if(!is_character(p)) _Error_1(sc, "Attempting to return a character from a non-character obj", p, sc->code->_debugger->_size);
-    return ivalue_unchecked(p); 
+    return ivalue_unchecked(p);
 }
 
 #define is_inport(p) (type(p)==T_PORT && p->_object._port->kind&port_input)
@@ -560,21 +541,21 @@ long long charvalue_sc(scheme* sc, pointer p)
 #define cdr(p)           ((p)->_object._cons._cdr)
 
 
-pointer pair_car(pointer p) 
+pointer pair_car(pointer p)
 {
   if(!is_pair(p)) throw ScmRuntimeError("Attempting to access the car of a primitive",p);
     return car(p);
 }
 
-pointer pair_car_sc(scheme* sc, pointer p)   
+pointer pair_car_sc(scheme* sc, pointer p)
 {
     if(!is_pair(p)) _Error_1(sc,"Attempting to access the car of a primitive",0,sc->code->_debugger->_size);
     return car(p);
 }
 
-pointer pair_cdr(pointer p)   
-{ 
-    if(!is_pair(p)&&!is_continuation(p)) 
+pointer pair_cdr(pointer p)
+{
+    if(!is_pair(p)&&!is_continuation(p))
     {
       throw ScmRuntimeError("Attempting to access the cdr of a primitive",p);
     }
@@ -582,21 +563,21 @@ pointer pair_cdr(pointer p)
 }
 
 // AS CHANGE TO CHECK VALIDITY OF P
-char* symname(pointer p)   
+char* symname(pointer p)
 {
     if(!is_symbol(p)) {
       throw ScmRuntimeError("Attempting to return a string from non-symbol obj",p);
         //[NSException raise:@"IncorrectSchemeOBJ" format:@"Attempting to return a string from non-symbol obj"];
     }
-    return strvalue(car(p)); 
+    return strvalue(car(p));
 }
 
-char* symname_sc(scheme* sc,pointer p)   
+char* symname_sc(scheme* sc,pointer p)
 {
     if(!is_symbol(p)) {
         _Error_1(sc, "Attempting to return a string from non-symbol obj", p, sc->code->_debugger->_size);
     }
-    return strvalue(car(p)); 
+    return strvalue(car(p));
 }
 
 #if USE_PLIST
@@ -606,18 +587,18 @@ inline int hasprop(pointer p)     { return (typeflag(p)&T_SYMBOL); }
 
 //int is_objc(pointer p) { return (type(p) == T_OBJC); }
 
-void* cptr_value(pointer p) 
-{ 
+void* cptr_value(pointer p)
+{
   if(!is_cptr(p)) {
      if(is_string(p)) return (void*) strvalue(p);
      else throw ScmRuntimeError("Attempting to return a cptr from a non-cptr obj",p);
         //[NSException raise:@"IncorrectSchemeOBJ" format:@"Attempting to return a cptr from a non-cptr obj"];
     }
-    return p->_object._cptr; 
+    return p->_object._cptr;
 }
 
-void* cptr_value_sc(scheme* sc, pointer p) 
-{ 
+void* cptr_value_sc(scheme* sc, pointer p)
+{
   if(!is_cptr(p)) {
     if(!is_string(p)) {
       _Error_1(sc, "Attempting to return a cptr from a non-cptr obj", p, sc->code->_debugger->_size);
@@ -625,7 +606,7 @@ void* cptr_value_sc(scheme* sc, pointer p)
       return strvalue(p);
     }
   }
-   return p->_object._cptr; 
+   return p->_object._cptr;
 }
 
 inline char *syntaxname(pointer p) { return strvalue(car(p)); }
@@ -794,10 +775,10 @@ int eqv(pointer a, pointer b);
 int eqv_sc(scheme* sc, pointer a, pointer b);
 
 static inline long long num_ivalue(num n) {
-    switch(n.num_type) { 
-    case 0: 
+    switch(n.num_type) {
+    case 0:
         return (n).value.ivalue;
-    case 1: 
+    case 1:
         return (long long)(n).value.rvalue;
     case 3:
         return (long long)((n).value.ratvalue.n/(n).value.ratvalue.d);
@@ -806,10 +787,10 @@ static inline long long num_ivalue(num n) {
 }
 
 static inline double num_rvalue(num n) {
-    switch(n.num_type) { 
-    case 0: 
+    switch(n.num_type) {
+    case 0:
         return (double)(n).value.ivalue;
-    case 1: 
+    case 1:
         return (n).value.rvalue;
     case 3:
         return (double)((n).value.ratvalue.n)/(double)((n).value.ratvalue.d);
@@ -823,13 +804,13 @@ static num num_add(num a, num b) {
     ret.num_type = MY_ARR[tot];
 
     switch(ret.num_type){
-    case 0: 
+    case 0:
         ret.value.ivalue=a.value.ivalue+b.value.ivalue;
         break;
-    case 1: 
+    case 1:
         ret.value.rvalue=num_rvalue(a)+num_rvalue(b);
         break;
-    case 3: 
+    case 3:
         if(a.num_type == 0)
         {
             ret.value.ratvalue.n=(a.value.ivalue*b.value.ratvalue.d)+b.value.ratvalue.n;
@@ -846,7 +827,7 @@ static num num_add(num a, num b) {
             ret.value.ratvalue.d=a.value.ratvalue.d*b.value.ratvalue.d;
         }
         break;
-    }    
+    }
     return ret;
 }
 
@@ -1066,13 +1047,13 @@ static num num_sub(num a, num b) {
     int tot = a.num_type + b.num_type;
     ret.num_type = MY_ARR[tot];
     switch(ret.num_type){
-    case 0: 
+    case 0:
         ret.value.ivalue=a.value.ivalue-b.value.ivalue;
         break;
-    case 1: 
+    case 1:
         ret.value.rvalue=num_rvalue(a)-num_rvalue(b);
         break;
-    case 3: 
+    case 3:
         if(a.num_type == 0)
         {
             ret.value.ratvalue.n=(a.value.ivalue*b.value.ratvalue.d)-b.value.ratvalue.n;
@@ -1089,7 +1070,7 @@ static num num_sub(num a, num b) {
             ret.value.ratvalue.d=a.value.ratvalue.d*b.value.ratvalue.d;
         }
         break;
-    }    
+    }
     return ret;
 }
 
@@ -1273,7 +1254,7 @@ static int alloc_cellseg(scheme *sc, int n) {
         newp=(pointer)cp;
   //  std::cout << "ALLOCATING MEM IN PROCESS: " << extemp::SchemeProcess::I(sc)->getName() << std::endl;
   //printf("Alloced Memory[%d]:  0x%" PRIXPTR ":0x%" PRIXPTR " 0x%" PRIXPTR ":0x%" PRIXPTR "\n",i,(uintptr_t)&newp[0],(uintptr_t)&newp[CELL_SEGSIZE],(uintptr_t)cp,(uintptr_t)(cp+(CELL_SEGSIZE * sizeof(struct cell))));
-  //printf("Alloced Memory[%d]: %" PRIuPTR ":%" PRIuPTR " %" PRIuPTR ":%" PRIuPTR "\n",i,(uintptr_t)&newp[0],(uintptr_t)&newp[CELL_SEGSIZE],(uintptr_t)cp,(uintptr_t)(cp+(CELL_SEGSIZE * sizeof(struct cell))));  
+  //printf("Alloced Memory[%d]: %" PRIuPTR ":%" PRIuPTR " %" PRIuPTR ":%" PRIuPTR "\n",i,(uintptr_t)&newp[0],(uintptr_t)&newp[CELL_SEGSIZE],(uintptr_t)cp,(uintptr_t)(cp+(CELL_SEGSIZE * sizeof(struct cell))));
 
         sc->cell_seg[i] = newp;
         while (i > 0 && sc->cell_seg[i - 1] > sc->cell_seg[i]) {
@@ -1282,7 +1263,7 @@ static int alloc_cellseg(scheme *sc, int n) {
             sc->cell_seg[--i] = p;
         }
         //      sc->fcells += CELL_SEGSIZE;
-        last = newp + CELL_SEGSIZE - 1;        
+        last = newp + CELL_SEGSIZE - 1;
 
         //sc->NIL = newp;
         int k=0;
@@ -1453,61 +1434,61 @@ pointer _cons(scheme *sc, pointer a, pointer b, int immutable) {
     return (x);
 }
 
-/* ========== oblist implementation  ========== */ 
+/* ========== oblist implementation  ========== */
 
-static int hash_fn(const char *key, int table_size); 
+static int hash_fn(const char *key, int table_size);
 
-static pointer oblist_initial_value(scheme *sc) 
-{ 
-    return mk_vector(sc, 461); /* probably should be bigger */ 
-} 
+static pointer oblist_initial_value(scheme *sc)
+{
+    return mk_vector(sc, 461); /* probably should be bigger */
+}
 
-/* returns the new symbol */ 
-static pointer oblist_add_by_name(scheme *sc, const char *name) 
-{ 
-    pointer x; 
-    int location; 
+/* returns the new symbol */
+static pointer oblist_add_by_name(scheme *sc, const char *name)
+{
+    pointer x;
+    int location;
 
-    x = immutable_cons(sc, mk_string(sc, name), sc->NIL); 
-    typeflag(x) = T_SYMBOL; 
-    setimmutable(car(x)); 
+    x = immutable_cons(sc, mk_string(sc, name), sc->NIL);
+    typeflag(x) = T_SYMBOL;
+    setimmutable(car(x));
 
-    location = hash_fn(name, sc->oblist->_size); 
-    set_vector_elem(sc, sc->oblist, location, 
+    location = hash_fn(name, sc->oblist->_size);
+    set_vector_elem(sc, sc->oblist, location,
                     immutable_cons(sc, x, vector_elem(sc->oblist, location)));
-    return x; 
-} 
+    return x;
+}
 
-static inline pointer oblist_find_by_name(scheme *sc, const char *name) 
-{ 
-    int location; 
-    pointer x; 
-    char *s; 
+static inline pointer oblist_find_by_name(scheme *sc, const char *name)
+{
+    int location;
+    pointer x;
+    char *s;
 
-    location = hash_fn(name, sc->oblist->_size); //ivalue_unchecked(sc->oblist)); 
-    for (x = vector_elem(sc->oblist, location); x != sc->NIL; x = cdr(x)) { 
+    location = hash_fn(name, sc->oblist->_size); //ivalue_unchecked(sc->oblist));
+    for (x = vector_elem(sc->oblist, location); x != sc->NIL; x = cdr(x)) {
         s = symname_sc(sc,car(x));
         /* case-insensitive, per R5RS section 2. */
         if(strcmp(name, s) == 0) {
             return car(x);
         }
-    } 
-    return sc->NIL; 
-} 
+    }
+    return sc->NIL;
+}
 
-static pointer oblist_all_symbols(scheme *sc) 
-{ 
-    int i; 
-    pointer x; 
-    pointer ob_list = sc->NIL; 
+static pointer oblist_all_symbols(scheme *sc)
+{
+    int i;
+    pointer x;
+    pointer ob_list = sc->NIL;
 
-    for (i = 0; i < sc->oblist->_size; i++) { 
+    for (i = 0; i < sc->oblist->_size; i++) {
         for (x  = vector_elem(sc->oblist, i); x != sc->NIL; x = cdr(x)) {
             ob_list = cons(sc, x, ob_list);
         }
-    } 
-    return ob_list; 
-} 
+    }
+    return ob_list;
+}
 
 static pointer mk_port(scheme *sc, port *p) {
     pointer x = get_cell(sc, sc->NIL, sc->NIL);
@@ -1749,7 +1730,7 @@ pointer mk_vector(scheme *sc, int len) {
 
 
 /* get new symbol */
-pointer mk_symbol(scheme *sc, const char *name) { 
+pointer mk_symbol(scheme *sc, const char *name) {
 //
 //       if(sc->inport != sc->NIL && sc->inport->_object._port->kind&port_string) {
 //               int position = 0;
@@ -1761,20 +1742,20 @@ pointer mk_symbol(scheme *sc, const char *name) {
 //
     pointer x;
 
-    /* first check oblist */ 
-    x = oblist_find_by_name(sc, name); 
-    if (x != sc->NIL) { 
+    /* first check oblist */
+    x = oblist_find_by_name(sc, name);
+    if (x != sc->NIL) {
         return (x);
-    } else { 
+    } else {
         x = oblist_add_by_name(sc, name);
         return (x);
-    } 
+    }
 }
 
 
 //impromtpu's evil gensym for making uninterned symbols
 pointer gensym(scheme *sc) {
-    pointer x; 
+    pointer x;
     char name[40];
     sc->gensym_cnt++;
     if(sc->gensym_cnt>10000000) sc->gensym_cnt = 0;
@@ -1810,8 +1791,8 @@ static pointer mk_atom(scheme *sc, char *q) {
 
     ratn = q;
     p = q;
-    c = *p++; 
-    if ((c == '+') || (c == '-')) { 
+    c = *p++;
+    if ((c == '+') || (c == '-')) {
         c = *p++;
         if (c == '.') {
             has_dec_point=1;
@@ -1820,7 +1801,7 @@ static pointer mk_atom(scheme *sc, char *q) {
         if (!isdigit(c)) {
             return (mk_symbol(sc, strlwr(q)));
         }
-    } else if (c == '.') { 
+    } else if (c == '.') {
         has_dec_point=1;
         c = *p++;
         if (!isdigit(c)) {
@@ -1828,7 +1809,7 @@ static pointer mk_atom(scheme *sc, char *q) {
         }
     }else if (c == 0) {
         return sc->NIL;
-    } else if (!isdigit(c)) { 
+    } else if (!isdigit(c)) {
         return (mk_symbol(sc, strlwr(q)));
     }
 
@@ -1914,7 +1895,7 @@ static pointer mk_sharp_const(scheme *sc, char *name) {
 #if USE_ASCII_NAMES
         } else if(is_ascii_name(name+1,&c)) {
             /* nothing */
-#endif               
+#endif
         } else if(name[2]==0) {
             c=name[1];
         } else {
@@ -1926,12 +1907,12 @@ static pointer mk_sharp_const(scheme *sc, char *name) {
 }
 
 
-struct dump_stack_frame { 
-    enum scheme_opcodes op; 
-    pointer args; 
-    pointer envir; 
-    pointer code; 
-}; 
+struct dump_stack_frame {
+    enum scheme_opcodes op;
+    pointer args;
+    pointer envir;
+    pointer code;
+};
 
 static void treadmill_mark_roots(scheme* sc, pointer a, pointer b) {
 #ifdef TREADMILL_DEBUG
@@ -1943,7 +1924,7 @@ static void treadmill_mark_roots(scheme* sc, pointer a, pointer b) {
 #ifdef TREADMILL_CHECKS
       last_call_to_insert_treadmill = 5;
 #endif
-    
+
     insert_treadmill(sc, sc->oblist);
     insert_treadmill(sc, sc->global_env);
     insert_treadmill(sc, sc->args);
@@ -2132,16 +2113,16 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
     //Sanity checks marking free cell colours
     long long free_cells = 0;
     pointer t = sc->treadmill_free;
-#ifdef TREADMILL_CHECKS    
+#ifdef TREADMILL_CHECKS
     for( ; t != sc->treadmill_bottom ; ++free_cells)
     {
              t->_list_colour = 0; //set ecrus to frees
              t = t->_cw;
     }
 #endif
-    
-#ifdef TREADMILL_CHECKS    
-    if(free_cells != ecrus) 
+
+#ifdef TREADMILL_CHECKS
+    if(free_cells != ecrus)
     {
         printf("FREE CELLS: %lld   OLD ECRUS: %lld\n",free_cells,ecrus);
         _Error_1(sc, "Old Ecrus should match exactly to new free_cells!", sc->NIL,0);
@@ -2304,7 +2285,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 #else
         usleep(50);
 #endif
-#ifdef TREADMILL_DEBUG 
+#ifdef TREADMILL_DEBUG
         std::cout << "SPINNING FLIP WAITING FOR NOTIFICATION" << std::endl << std::flush;
 #endif
     }
@@ -2315,7 +2296,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 }
 
 
- 
+
 static void* treadmill_scanner(void* obj)
 {
    scheme* sc = (scheme*) obj;
@@ -2404,7 +2385,7 @@ static void* treadmill_scanner(void* obj)
                        }
                    }
                }
-    
+
              if(!is_atom(scan))
                {
                  pointer a = scan->_object._cons._car;
@@ -2432,7 +2413,7 @@ static void* treadmill_scanner(void* obj)
              total_previous_scan++;
 
              if(!(count%100)) {         // force a yield every now and then?
-               sc->mutex->unlock(); 
+               sc->mutex->unlock();
                sc->mutex->lock();
              }
              count++;
@@ -2454,7 +2435,7 @@ static void* treadmill_scanner(void* obj)
        std::cout << "TREADMILL: FINISHED SCAN: " << sc->treadmill_flip_active << std::endl << std::flush;
 #endif
 
-       if(sc->treadmill_scan != sc->treadmill_top) 
+       if(sc->treadmill_scan != sc->treadmill_top)
          {
            std::cout << "HUGE ERROR:  SHOULD NOT FINISH SCANNER UNTIL SCAN == TOP" << std::endl << std::flush;
          }
@@ -2470,7 +2451,7 @@ static void* treadmill_scanner(void* obj)
 #else
        sc->Treadmill_Guard->unlock();
 #endif
-       if(sc->treadmill_stop) break; // exit treadmill thread 
+       if(sc->treadmill_stop) break; // exit treadmill thread
      }
 
    return sc;
@@ -3270,56 +3251,56 @@ static pointer list_star(scheme *sc, pointer d) {
 #define is_true(p)       ((p) != sc->F)
 #define is_false(p)      ((p) == sc->F)
 
-/* ========== Environment implementation  ========== */ 
+/* ========== Environment implementation  ========== */
 
-static int hash_fn(const char *key, int table_size) 
-{ 
-    unsigned int hashed = 0; 
-    const char *c; 
-    int bits_per_int = sizeof(unsigned int)*8; 
+static int hash_fn(const char *key, int table_size)
+{
+    unsigned int hashed = 0;
+    const char *c;
+    int bits_per_int = sizeof(unsigned int)*8;
 
-    for (c = key; *c; c++) { 
+    for (c = key; *c; c++) {
         /* letters have about 5 bits in them */
         hashed = (hashed<<5) | (hashed>>(bits_per_int-5));
         hashed ^= *c;
-    } 
-    return hashed % table_size; 
-} 
+    }
+    return hashed % table_size;
+}
 
-/* 
- * In this implementation, each frame of the environment may be 
- * a hash table: a vector of alists hashed by variable name. 
- * In practice, we use a vector only for the initial frame; 
- * subsequent frames are too small and transient for the lookup 
- * speed to out-weigh the cost of making a new vector. 
- */ 
-static void new_frame_in_env(scheme *sc, pointer old_env) 
+/*
+ * In this implementation, each frame of the environment may be
+ * a hash table: a vector of alists hashed by variable name.
+ * In practice, we use a vector only for the initial frame;
+ * subsequent frames are too small and transient for the lookup
+ * speed to out-weigh the cost of making a new vector.
+ */
+static void new_frame_in_env(scheme *sc, pointer old_env)
 {
     pointer new_frame;
 
-    /* The interaction-environment has about 300 variables in it. */ 
-    if (old_env == sc->NIL) { 
+    /* The interaction-environment has about 300 variables in it. */
+    if (old_env == sc->NIL) {
         new_frame = mk_vector(sc, 1000);
-    } else { 
+    } else {
         new_frame = sc->NIL;
-    } 
+    }
 
-    sc->envir = immutable_cons(sc, new_frame, old_env); 
+    sc->envir = immutable_cons(sc, new_frame, old_env);
     setenvironment(sc->envir);
-} 
+}
 
-static inline void new_slot_spec_in_env(scheme *sc, pointer env, 
-                                        pointer variable, pointer value) 
-{ 
-  pointer slot = immutable_cons(sc, variable, value); 
+static inline void new_slot_spec_in_env(scheme *sc, pointer env,
+                                        pointer variable, pointer value)
+{
+  pointer slot = immutable_cons(sc, variable, value);
 
-  if (is_vector(car(env))) { 
-    int location = hash_fn(symname_sc(sc,variable), (car(env))->_size); 
+  if (is_vector(car(env))) {
+    int location = hash_fn(symname_sc(sc,variable), (car(env))->_size);
 
-    set_vector_elem(sc, car(env), location, 
-                    immutable_cons(sc, slot, vector_elem(car(env), location))); 
+    set_vector_elem(sc, car(env), location,
+                    immutable_cons(sc, slot, vector_elem(car(env), location)));
   } else {
-    pointer tmp = immutable_cons(sc, slot, car(env)); 
+    pointer tmp = immutable_cons(sc, slot, car(env));
     ////////////// write barrier for treadmill
 #ifdef TREADMILL_CHECKS
     last_call_to_insert_treadmill = 18;
@@ -3327,16 +3308,16 @@ static inline void new_slot_spec_in_env(scheme *sc, pointer env,
     insert_treadmill(sc,tmp);
     //////////////////////////////////////////
     car(env) = tmp;
-  } 
-} 
+  }
+}
 
-pointer find_slot_in_env(scheme *sc, pointer env, pointer hdl, int all) 
-{ 
+pointer find_slot_in_env(scheme *sc, pointer env, pointer hdl, int all)
+{
     pointer x = NULL;
-    pointer y = NULL;; 
-    int location; 
+    pointer y = NULL;;
+    int location;
 
-    for (x = env; x != sc->NIL; x = cdr(x)) { 
+    for (x = env; x != sc->NIL; x = cdr(x)) {
         if (is_vector(car(x))) {
             location = hash_fn(symname_sc(sc,hdl), (car(x))->_size);
             y = vector_elem(car(x), location);
@@ -3354,21 +3335,21 @@ pointer find_slot_in_env(scheme *sc, pointer env, pointer hdl, int all)
         if(!all) {
             return sc->NIL;
         }
-    } 
-    if (x != sc->NIL) { 
+    }
+    if (x != sc->NIL) {
         return car(y);
-    } 
-    return sc->NIL; 
-} 
+    }
+    return sc->NIL;
+}
 
 
-inline void new_slot_in_env(scheme *sc, pointer variable, pointer value) 
+inline void new_slot_in_env(scheme *sc, pointer variable, pointer value)
 {
-    new_slot_spec_in_env(sc, sc->envir, variable, value); 
-} 
+    new_slot_spec_in_env(sc, sc->envir, variable, value);
+}
 
-inline void set_slot_in_env(scheme *sc, pointer slot, pointer value) 
-{ 
+inline void set_slot_in_env(scheme *sc, pointer slot, pointer value)
+{
     ////////////// write barrier for treadmill
 #ifdef TREADMILL_CHECKS
       last_call_to_insert_treadmill = 19;
@@ -3376,12 +3357,12 @@ inline void set_slot_in_env(scheme *sc, pointer slot, pointer value)
     insert_treadmill(sc,value);
     //////////////////////////////////////////
 
-    cdr(slot) = value; 
-} 
+    cdr(slot) = value;
+}
 
-inline pointer slot_value_in_env(pointer slot) 
-{ 
-    return cdr(slot); 
+inline pointer slot_value_in_env(pointer slot)
+{
+    return cdr(slot);
 }
 
 
@@ -3408,7 +3389,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
           cnt++;
           sc->applied_symbol_names.pop();
         }
-    }    
+    }
 
     while(!sc->applied_symbol_names.empty() && cnt<10 && current != 0)
     {
@@ -3427,7 +3408,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
     //if(cnt>9) sss << " ... " << std::endl;
     //else sss << std::endl;
 
-    // log message 
+    // log message
     char msg[256*10];
     int position = 0;
     if(a!=0) {
@@ -3511,7 +3492,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
     }
     sc->code = cons(sc, mk_string(sc, (s)), sc->code);
     setimmutable(car(sc->code));
-    sc->code = cons(sc, slot_value_in_env(x), sc->code); 
+    sc->code = cons(sc, slot_value_in_env(x), sc->code);
     sc->op = (int)OP_EVAL;
 
     sc->last_symbol_apply = sc->NIL;
@@ -3558,13 +3539,13 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
     sc->op = (int)(a);                          \
     return sc->T; END
 
-#define s_return(sc,a) return _s_return(sc,a) 
+#define s_return(sc,a) return _s_return(sc,a)
 
-#ifndef USE_SCHEME_STACK 
+#ifndef USE_SCHEME_STACK
 
-#define STACK_GROWTH 3 
+#define STACK_GROWTH 3
 
-static void s_save(scheme *sc, enum scheme_opcodes op, pointer args, pointer code) 
+static void s_save(scheme *sc, enum scheme_opcodes op, pointer args, pointer code)
 {
     sc->applied_symbol_names.push(sc->last_symbol_apply);
 //      if(is_symbol(sc->last_symbol_apply)) {
@@ -3573,72 +3554,72 @@ static void s_save(scheme *sc, enum scheme_opcodes op, pointer args, pointer cod
 //              std::cout << "PUSH SYM " << sc->applied_symbol_names.size() << std::endl;
 //      }
 
-    intptr_t nframes = (intptr_t)sc->dump; 
-    struct dump_stack_frame *next_frame; 
+    intptr_t nframes = (intptr_t)sc->dump;
+    struct dump_stack_frame *next_frame;
 
-    /* enough room for the next frame? */ 
-    if (nframes >= sc->dump_size) { 
+    /* enough room for the next frame? */
+    if (nframes >= sc->dump_size) {
         sc->dump_size += STACK_GROWTH;
         /* alas there is no sc->realloc */
         sc->dump_base = realloc(sc->dump_base, sizeof(struct dump_stack_frame) * sc->dump_size);
-    } 
-    next_frame = (struct dump_stack_frame *)sc->dump_base + nframes; 
-    next_frame->op = op; 
-    next_frame->args = args; 
-    next_frame->envir = sc->envir; 
-    next_frame->code = code; 
-    sc->dump = (pointer)(nframes+1); 
-} 
+    }
+    next_frame = (struct dump_stack_frame *)sc->dump_base + nframes;
+    next_frame->op = op;
+    next_frame->args = args;
+    next_frame->envir = sc->envir;
+    next_frame->code = code;
+    sc->dump = (pointer)(nframes+1);
+}
 
 static pointer _s_return(scheme *sc, pointer a)
-{ 
+{
     if(sc->applied_symbol_names.empty()) {
         sc->last_symbol_apply = sc->NIL;
     }else{
-        sc->last_symbol_apply = sc->applied_symbol_names.top();                
+        sc->last_symbol_apply = sc->applied_symbol_names.top();
         sc->applied_symbol_names.pop();
     }
 
     intptr_t nframes = (intptr_t)sc->dump;
     struct dump_stack_frame *frame;
-        
+
     sc->value = (a);
-    if (nframes <= 0) { 
-        return sc->NIL; 
+    if (nframes <= 0) {
+        return sc->NIL;
     }
     nframes--;
-    frame = (struct dump_stack_frame *)sc->dump_base + nframes; 
-    sc->op = frame->op; 
-    sc->args = frame->args; 
-    sc->envir = frame->envir; 
-    sc->code = frame->code; 
-    sc->dump = (pointer)nframes; 
-    return sc->T; 
-} 
-
-static inline void dump_stack_reset(scheme *sc) 
-{       
-    /* in this implementation, sc->dump is the number of frames on the stack */
-    sc->dump = (pointer)0; 
-} 
-
-static inline void dump_stack_initialize(scheme *sc) 
-{ 
-    sc->dump_size = 0; 
-    sc->dump_base = NULL; 
-    dump_stack_reset(sc); 
+    frame = (struct dump_stack_frame *)sc->dump_base + nframes;
+    sc->op = frame->op;
+    sc->args = frame->args;
+    sc->envir = frame->envir;
+    sc->code = frame->code;
+    sc->dump = (pointer)nframes;
+    return sc->T;
 }
 
-static void dump_stack_free(scheme *sc) 
-{ 
-    sc->free(sc->dump_base); 
-    sc->dump_base = NULL; 
-    sc->dump = (pointer)0; 
-    sc->dump_size = 0; 
+static inline void dump_stack_reset(scheme *sc)
+{
+    /* in this implementation, sc->dump is the number of frames on the stack */
+    sc->dump = (pointer)0;
+}
+
+static inline void dump_stack_initialize(scheme *sc)
+{
+    sc->dump_size = 0;
+    sc->dump_base = NULL;
+    dump_stack_reset(sc);
+}
+
+static void dump_stack_free(scheme *sc)
+{
+    sc->free(sc->dump_base);
+    sc->dump_base = NULL;
+    sc->dump = (pointer)0;
+    sc->dump_size = 0;
 }
 /*
-static inline void dump_stack_mark(scheme *sc) 
-{ 
+static inline void dump_stack_mark(scheme *sc)
+{
     intptr_t nframes = (intptr_t)sc->dump;
     int i;
     for(i=0; i<nframes; i++) {
@@ -3648,7 +3629,7 @@ static inline void dump_stack_mark(scheme *sc)
         mark(frame->envir);
         mark(frame->code);
     }
-} 
+}
 */
 
 static void dump_stack_continuation_set(scheme* sc, pointer p)
@@ -3657,9 +3638,9 @@ static void dump_stack_continuation_set(scheme* sc, pointer p)
     ptrdiff_t nframes = olddump[0];
     memcpy(sc->dump_base, &olddump[1], nframes*sizeof(struct dump_stack_frame));
     sc->dump = (pointer)nframes;
-        
+
     // must also copy the args and code lists so the continuations versions don't get modified!
-    dump_stack_frame* frames = (dump_stack_frame*)sc->dump_base;        
+    dump_stack_frame* frames = (dump_stack_frame*)sc->dump_base;
 
 //      std::cout << "STACK DUMP RETURN-----------------------------------------------------------------" << std::endl;
     // for each frame copy the args and code lists
@@ -3709,14 +3690,14 @@ static void dump_stack_continuation_set(scheme* sc, pointer p)
     return;
 }
 
-pointer dump_stack_copy(scheme* sc) 
+pointer dump_stack_copy(scheme* sc)
 {
     intptr_t nframes = (intptr_t)sc->dump;
 
     unsigned int* newdump = (unsigned int*) malloc(4+(nframes*sizeof(struct dump_stack_frame)));
     memcpy(&newdump[1],sc->dump_base, nframes*sizeof(struct dump_stack_frame));
     newdump[0] = nframes;
-        
+
     pointer new_stack_ptr = mk_cptr(sc, newdump);
     EnvInjector injector(sc, new_stack_ptr);
 
@@ -3725,7 +3706,7 @@ pointer dump_stack_copy(scheme* sc)
 //      std::cout << "STACK DUMP-----------------------------------------------------------------" << std::endl;
     // for each frame copy the args and code lists
     for(int j=0;j<nframes;j++)
-    { 
+    {
 //              std::cout << "OPCODE: " << opcodename(frames[j].op) << std::endl << "----------" << std::endl;
 
         // copy args
@@ -3768,39 +3749,39 @@ pointer dump_stack_copy(scheme* sc)
     return new_stack_ptr;
 }
 
-#else 
+#else
 
-static inline void dump_stack_reset(scheme *sc) 
-{ 
-    sc->dump = sc->NIL; 
-} 
+static inline void dump_stack_reset(scheme *sc)
+{
+    sc->dump = sc->NIL;
+}
 
-static inline void dump_stack_initialize(scheme *sc) 
-{ 
-    dump_stack_reset(sc); 
-} 
+static inline void dump_stack_initialize(scheme *sc)
+{
+    dump_stack_reset(sc);
+}
 
-static void dump_stack_free(scheme *sc) 
-{ 
-    sc->dump = sc->NIL; 
-} 
+static void dump_stack_free(scheme *sc)
+{
+    sc->dump = sc->NIL;
+}
 
 static pointer _s_return(scheme *sc, pointer a) {
-    sc->value = (a); 
-    if(sc->dump==sc->NIL) return sc->NIL; 
-    sc->op = ivalue(car(sc->dump)); 
-    sc->args = cadr(sc->dump); 
-    sc->envir = caddr(sc->dump); 
-    sc->code = cadddr(sc->dump); 
-    sc->dump = cddddr(sc->dump); 
+    sc->value = (a);
+    if(sc->dump==sc->NIL) return sc->NIL;
+    sc->op = ivalue(car(sc->dump));
+    sc->args = cadr(sc->dump);
+    sc->envir = caddr(sc->dump);
+    sc->code = cadddr(sc->dump);
+    sc->dump = cddddr(sc->dump);
     return sc->T;
 }
 
 static void s_save(scheme *sc, enum scheme_opcodes op, pointer args, pointer code) {
-    sc->dump = cons(sc, sc->envir, cons(sc, (code), sc->dump)); 
-    sc->dump = cons(sc, (args), sc->dump); 
-    sc->dump = cons(sc, mk_integer(sc, (long)(op)), sc->dump); 
-} 
+    sc->dump = cons(sc, sc->envir, cons(sc, (code), sc->dump));
+    sc->dump = cons(sc, (args), sc->dump);
+    sc->dump = cons(sc, mk_integer(sc, (long)(op)), sc->dump);
+}
 
 // NOTE:  This is probably really needlessly inefficient
 // I'm probably doing to much gc_masking etc. and should
@@ -3814,11 +3795,11 @@ static void s_save(scheme *sc, enum scheme_opcodes op, pointer args, pointer cod
 // All that said, at least continuations now work :)
 static pointer dump_stack_copy(scheme* sc, pointer dump) {
     sc->tmp_dump = dump;
-        
+
     sc->tmp_dump = reverse(sc,sc->tmp_dump);
     sc->tmp_args = sc->NIL;
     for( ;sc->tmp_dump != sc->NIL; sc->tmp_dump=cdr(sc->tmp_dump))
-    {           
+    {
         pointer val = car(sc->tmp_dump);
         if(is_pair(val) && !is_environment(val)) {
             int lgth = list_length(sc, val);
@@ -3836,16 +3817,16 @@ static pointer dump_stack_copy(scheme* sc, pointer dump) {
             sc->tmp_args = cons(sc, val, sc->tmp_args);
         }
     }
-        
+
     return sc->tmp_args;
 }
 /*
-static inline void dump_stack_mark(scheme *sc) 
-{ 
-    mark(sc->dump); 
-} 
+static inline void dump_stack_mark(scheme *sc)
+{
+    mark(sc->dump);
+}
 */
-#endif 
+#endif
 
 #define s_retbool(tf)    s_return(sc,(tf) ? sc->T : sc->F)
 
@@ -3940,7 +3921,7 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
         /* fall through */
     case OP_REAL_EVAL:
 #endif
-        if (is_symbol(sc->code)) {    /* symbol */                                                                                                                      
+        if (is_symbol(sc->code)) {    /* symbol */
             //printf("evaluating symbol: %s\n",symname_sc(sc,sc->code));
             x=find_slot_in_env(sc,sc->envir,sc->code,1);
             if (x != sc->NIL) {
@@ -4019,7 +4000,7 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
 
         /* fall through */
     case OP_REAL_APPLY:
-#endif                  
+#endif
         if (is_proc(sc->code)) {
             s_goto(sc,procnum(sc->code));   /* PROCEDURE */
         } else if (is_foreign(sc->code)) {
@@ -4182,7 +4163,7 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
             Error_1(sc,"set!: unbound variable:", 0, sc->code->_debugger->_size);
         }
 
-    case OP_BEGIN:      /* begin */                                 
+    case OP_BEGIN:      /* begin */
         if (!is_pair(sc->code)) {
             s_return(sc,sc->code);
         }
@@ -4235,7 +4216,7 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
         }
 
     case OP_LET2:       /* let */
-        new_frame_in_env(sc, sc->envir); 
+        new_frame_in_env(sc, sc->envir);
         for (x = is_symbol(car(sc->code)) ? cadr(sc->code) : car(sc->code), y = sc->args;
              y != sc->NIL; x = cdr(x), y = cdr(y)) {
             new_slot_in_env(sc, caar(x), car(y));
@@ -4247,8 +4228,8 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
           for (x = cadr(sc->code), sc->args = sc->NIL; x != sc->NIL; x = cdr(x)) {
             sc->args = cons(sc, caar(x), sc->args);
           }
-          x = mk_closure(sc, cons(sc, reverse_in_place(sc, sc->NIL, sc->args), cddr(sc->code)), sc->envir); 
-          new_slot_in_env(sc, car(sc->code), x); 
+          x = mk_closure(sc, cons(sc, reverse_in_place(sc, sc->NIL, sc->args), cddr(sc->code)), sc->envir);
+          new_slot_in_env(sc, car(sc->code), x);
           sc->code = cddr(sc->code);
           sc->args = sc->NIL;
         } else {
@@ -4278,11 +4259,11 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
         s_goto(sc,OP_EVAL);
     }
     case OP_LET1AST:    /* let* (make new frame) */
-        new_frame_in_env(sc, sc->envir); 
+        new_frame_in_env(sc, sc->envir);
         s_goto(sc,OP_LET2AST);
 
     case OP_LET2AST:    /* let* (calculate parameters) */
-        new_slot_in_env(sc, caar(sc->code), sc->value); 
+        new_slot_in_env(sc, caar(sc->code), sc->value);
         sc->code = cdr(sc->code);
         if (is_pair(sc->code)) { /* continue */
             s_save(sc,OP_LET2AST, sc->args, sc->code);
@@ -4307,10 +4288,10 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
 
 static pointer opexe_1(scheme *sc, enum scheme_opcodes op) {
     pointer x, y;
-        
+
     switch (op) {
     case OP_LET0REC:    /* letrec */
-        new_frame_in_env(sc, sc->envir); 
+        new_frame_in_env(sc, sc->envir);
         sc->args = sc->NIL;
         sc->value = sc->code;
         sc->code = car(sc->code);
@@ -4455,7 +4436,7 @@ static pointer opexe_1(scheme *sc, enum scheme_opcodes op) {
       s_save(sc,OP_CASE1, sc->NIL, cdr(sc->code));
       sc->code = car(sc->code);
       s_goto(sc,OP_EVAL);
-                                
+
     case OP_CASE1:      /* case */
       for (x = sc->code; x != sc->NIL; x = cdr(x)) {
         if (!is_pair(y = caar(x))) {
@@ -4487,20 +4468,20 @@ static pointer opexe_1(scheme *sc, enum scheme_opcodes op) {
       } else {
         s_return(sc,sc->NIL);
       }
-                        
+
     case OP_CASE2:      /* case */
       if (is_true(sc->value)) {
         s_goto(sc,OP_BEGIN);
       } else {
         s_return(sc,sc->NIL);
       }
-                        
+
     case OP_PAPPLY:     /* apply */
         sc->code = car(sc->args);
         sc->args = list_star(sc,cdr(sc->args));
   if(!is_pair(sc->args) && sc->args != sc->NIL) {
     Error_1(sc,"Error: Apply must finish with a string argument! not:",sc->args,sc->code->_debugger->_size);
-  }  
+  }
         /*sc->args = cadr(sc->args);*/
         s_goto(sc,OP_APPLY);
 
@@ -4533,7 +4514,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
 #if USE_MATH
     double dd;
 #endif
-        
+
     switch (op) {
 #if USE_MATH
     case OP_INEX2EX:    /* inexact->exact */
@@ -4614,12 +4595,12 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
             s_return(sc, mk_real(sc, ceil(rvalue_of_x)));
         }
     }
-                        
+
     case OP_ROUND:
         x=car(sc->args);
         s_return(sc, mk_real(sc, round_per_R5RS(rvalue(x))));
 #endif
-                        
+
     case OP_ADD:        /* + */
         v=num_zero;
         for (x = sc->args; x != sc->NIL; x = cdr(x)) {
@@ -4678,21 +4659,21 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
       }
     }
     s_return(sc,mk_number(sc, v));
-                                
+
   case OP_BITOR:        /* | */
     v=num_zero;
     for (x = sc->args; x != sc->NIL; x = cdr(x)) {
       v=num_bitor(v,nvalue(car(x)));
     }
     s_return(sc,mk_number(sc, v));
-                                
+
   case OP_BITEOR:        /* ^ */
     v=num_zero;
     for (x = sc->args; x != sc->NIL; x = cdr(x)) {
       v=num_biteor(v,nvalue(car(x)));
     }
     s_return(sc,mk_number(sc, v));
-                                
+
   case OP_BITLSL:        /* << */
     v=num_zero;
     x = sc->args;
@@ -4703,7 +4684,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
       }
     }
     s_return(sc,mk_number(sc, v));
-                                
+
   case OP_BITLSR:        /* >> */
     v=num_zero;
     x = sc->args;
@@ -4714,7 +4695,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
       }
     }
     s_return(sc,mk_number(sc, v));
-                                
+
     case OP_INTDIV:        /* quotient */
         if(cdr(sc->args)==sc->NIL) {
             x=sc->args;
@@ -4765,7 +4746,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
         ////////////// write barrier for treadmill
 #ifdef TREADMILL_CHECKS
       last_call_to_insert_treadmill = 20;
-#endif  
+#endif
         insert_treadmill(sc,cdr(sc->args));
         //////////////////////////////////////////
         s_return(sc,sc->args);
@@ -4775,7 +4756,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
     ////////////// write barrier for treadmill
 #ifdef TREADMILL_CHECKS
       last_call_to_insert_treadmill = 21;
-#endif    
+#endif
             insert_treadmill(sc,cadr(sc->args));
             //////////////////////////////////////////
 
@@ -4790,7 +4771,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
     ////////////// write barrier for treadmill
 #ifdef TREADMILL_CHECKS
       last_call_to_insert_treadmill = 22;
-#endif    
+#endif
             insert_treadmill(sc,cadr(sc->args));
             //////////////////////////////////////////
 
@@ -4805,7 +4786,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
         c=(char)ivalue(car(sc->args));
         s_return(sc,mk_integer(sc,(unsigned char)c));
     }
-                        
+
     case OP_INT2CHAR: { /* integer->char */
         unsigned char c;
         c=(unsigned char)ivalue(car(sc->args));
@@ -5106,7 +5087,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
           if(0 == strcmp(lkey,skey)) {
             retlst = cons(sc, pair, retlst);
             continue;
-          }             
+          }
         } else {
           return sc->NIL;
         }
@@ -5120,7 +5101,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
           if(0 == strcmp(lkey,skey)) {
             retlst = cons(sc, pair, retlst);
             continue;
-          }             
+          }
         } else {
           return sc->NIL;
         }
@@ -5136,10 +5117,10 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
       return retlst;
     }
 }
-    
+
 
 /*static*/ pointer list_ref(scheme *sc, const int pos, pointer a) {
-    pointer x;  
+    pointer x;
     for (int i=0; i<=pos; i++,a = cdr(a))
     {
         if(!is_pair(a)) return sc->NIL;
@@ -5153,7 +5134,7 @@ static pointer opexe_3(scheme *sc, enum scheme_opcodes op) {
     pointer x;
     num v;
     int (*comp_func)(num,num)=0;
-        
+
     switch (op) {
     case OP_NOT:        /* not */
         s_retbool(is_false(car(sc->args)));
@@ -5269,7 +5250,7 @@ static pointer opexe_3(scheme *sc, enum scheme_opcodes op) {
 
 static pointer opexe_4(scheme *sc, enum scheme_opcodes op) {
     pointer x, y;
-        
+
     switch (op) {
     case OP_FORCE:      /* force */
         sc->code = car(sc->args);
@@ -5407,7 +5388,7 @@ static pointer opexe_4(scheme *sc, enum scheme_opcodes op) {
         s_return(sc,sc->T);
 
     case OP_OBLIST: /* oblist */
-        s_return(sc, oblist_all_symbols(sc)); 
+        s_return(sc, oblist_all_symbols(sc));
 
     case OP_CURR_INPORT: /* current-input-port */
         s_return(sc,sc->inport);
@@ -5431,7 +5412,7 @@ static pointer opexe_4(scheme *sc, enum scheme_opcodes op) {
         }
         s_return(sc,p);
     }
-                        
+
 #if USE_STRING_PORTS
     case OP_OPEN_INSTRING: /* open-input-string */
     case OP_OPEN_INOUTSTRING: /* open-input-output-string */ {
@@ -5486,7 +5467,7 @@ static pointer opexe_4(scheme *sc, enum scheme_opcodes op) {
       s_return(sc,sc->F);
     }
 #endif
-                        
+
     case OP_CLOSE_INPORT: /* close-input-port */
         port_close(sc,car(sc->args),port_input);
         s_return(sc,sc->T);
@@ -5507,14 +5488,14 @@ static pointer opexe_4(scheme *sc, enum scheme_opcodes op) {
 
 static pointer opexe_5(scheme *sc, enum scheme_opcodes op) {
     pointer x;
-        
+
     if(sc->nesting!=0) {
         int n=sc->nesting;
         sc->nesting=0;
         sc->retcode=-1;
         Error_1(sc,"unmatched parentheses:",mk_integer(sc,n),0);
     }
-        
+
     switch (op) {
         /* ========== reading part ========== */
     case OP_READ:
@@ -5572,7 +5553,7 @@ static pointer opexe_5(scheme *sc, enum scheme_opcodes op) {
         res=p->_object._port->kind&port_string;
         s_retbool(res);
     }
-                        
+
     case OP_SET_INPORT: /* set-input-port */
         sc->inport=car(sc->args);
         s_return(sc,sc->value);
@@ -5661,10 +5642,10 @@ static pointer opexe_5(scheme *sc, enum scheme_opcodes op) {
     if(sc->tok == 1) {
       std::cout << "ILLEGAL RIGHT BRACKET!!!" << std::endl;
       std::cout << "Check for unbalanced expression" << std::endl;
-      Error_0(sc,"Illegal right bracket: unbalanced expr?",sc->args->_size);      
+      Error_0(sc,"Illegal right bracket: unbalanced expr?",sc->args->_size);
     }else{
       std::cout << "ILLEGAL TOKEN: " << sc->tok << std::endl;
-      Error_0(sc,"syntax error: illegal token",sc->args->_size);    
+      Error_0(sc,"syntax error: illegal token",sc->args->_size);
     }
         }
         break;
@@ -5710,7 +5691,7 @@ static pointer opexe_5(scheme *sc, enum scheme_opcodes op) {
             s_goto(sc,OP_RDSEXPR);
         }
     }
-                        
+
     case OP_RDDOT:
         if (token(sc) != TOK_RPAREN) {
             Error_0(sc,"syntax error: illegal dot expression",sc->code->_debugger->_size);
@@ -5811,7 +5792,7 @@ static pointer opexe_5(scheme *sc, enum scheme_opcodes op) {
             s_goto(sc,OP_P0LIST);
         }
     }
-                        
+
     default:
         sprintf(sc->strbuff, "%d: illegal operator", sc->op);
         Error_0(sc,sc->strbuff,0);
@@ -5825,7 +5806,7 @@ static pointer opexe_5(scheme *sc, enum scheme_opcodes op) {
 static pointer opexe_6(scheme *sc, enum scheme_opcodes op) {
     pointer x, y;
     long v;
-        
+
     switch (op) {
     case OP_LIST_LENGTH:     /* length */   /* a.k */
         v=list_length(sc,car(sc->args));
@@ -5885,7 +5866,7 @@ typedef int (*test_predicate)(pointer);
 static int is_any(pointer p) { return 1;}
 static int is_num_integer(pointer p) {
     return is_number(p) && ((p)->_object._number.num_type==0);
-    //return is_number(p) && ((p)->_object._number.is_fixnum); 
+    //return is_number(p) && ((p)->_object._number.is_fixnum);
 }
 static int is_nonneg(pointer p) {
     return is_num_integer(p) && ivalue(p)>=0;
@@ -5912,7 +5893,7 @@ static struct {
     {is_num_integer, "integer"},
     {is_nonneg, "non-negative integer"},
     {is_cptr, "cptr"} //,
-    // {is_objc, "objc"}        
+    // {is_objc, "objc"}
 };
 
 #define TST_NONE 0
@@ -5943,11 +5924,11 @@ typedef struct {
 
 #define INF_ARG 0xffff
 
-static op_code_info dispatch_table[]= { 
-#define _OP_DEF(A,B,C,D,E,OP) {A,(char*)B,C,D,(char*)E}, 
-#include "OPDefines.h" 
-    { 0, NULL, 0, 0, NULL } 
-}; 
+static op_code_info dispatch_table[]= {
+#define _OP_DEF(A,B,C,D,E,OP) {A,(char*)B,C,D,(char*)E},
+#include "OPDefines.h"
+    { 0, NULL, 0, 0, NULL }
+};
 
 //
 //  Dodgy Function to return string name for common opcodes
@@ -5978,21 +5959,21 @@ static const char* opcodename(int opcode)
     case 9:
         return "apply";
     case 10:
-        return "domacro";               
+        return "domacro";
     case 11:
-        return "lambda";                
+        return "lambda";
     case 12:
-        return "mkclosure";             
+        return "mkclosure";
     case 13:
-        return "quote";         
+        return "quote";
     case 14:
-        return "def0";          
+        return "def0";
     case 15:
-        return "def1";          
+        return "def1";
     case 16:
-        return "defp";          
+        return "defp";
     case 17:
-        return "begin";         
+        return "begin";
     case 18:
         return "if0";
     case 19:
@@ -6002,17 +5983,17 @@ static const char* opcodename(int opcode)
     case 21:
         return "set1";
     case 22:
-        return "let0";          
+        return "let0";
     case 23:
-        return "let1";          
+        return "let1";
     case 24:
-        return "let2";          
+        return "let2";
     case 25:
-        return "let0ast";               
+        return "let0ast";
     case 26:
-        return "let1ast";               
+        return "let1ast";
     case 27:
-        return "let2ast";       
+        return "let2ast";
     case 28:
         return "let0rec";
     case 29:
@@ -6020,19 +6001,19 @@ static const char* opcodename(int opcode)
     case 30:
         return "let2rec";
     case 31:
-        return "cond0";         
+        return "cond0";
     case 32:
-        return "cond1";         
+        return "cond1";
     case 33:
-        return "delay";         
+        return "delay";
     case 34:
-        return "and0";          
+        return "and0";
     case 35:
-        return "and1";          
+        return "and1";
     case 36:
-        return "or0";   
+        return "or0";
     case 37:
-        return "or1";   
+        return "or1";
     case 38:
         return "c0stream";
     case 39:
@@ -6040,38 +6021,38 @@ static const char* opcodename(int opcode)
     case 40:
         return "macro0";
     case 41:
-        return "macro1";                
+        return "macro1";
     case 42:
-        return "case0";         
+        return "case0";
     case 43:
-        return "case1";         
+        return "case1";
     case 44:
-        return "case2";         
+        return "case2";
 
     case 165:
-        return "rdsexpr";               
+        return "rdsexpr";
     case 166:
-        return "rdlist";        
+        return "rdlist";
     case 167:
-        return "rddot"; 
+        return "rddot";
     case 168:
-        return "rdquote";               
+        return "rdquote";
     case 169:
-        return "rdqquote";      
+        return "rdqquote";
     case 170:
-        return "rdqquotevec";   
+        return "rdqquotevec";
     case 171:
-        return "rdunquote";             
+        return "rdunquote";
     case 172:
-        return "rduqtsp";       
+        return "rduqtsp";
     case 173:
-        return "rdvec"; 
+        return "rdvec";
     case 174:
-        return "p0list";                
+        return "p0list";
     case 175:
-        return "p1list";        
+        return "p1list";
     case 176:
-        return "pvecfrom";      
+        return "pvecfrom";
 
     default:
         return dispatch_table[opcode].name;
@@ -6092,7 +6073,7 @@ const char *procname(pointer x) {
 static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
     int count=0;
     int old_op;
-        
+
     sc->op = op;
     for (;;) {
         if(extemp::UNIV::TIME > sc->call_end_time)
@@ -6199,22 +6180,22 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
 
 static void assign_syntax(scheme *sc, char *name) {
     pointer x;
-        
+
     x = oblist_add_by_name(sc, name);
-    typeflag(x) |= T_SYNTAX; 
+    typeflag(x) |= T_SYNTAX;
 }
 
 static void assign_proc(scheme *sc, enum scheme_opcodes op, char *name) {
     pointer x, y;
-        
+
     x = mk_symbol(sc, name);
     y = mk_proc(sc,op);
-    new_slot_in_env(sc, x, y); 
+    new_slot_in_env(sc, x, y);
 }
 
 static pointer mk_proc(scheme *sc, enum scheme_opcodes op) {
     pointer y;
-        
+
     y = get_cell(sc, sc->NIL, sc->NIL);
     typeflag(y) = (T_PROC | T_ATOM);
     ivalue_unchecked(y) = (long) op;
@@ -6265,7 +6246,7 @@ scheme* extempore_scheme_init_new() {
 
 scheme *scheme_init_new() {
   scheme *sc=(scheme*)malloc(sizeof(scheme));
-  //printf("Scheme init new %p \n",sc);  
+  //printf("Scheme init new %p \n",sc);
     if(!scheme_init(sc)) {
         free(sc);
         return 0;
@@ -6275,9 +6256,9 @@ scheme *scheme_init_new() {
 }
 
 scheme *scheme_init_new_custom_alloc(func_alloc malloc, func_dealloc free) {
-  
+
   scheme *sc=(scheme*)malloc(sizeof(scheme));
-  //printf("Scheme init new custom %p \n",sc);    
+  //printf("Scheme init new custom %p \n",sc);
     if(!scheme_init_custom_alloc(sc,malloc,free)) {
         free(sc);
         return 0;
@@ -6295,12 +6276,12 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     int i, n=sizeof(dispatch_table)/sizeof(dispatch_table[0]);
     pointer x;
     //printf("Scheme init custom alloc %p\n",sc);
-        
+
     num_zero.num_type=0; //is_fixnum=1;
     num_zero.value.ivalue=0;
     num_one.num_type=0; //is_fixnum=1;
     num_one.value.ivalue=1;
-        
+
 #if USE_
     sc->vptr=&vtbl;
 #endif
@@ -6308,23 +6289,23 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     sc->malloc=malloc;
     sc->free=free;
     sc->last_cell_seg = -1;
-        
+
     sc->fcells = 0;
     sc->allocation_request = -1;
     sc->no_memory=0;
     sc->dark = 1;
-        
+
     if (alloc_cellseg(sc,FIRST_CELLSEGS) != FIRST_CELLSEGS) {
         sc->no_memory=1;
         return 0;
     }
 
-    sc->NIL = get_cell(sc,sc->NIL,sc->NIL);  
-    sc->sink = get_cell(sc,sc->NIL,sc->NIL);  
-    sc->T = get_cell(sc,sc->NIL,sc->NIL);  
-    sc->F = get_cell(sc,sc->NIL,sc->NIL);  
-    sc->EOF_OBJ = get_cell(sc,sc->NIL,sc->NIL);  
-        
+    sc->NIL = get_cell(sc,sc->NIL,sc->NIL);
+    sc->sink = get_cell(sc,sc->NIL,sc->NIL);
+    sc->T = get_cell(sc,sc->NIL,sc->NIL);
+    sc->F = get_cell(sc,sc->NIL,sc->NIL);
+    sc->EOF_OBJ = get_cell(sc,sc->NIL,sc->NIL);
+
     sc->free_cell = sc->NIL;
     sc->inport=sc->NIL;
     sc->outport=sc->NIL;
@@ -6332,13 +6313,13 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     sc->loadport=sc->NIL;
     sc->nesting=0;
     sc->interactive_repl=0;
-        
+
     dump_stack_initialize(sc);
     sc->code = sc->NIL;
     sc->tracing=0;
     sc->args = sc->NIL;
     sc->value = sc->NIL;
-        
+
     /* init sc->NIL */
     typeflag(sc->NIL) = (T_ATOM | MARK);
     car(sc->NIL) = cdr(sc->NIL) = sc->NIL;
@@ -6349,14 +6330,14 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     typeflag(sc->F) = (T_ATOM | MARK);
     car(sc->F) = cdr(sc->F) = sc->F;
     sc->oblist = oblist_initial_value(sc);
-        
+
     /* init global_env */
-    new_frame_in_env(sc, sc->NIL); 
-    sc->global_env = sc->envir; 
+    new_frame_in_env(sc, sc->NIL);
+    sc->global_env = sc->envir;
     /* init else */
     x = mk_symbol(sc,"else");
-    new_slot_in_env(sc, x, sc->T); 
-        
+    new_slot_in_env(sc, x, sc->T);
+
     assign_syntax(sc, (char*)"lambda");
     assign_syntax(sc, (char*)"quote");
     assign_syntax(sc, (char*)"define");
@@ -6373,13 +6354,13 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     assign_syntax(sc, (char*)"cons-stream");
     assign_syntax(sc, (char*)"macro");
     assign_syntax(sc, (char*)"case");
-        
+
     for(i=0; i<n; i++) {
         if(dispatch_table[i].name!=0) {
             assign_proc(sc, (enum scheme_opcodes)i, (char*)dispatch_table[i].name);
         }
     }
-        
+
     /* initialization of global pointers to special symbols */
     sc->LAMBDA = mk_symbol(sc, "lambda");
     sc->QUOTE = mk_symbol(sc, "quote");
@@ -6389,37 +6370,37 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     sc->FEED_TO = mk_symbol(sc, "=>");
     sc->COLON_HOOK = mk_symbol(sc,"*colon-hook*");
     sc->LIVECODING_ERROR_HOOK = mk_symbol(sc, "*livecoding-error-hook*");
-    sc->ERROR_HOOK = mk_symbol(sc, "*error-hook*");     
+    sc->ERROR_HOOK = mk_symbol(sc, "*error-hook*");
     sc->SHARP_HOOK = mk_symbol(sc, "*sharp-hook*");
-        
+
     //sc->imp_env = sc->NIL;
     //sc->imp_env.clear();
     sc->tmp_dump = sc->NIL;
     sc->tmp_args = sc->NIL;
     sc->func_called_by_extempore = sc->NIL;
-        
+
     // setup treadmill stuff
     sc->mutex = new extemp::EXTMutex("treadmill_mutex");
     sc->mutex->init();
     sc->Treadmill_Guard = new extemp::EXTMonitor("treadmill_guard");
     sc->Treadmill_Guard->init();
-        
+
     sc->treadmill_flip_active = false;
     sc->treadmill_scanner_finished = false;
-        
+
 
     //define keywords
     int dispatch_table_length = sizeof(dispatch_table) / sizeof(dispatch_table[0]);
-        
+
     treadmill_mark_roots(sc, sc->NIL, sc->NIL);
-        
+
     ///////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////
     // Some very basic sanity checking
-#ifdef TREADMILL_CHECKS 
+#ifdef TREADMILL_CHECKS
     bool empty_grey_list = false;
     printf("==============ALLOC POST MARK SANITY CHECKS====================\n");
-    if(sc->treadmill_top->_list_colour != 1 || sc->treadmill_bottom->_list_colour != 1) {       
+    if(sc->treadmill_top->_list_colour != 1 || sc->treadmill_bottom->_list_colour != 1) {
         printf("Top & Bottom must both be ecru!  TOP(%d)  BOTTOM(%d) Catastrophic error in GC\n",sc->treadmill_top->_list_colour,sc->treadmill_bottom->_list_colour);
     }
     if(sc->treadmill_scan->_cw->_list_colour != 3)
@@ -6449,7 +6430,7 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     //check no gaps between ecru cells
     pointer ecru_check = sc->treadmill_top;
     long long ecrus = 0;
-    while(ecru_check != sc->treadmill_bottom->_ccw){            
+    while(ecru_check != sc->treadmill_bottom->_ccw){
         if(ecru_check->_list_colour != 1)
         {
             printf("Should have complete list of ecrus between TOP and BOTTOM moving counter clockwise!  Catastrophic error in GC\n");
@@ -6460,7 +6441,7 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     //check no gaps between white cells
     long long whites = 0;
     pointer white_check = sc->treadmill_free;
-    while(white_check != sc->treadmill_bottom){         
+    while(white_check != sc->treadmill_bottom){
         if(white_check->_list_colour != 0)
         {
             printf("Should have complete list of whites between BOTTOM and FREE moving counter clockwise!  Catastrophic error in GC\n");
@@ -6471,7 +6452,7 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     //check no gaps between black cells
     long long blacks = 0;
     pointer black_check = sc->treadmill_scan->_cw;
-    while(black_check != sc->treadmill_free){           
+    while(black_check != sc->treadmill_free){
         if(black_check->_list_colour != 3)
         {
             printf("Should have complete list of blacks between SCAN and FREE moving counter clockwise  colour(%d)!  Catastrophic error in GC\n",black_check->_list_colour);
@@ -6493,22 +6474,22 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
         }
     }
     printf("BLACKS(%lld)  GREYS(%lld)  WHITES(%lld)  ECRUS(%lld)  TOTAL(%lld)  SEGSIZE(%lld)\n",blacks,greys,whites,ecrus,blacks+greys+whites+ecrus,sc->total_memory_allocated);
-    printf("-----------------DONE ALLOC POST MARK CHECK-----------------\n");   
+    printf("-----------------DONE ALLOC POST MARK CHECK-----------------\n");
 #endif
     /////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////
-        
+
 
     sc->treadmill_stop = false;
     sc->treadmill_scan_thread = new extemp::EXTThread(&treadmill_scanner, sc, "treadmill");
     sc->treadmill_scan_thread->start();
-        
+
     sc->call_end_time = ULLONG_MAX;
     //sc->call_default_time = 158760000ll;  // 1 hour
     sc->call_default_time = extemp::UNIV::SAMPLERATE*60*5; // 5 minutes
-        
+
     sc->last_symbol_apply = sc->NIL;
-        
+
     return !sc->no_memory;
 }
 
@@ -6534,13 +6515,13 @@ void scheme_set_external_data(scheme *sc, void *p) {
 
 void scheme_deinit(scheme *sc) {
     int i;
-        
+
     sc->treadmill_stop = true;
     sc->Treadmill_Guard->signal();
-        
+
     sc->oblist=sc->NIL;
     sc->global_env=sc->NIL;
-    dump_stack_free(sc); 
+    dump_stack_free(sc);
     sc->envir=sc->NIL;
     sc->code=sc->NIL;
     sc->args=sc->NIL;
@@ -6567,7 +6548,7 @@ void scheme_deinit(scheme *sc) {
 }
 
 void scheme_load_file(scheme *sc, FILE *fin) {
-    dump_stack_reset(sc); 
+    dump_stack_reset(sc);
     sc->envir = sc->global_env;
     sc->file_i=0;
     sc->load_stack[0].kind=port_input|port_file;
@@ -6578,34 +6559,34 @@ void scheme_load_file(scheme *sc, FILE *fin) {
         sc->interactive_repl=1;
     }
     sc->inport=sc->loadport;
-        
+
     sc->func_called_by_extempore = sc->NIL;
     sc->call_end_time = extemp::UNIV::TIME+(uint64_t)(extemp::UNIV::SAMPLERATE*60*60); // 60 minutes
-        
+
     try{
-        Eval_Cycle(sc, OP_T0LVL); 
+        Eval_Cycle(sc, OP_T0LVL);
     }catch(ScmRuntimeError err){
         _Error_1(sc,err.msg,err.p,0,0);
     }
-        
+
     typeflag(sc->loadport)=T_ATOM;
     if(sc->retcode==0) {
         sc->retcode=sc->nesting!=0;
     }
-        
+
     while(!sc->applied_symbol_names.empty())
     {
         sc->applied_symbol_names.pop();
     }
     sc->last_symbol_apply = sc->NIL;
     sc->error_position = -1;
-        
+
     sc->call_end_time = ULLONG_MAX;
 }
 
 void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_time, unsigned long long end_time) {
 
-    dump_stack_reset(sc); 
+    dump_stack_reset(sc);
     sc->envir = sc->global_env;
     sc->file_i=0;
     sc->load_stack[0].kind=port_input|port_string;
@@ -6616,16 +6597,16 @@ void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_ti
     sc->retcode=0;
     sc->interactive_repl=0;
     sc->inport=sc->loadport;
-        
+
     sc->func_called_by_extempore = sc->NIL;
 
     //std::cout << "START: " << start_time << "  END: " << end_time << std::endl;
-        
+
     sc->call_start_time = start_time;
     sc->call_end_time = end_time;
-        
+
     try{
-                Eval_Cycle(sc, OP_T0LVL); 
+                Eval_Cycle(sc, OP_T0LVL);
     }catch(ScmRuntimeError err){
       std::cout << "Error: evaluating expr: " << cmd << std::endl;
                 _Error_1(sc,err.msg,err.p,0,0);
@@ -6639,14 +6620,14 @@ void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_ti
     if(sc->retcode==0) {
         sc->retcode=sc->nesting!=0;
     }
-        
+
     while(!sc->applied_symbol_names.empty())
     {
         sc->applied_symbol_names.pop();
     }
-    sc->last_symbol_apply = sc->NIL;    
+    sc->last_symbol_apply = sc->NIL;
     sc->error_position = -1;
-        
+
     sc->call_end_time = ULLONG_MAX;
 }
 
@@ -6654,10 +6635,10 @@ void scheme_define(scheme *sc, pointer envir, pointer symbol, pointer value) {
     pointer x;
 
     x=find_slot_in_env(sc,envir,symbol,0);
-    if (x != sc->NIL) { 
-        set_slot_in_env(sc, x, value); 
+    if (x != sc->NIL) {
+        set_slot_in_env(sc, x, value);
     } else {
-        new_slot_spec_in_env(sc, envir, symbol, value); 
+        new_slot_spec_in_env(sc, envir, symbol, value);
     }
 }
 
@@ -6665,63 +6646,63 @@ void scheme_define(scheme *sc, pointer envir, pointer symbol, pointer value) {
 void scheme_apply0(scheme *sc, const char *procname) {
     pointer carx=mk_symbol(sc,procname);
     pointer cdrx=sc->NIL;
-    dump_stack_reset(sc); 
+    dump_stack_reset(sc);
     sc->envir = sc->global_env;
     sc->code = cons(sc,carx,cdrx);
     sc->interactive_repl=0;
     sc->retcode=0;
-        
+
     try{
-        Eval_Cycle(sc, OP_EVAL); 
+        Eval_Cycle(sc, OP_EVAL);
     }catch(ScmRuntimeError err){
         _Error_1(sc,err.msg,err.p,0,0);
     }
 }
 
-void scheme_call_without_stack_reset(scheme *sc, pointer func, pointer args) 
-{       
+void scheme_call_without_stack_reset(scheme *sc, pointer func, pointer args)
+{
     sc->args = args;
-    sc->code = func;            
+    sc->code = func;
 
     sc->func_called_by_extempore = func;
-        
+
     sc->interactive_repl = 0;
-    sc->retcode = 0; 
-        
+    sc->retcode = 0;
+
     try{
-        Eval_Cycle(sc, OP_APPLY); 
+        Eval_Cycle(sc, OP_APPLY);
     }catch(ScmRuntimeError err){
         _Error_1(sc,err.msg,err.p,0,0);
     }
-} 
+}
 
 void scheme_call(scheme *sc, pointer func, pointer args, uint64_t start_time, uint64_t end_time) {
     dump_stack_reset(sc);
     sc->envir = sc->global_env;
     sc->args = args;
     sc->code = func;
-                
+
     sc->call_start_time = start_time;
     sc->call_end_time = end_time;
 
     sc->func_called_by_extempore = func;
-        
+
     sc->interactive_repl = 0;
-    sc->retcode = 0; 
-        
+    sc->retcode = 0;
+
     try{
-        Eval_Cycle(sc, OP_APPLY); 
+        Eval_Cycle(sc, OP_APPLY);
     }catch(ScmRuntimeError err){
         _Error_1(sc,err.msg,err.p,0,0);
     }
-        
+
     while(!sc->applied_symbol_names.empty())
     {
         sc->applied_symbol_names.pop();
     }
     sc->last_symbol_apply = sc->NIL;
     sc->error_position = -1;
-        
+
     sc->call_end_time = ULLONG_MAX;
 }
 //#endif

@@ -639,7 +639,7 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
         ss << "-ERROR BAD POINTER-";
         return;
     }
-    if(pointer_type(val) > 16) {
+    if (pointer_type(val) > T_LAST_SYSTEM_TYPE) {
         printf("Bad cell type - not printing\n");
         return;
     }

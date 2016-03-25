@@ -222,8 +222,11 @@ void* SchemeProcess::taskImpl()
 #endif
     // only load extempore.xtm in primary process
     if (m_name == "primary") {
+        EXTMonitor::ScopedLock lock(m_guard);
+        m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
+                new std::string("(sys:compile-init-ll)"), "file_init",
+                    SchemeTask::Type::LOCAL_PROCESS_STRING));
         if (extemp::UNIV::EXT_LOADBASE) {
-            EXTMonitor::ScopedLock lock(m_guard);
             m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
                     new std::string("(sys:load \"libs/base/base.xtm\" 'quiet)"), "file_init",
                         SchemeTask::Type::LOCAL_PROCESS_STRING));
@@ -233,7 +236,6 @@ void* SchemeProcess::taskImpl()
             printf("\nEvaluating expression: ");
             ascii_normal();
             printf("%s\n\n", m_initExpr.c_str());
-            EXTMonitor::ScopedLock lock(m_guard);
             m_taskQueue.push(SchemeTask(extemp::UNIV::TIME + 1000, 60 * 60 * UNIV::SECOND(),
                     new std::string(m_initExpr), "file_init", SchemeTask::Type::LOCAL_PROCESS_STRING));
         }

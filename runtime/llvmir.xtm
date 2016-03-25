@@ -99,10 +99,6 @@
   (lambda ()
     (sys:compile-ll "init.ll")))
 
-(define sys:compile-types-ll
-  (lambda ()
-    (sys:compile-ll "types.ll")))
-
 ;; GCHANGE
 ;; removes %b when returning base types (i.e. !head%b returns !head)
 (define impc:ir:get-base-type-g

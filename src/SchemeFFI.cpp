@@ -1625,27 +1625,24 @@ namespace extemp {
       }
 
 #else
-    static std::string sInitString; // This is a hack for now, but it *WORKS*
-    if (sInitString.empty()) {
-        std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/init.ll");
+    static std::string sInlineString; // This is a hack for now, but it *WORKS*
+    if (sInlineString.empty()) {
+        std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
         std::stringstream inString;
         inString << inStream.rdbuf();
-        sInitString = inString.str();
+        sInlineString = inString.str();
     }
     std::string asmcode(assm);
-    int cnt = 0;
-
-    std::unique_ptr<llvm::Module> newModule;
     auto context(LLVMContextCreate());
-    pa = SMDiagnostic();
-    newModule = parseAssemblyString(asmcode, pa, *unwrap(context));
+    auto newModule(parseAssemblyString(asmcode, pa, *unwrap(context)));
     bool built(newModule);
     newModule.reset();
     LLVMContextDispose(context);
-    if (!built) {
-        asmcode = sInitString + asmcode;
+    if (likely(!built)) {
+        asmcode = sInlineString + asmcode;
     }
     newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
+    int cnt = 0;
     while (!newModule) {
       std::string err = pa.getMessage().str();
       if(cnt > 1000) {
@@ -1692,7 +1689,7 @@ namespace extemp {
         std::string stype = ss.str();
 
         stype.resize(stype.length()-1); // drop last '*'
-        std::string exprr("");
+        std::string exprr;
         if(func) {
           Type* rettype = func->getReturnType();
           typestr.clear();
@@ -1713,10 +1710,10 @@ namespace extemp {
           exprr.append(" = external global ");
           exprr.append(stype);
         }
+// std::cout << "REPLACE " << symname << " WITH " << exprr << " ERR: " << err << std::endl;
         exprr.append("\n\n");
         exprr.append(asmcode);
-        asmcode.clear();
-        asmcode.append(exprr);
+        asmcode.swap(exprr);
         cnt++;
       } else {
         break; // going to die
@@ -1738,7 +1735,7 @@ namespace extemp {
 //     }
 //     close(fd);
 // }
-
+    if (newModule)
     if(EXTLLVM::OPTIMIZE_COMPILES && newModule)
       {
         PM->run(*newModule);

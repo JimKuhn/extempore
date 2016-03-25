@@ -45,9 +45,6 @@
 
 (impc:aot:insert-header "xtmbase")
 
-(sys:compile-types-ll)
-(impc:aot:insert-forms (sys:compile-types-ll))
-
 ;; (suppress-compiler-messages #f)
 
 ;;;;;;;;;;;;;
