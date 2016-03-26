@@ -16,7 +16,6 @@ declare %clsvar* @get_address_table(i8*, %clsvar*) nounwind
 declare i32 @get_address_offset(i64, %clsvar*) nounwind
 declare i1 @check_address_type(i64, %clsvar*, i8*) nounwind
 declare i1 @check_address_exists(i64, %clsvar*) nounwind
-declare %clsvar* @new_address_table() nounwind
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SCHEME STUFF
@@ -630,4 +629,9 @@ define i32 @is_cptr_or_str(i8* %ptr) alwaysinline
   %v2 = call i32 @is_string(i8* %ptr)
   %res = or i32 %v1, %v2
   ret i32 %res
+}
+
+define %clsvar* @new_address_table() nounwind alwaysinline
+{
+  ret %clsvar* null
 }
