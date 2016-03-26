@@ -593,3 +593,41 @@ define i32 @llvm_fscanf(i8* %file, i8* noalias nocapture %format, ...) alwaysinl
   %1 = musttail call i32 (i8*, i8*, ...) @fscanf(i8* %file, i8* %format, ...)
   ret i32 %1
 }
+
+;; scheme helpers
+
+define i32 @is_type(i8* %ptr, i32 %val) alwaysinline
+{
+  %1 = bitcast i8* %ptr to i32*
+  %2 = load i32, i32* %1
+  %3 = and i32 %2, 15
+  %set = icmp eq i32 %3, %val
+  %res = zext i1 %set to i32
+  ret i32 %res
+}
+
+define i32 @is_string(i8* %ptr) alwaysinline
+{
+  %res = call i32 @is_type(i8* %ptr, i32 1)
+  ret i32 %res
+}
+
+define i32 @is_real(i8* %ptr) alwaysinline
+{
+  %res = call i32 @is_type(i8* %ptr, i32 2)
+  ret i32 %res
+}
+
+define i32 @is_cptr(i8* %ptr) alwaysinline
+{
+  %res = call i32 @is_type(i8* %ptr, i32 15)
+  ret i32 %res
+}
+
+define i32 @is_cptr_or_str(i8* %ptr) alwaysinline
+{
+  %v1 = call i32 @is_cptr(i8* %ptr)
+  %v2 = call i32 @is_string(i8* %ptr)
+  %res = or i32 %v1, %v2
+  ret i32 %res
+}
