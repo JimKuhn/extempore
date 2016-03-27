@@ -1284,6 +1284,8 @@ namespace extemp {
 
 
             //EE = llvm::EngineBuilder(M).create();
+            PM_NO = new llvm::legacy::PassManager();
+            PM_NO->add(llvm::createAlwaysInlinerPass());
             PM = new llvm::legacy::PassManager();
 #if 1
             PM->add(llvm::createAggressiveDCEPass());

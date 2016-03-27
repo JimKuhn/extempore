@@ -380,6 +380,7 @@ namespace extemp {
 	llvm::ModuleProvider* MP;
 	llvm::ExecutionEngine* EE;
   llvm::legacy::PassManager* PM;
+  llvm::legacy::PassManager* PM_NO;
 #ifdef EXT_MCJIT
   std::unique_ptr<llvm::SectionMemoryManager> MM;
 #endif

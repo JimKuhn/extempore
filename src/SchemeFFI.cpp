@@ -1604,7 +1604,7 @@ namespace extemp {
     using namespace llvm;
     Module* M = EXTLLVM::I()->M;
     legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
-    // legacy::PassManager* PM_NO = extemp::EXTLLVM::I()->PM_NO;
+    legacy::PassManager* PM_NO = extemp::EXTLLVM::I()->PM_NO;
 
 #ifdef EXT_MCJIT
     char modname[256];
@@ -1736,11 +1736,13 @@ namespace extemp {
 //     }
 //     close(fd);
 // }
-    if (newModule)
-    if(EXTLLVM::OPTIMIZE_COMPILES && newModule)
-      {
-        PM->run(*newModule);
-      }
+    if (newModule) {
+        if(EXTLLVM::OPTIMIZE_COMPILES) {
+            PM->run(*newModule);
+        } else {
+            PM_NO->run(*newModule);
+        }
+    }
 
 #endif
 
