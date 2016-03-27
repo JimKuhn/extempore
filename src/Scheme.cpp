@@ -254,27 +254,16 @@ inline void insert_treadmill(scheme* sc, pointer p)
     }
 #endif
 
-    // LOCK MUTEX
-
-    bool already_locked = false;
-    if(sc->mutex->isOwnedByCurrentThread()){
-        already_locked = true;
-//              hit_thread_insert++;
-    }
-    if(!already_locked) {
-        sc->mutex->lock();
-        // we might be locked while the treadmill flip happens
-        // so when we wake up we should re-check our colour to make
-        // sure that the flip hasn't already added us to the scanner list
-        if(p->_colour == sc->dark)
-        {
+    extemp::EXTMutex::ScopedLock lock(*sc->mutex);
+    // we might be locked while the treadmill flip happens
+    // so when we wake up we should re-check our colour to make
+    // sure that the flip hasn't already added us to the scanner list
+    if(p->_colour == sc->dark)
+    {
 #ifdef TREADMILL_CHECKS
-          //std::cout << "WARNING: inserting during flip ... this should be OK?" << p << std::endl;
+      //std::cout << "WARNING: inserting during flip ... this should be OK?" << p << std::endl;
 #endif
-            sc->mutex->unlock();
-            return;
-        }
-//              missed_thread_insert++;
+        return;
     }
 
     pointer at = sc->treadmill_top;
@@ -332,7 +321,6 @@ inline void insert_treadmill(scheme* sc, pointer p)
         //sc->treadmill_bottom = sc->treadmill_bottom->_cw;
     }else if(p == sc->treadmill_free) {
         std::cout << "WARNING MOVING FREE POINTER BY MISTAKE: THIS IS AN ERROR!!!!!!!" << std::endl;
-        if(!already_locked) sc->mutex->unlock();
         _Error_1(sc, "OUT OF MEMORY ERROR!", sc->NIL, 0, 0);
         return;
     }
@@ -374,7 +362,6 @@ inline void insert_treadmill(scheme* sc, pointer p)
     }
 #endif
 
-    if(!already_locked) sc->mutex->unlock();
     return;
 }
 
@@ -1705,29 +1692,6 @@ pointer mk_vector(scheme *sc, int len) {
         cptr[i] = obj;
     }
 }
-
-/* static*/ pointer vector_elem(pointer vec, int ielem) {
-    pointer* p = (pointer*)vec->_object._cptr;
-    return p[ielem];
-}
-
-/* static*/ pointer set_vector_elem(scheme* sc, pointer vec, int ielem, pointer a) {
-
-    pointer* p = (pointer*)vec->_object._cptr;
-
-    ////////////// write barrier for treadmill
-#ifdef TREADMILL_CHECKS
-      last_call_to_insert_treadmill = 4;
-#endif
-    insert_treadmill(sc,a);
-    //////////////////////////////////////////
-
-    p[ielem] = a;
-    return a;
-
-}
-
-
 
 /* get new symbol */
 pointer mk_symbol(scheme *sc, const char *name) {
@@ -3253,18 +3217,19 @@ static pointer list_star(scheme *sc, pointer d) {
 
 /* ========== Environment implementation  ========== */
 
+static inline uint64_t str_hash(const char* str)
+{
+    uint64_t result(0);
+    unsigned char c;
+    while((c = *(str++))) {
+        result = result * 33 + c;
+    }
+    return result;
+}
+
 static int hash_fn(const char *key, int table_size)
 {
-    unsigned int hashed = 0;
-    const char *c;
-    int bits_per_int = sizeof(unsigned int)*8;
-
-    for (c = key; *c; c++) {
-        /* letters have about 5 bits in them */
-        hashed = (hashed<<5) | (hashed>>(bits_per_int-5));
-        hashed ^= *c;
-    }
-    return hashed % table_size;
+    return str_hash(key) % table_size;
 }
 
 /*

@@ -1,8 +1,6 @@
 declare %mzone* @llvm_zone_callback_setup() nounwind
 declare %mzone* @llvm_zone_create(i64) nounwind
-declare %mzone* @llvm_peek_zone_stack() nounwind
 declare %mzone* @llvm_pop_zone_stack() nounwind
-declare void @llvm_push_zone_stack(%mzone*) nounwind
 declare void @llvm_zone_destroy(%mzone*) nounwind
 declare void @llvm_zone_print(%mzone*) nounwind
 declare %mzone* @llvm_zone_reset(%mzone*) nounwind
@@ -634,4 +632,18 @@ define i32 @is_cptr_or_str(i8* %ptr) alwaysinline
 define %clsvar* @new_address_table() nounwind alwaysinline
 {
   ret %clsvar* null
+}
+
+declare %mzone* @llvm_peek_zone_stack_extern() nounwind
+define %mzone* @llvm_peek_zone_stack() nounwind alwaysinline
+{
+  %zone = call %mzone* @llvm_peek_zone_stack_extern()
+  ret %mzone* %zone
+}
+
+declare void @llvm_push_zone_stack_extern(%mzone*) nounwind
+define void @llvm_push_zone_stack(%mzone* %zone) nounwind alwaysinline
+{
+  call void @llvm_push_zone_stack_extern(%mzone* %zone)
+  ret void
 }

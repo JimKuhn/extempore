@@ -175,7 +175,6 @@ void llvm_zone_print(llvm_zone_t* zone);
 void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay);
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
 llvm_zone_t* llvm_pop_zone_stack();
-llvm_zone_t* llvm_peek_zone_stack();
 
 inline void llvm_push_zone_stack(llvm_zone_t* z)
 {
@@ -184,6 +183,29 @@ inline void llvm_push_zone_stack(llvm_zone_t* z)
     stack->tail = llvm_threads_get_zone_stack();
     llvm_threads_set_zone_stack(stack);
     return;
+}
+
+inline llvm_zone_t* llvm_peek_zone_stack()
+{
+    llvm_zone_t* z = 0;
+    llvm_zone_stack* stack = llvm_threads_get_zone_stack();
+    if (unlikely(!stack)) {  // for the moment create a "DEFAULT" zone if stack is NULL
+#if DEBUG_ZONE_STACK
+        printf("TRYING TO PEEK AT A NULL ZONE STACK\n");
+#endif
+        llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1); // default root zone is 1M
+        llvm_push_zone_stack(z);
+        stack = llvm_threads_get_zone_stack();
+#if DEBUG_ZONE_STACK
+        printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
+#endif
+        return z;
+    }
+    z = stack->head;
+#if DEBUG_ZONE_STACK
+    printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
+#endif
+    return z;
 }
 
 inline llvm_zone_t* llvm_zone_callback_setup()

@@ -133,8 +133,7 @@ static inline SAMPLE audio_sanity(SAMPLE x)
 static inline float audio_sanity_f(float x)
 {
     if (likely(isfinite(x))) {
-        if (unlikely(x < -0.99f)) return -0.99f;
-        if (unlikely(x > 0.99f)) return 0.99f;
+        _mm_store_ss(&x, _mm_min_ss(_mm_max_ss(_mm_set_ss(x), _mm_set_ss(-0.99f)), _mm_set_ss(0.99f)));
         return x;
     }
     return 0.0;
@@ -378,9 +377,8 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         auto dat(reinterpret_cast<float*>(OutputBuffer));
         auto in(reinterpret_cast<const float*>(InputBuffer));
         auto time(UNIV::DEVICE_TIME);
-        for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time)
-        {
-            if (likely(!UNIV::IN_CHANNELS)) {
+        if (likely(!UNIV::IN_CHANNELS)) {
+            for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
                     *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), 0.0, time, k,
                             indata))); // why indata (can't be null?)
@@ -388,14 +386,18 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
                 }
                 continue;
             }
+        } else if (UNIV::IN_CHANNELS == UNIV::CHANNELS) {
             std::copy(in, in + UNIV::IN_CHANNELS, indata);
-            if (UNIV::IN_CHANNELS == UNIV::CHANNELS) {
+            for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
                     *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), *(in++),
                             time, k, indata))); // indata??
                     llvm_zone_reset(zone);
                 }
-            } else if (UNIV::IN_CHANNELS == 1) {
+            }
+        } else if (UNIV::IN_CHANNELS == 1) {
+            std::copy(in, in + UNIV::IN_CHANNELS, indata);
+            for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 for (uint64_t k=0; k <UNIV::CHANNELS; k++) {
                     *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), *(in++),
                             time, k, indata))); // indata??

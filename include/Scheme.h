@@ -221,7 +221,6 @@ pointer list_ref(scheme* sc, int pos, pointer a);
 int eqv(pointer a, pointer b);
 pointer mk_vector(scheme *sc, int len);
 void fill_vector(scheme* sc, pointer vec, pointer obj);
-pointer vector_elem(pointer vec, int ielem);
 pointer set_vector_elem(scheme* sc, pointer vec, int ielem, pointer a);
 int scheme_init(scheme* sc);
 scheme* extempore_scheme_init_new();
@@ -342,6 +341,66 @@ enum scheme_types {
     T_CPTR = 15,
     T_LAST_SYSTEM_TYPE = 15
 };
+
+struct port {
+    unsigned char kind;
+    union {
+    struct {
+        FILE *file;
+        int closeit;
+    } stdio;
+    struct {
+        char *start;
+        char *past_the_end;
+        char *curr;
+    } string;
+    } rep;
+};
+
+
+/* cell structure */
+struct cell {
+    unsigned int _flag;
+//  unsigned int _colour;
+//  unsigned int _list_colour;
+    unsigned char _colour;
+    unsigned char _list_colour;
+    unsigned int _size;
+    cell* _debugger;
+    cell* _cw;
+    cell* _ccw;
+    union {
+    struct {
+        char   *_svalue;
+        int   _length;
+    } _string;
+    num _number;
+    port *_port;
+    foreign_func _ff;
+    struct {
+        struct cell *_car;
+        struct cell *_cdr;
+    } _cons;
+    void* _cptr;
+    } _object;
+};
+
+inline pointer vector_elem(pointer Vector, int Index)
+{
+    return reinterpret_cast<pointer*>(Vector->_object._cptr)[Index];
+}
+
+extern void insert_treadmill(scheme* sc, pointer p);
+
+inline pointer set_vector_elem(scheme* Scheme, pointer Vector, int Index, pointer Val)
+{
+#ifdef TREADMILL_CHECKS
+    last_call_to_insert_treadmill = 4;
+#endif
+    insert_treadmill(Scheme, Val);
+    reinterpret_cast<pointer*>(Vector->_object._cptr)[Index] = Val;
+    return Val;
+}
 
 }
 

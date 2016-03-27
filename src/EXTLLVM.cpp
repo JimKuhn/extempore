@@ -208,29 +208,6 @@ thread_local llvm_zone_stack* tls_llvm_zone_stack = 0;
 thread_local uint64_t tls_llvm_zone_stacksize = 0;
 thread_local llvm_zone_t* tls_llvm_callback_zone = 0;
 
-llvm_zone_t* llvm_peek_zone_stack()
-{
-    llvm_zone_t* z = 0;
-    llvm_zone_stack* stack = llvm_threads_get_zone_stack();
-    if (unlikely(!stack)) {  // for the moment create a "DEFAULT" zone if stack is NULL
-#if DEBUG_ZONE_STACK
-        printf("TRYING TO PEEK AT A NULL ZONE STACK\n");
-#endif
-        llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1); // default root zone is 1M
-        llvm_push_zone_stack(z);
-        stack = llvm_threads_get_zone_stack();
-#if DEBUG_ZONE_STACK
-        printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
-#endif
-        return z;
-    }
-    z = stack->head;
-#if DEBUG_ZONE_STACK
-    printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
-#endif
-    return z;
-}
-
 llvm_zone_t* llvm_pop_zone_stack()
 {
     llvm_zone_stack* stack = llvm_threads_get_zone_stack();
@@ -1372,9 +1349,9 @@ namespace extemp {
             EE->updateGlobalMapping("llvm_send_udp", (uint64_t)&llvm_send_udp);
             EE->updateGlobalMapping("llvm_schedule_callback", (uint64_t)&llvm_schedule_callback);
             EE->updateGlobalMapping("llvm_get_function_ptr", (uint64_t)&llvm_get_function_ptr);
-            EE->updateGlobalMapping("llvm_peek_zone_stack", (uint64_t)&llvm_peek_zone_stack);
+            EE->updateGlobalMapping("llvm_peek_zone_stack_extern", (uint64_t)&llvm_peek_zone_stack);
             EE->updateGlobalMapping("llvm_pop_zone_stack", (uint64_t)&llvm_pop_zone_stack);
-            EE->updateGlobalMapping("llvm_push_zone_stack", (uint64_t)&llvm_push_zone_stack);
+            EE->updateGlobalMapping("llvm_push_zone_stack_extern", (uint64_t)&llvm_push_zone_stack);
             EE->updateGlobalMapping("llvm_zone_malloc", (uint64_t)&llvm_zone_malloc);
             EE->updateGlobalMapping("llvm_zone_callback_setup", uintptr_t(&llvm_zone_callback_setup));
             EE->updateGlobalMapping("get_address_table", (uint64_t)&get_address_table);
@@ -1486,4 +1463,19 @@ namespace extemp {
       return;
     }
   }
+}
+
+extern "C" {
+
+llvm_zone_t* llvm_peek_zone_stack_extern()
+{
+  return llvm_peek_zone_stack();
+}
+
+void llvm_push_zone_stack_extern (llvm_zone_t* z)
+{
+  llvm_push_zone_stack(z);
+}
+
+
 }
