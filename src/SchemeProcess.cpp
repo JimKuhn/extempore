@@ -160,13 +160,6 @@ void SchemeProcess::stop()
 
 void SchemeProcess::addCallback(TaskI* TaskAdd, SchemeTask::Type Type)
 {
-#if !defined(NDEBUG)
-    if (m_guard.isOwnedByCurrentThread())
-    {
-        printf("Thread trying to relock during scheme callback. Potential deadlock. Dropping Task!\n");
-        return;
-    }
-#endif
     EXTMonitor::ScopedLock lock(m_guard, true);
     auto currentTime(TaskAdd->getStartTime());
     auto duration(TaskAdd->getDuration());
@@ -176,13 +169,6 @@ void SchemeProcess::addCallback(TaskI* TaskAdd, SchemeTask::Type Type)
 
 void SchemeProcess::createSchemeTask(void* Arg, const std::string& Label, SchemeTask::Type Type)
 {
-#if !defined(NDEBUG)
-    if (m_guard.isOwnedByCurrentThread())
-    {
-        printf("Thread trying to relock creating scheme task. Potential deadlock. Dropping Task!");
-        return;
-    }
-#endif
     EXTMonitor::ScopedLock lock(m_guard, true);
     m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, Arg, Label, Type));
 }
@@ -470,11 +456,6 @@ void* SchemeProcess::serverImpl()
                     std::string::size_type pos = 0;
                     std::string::size_type end = evalStr.find_first_of('\x0d', pos);
                     for (; end != std::string::npos; pos = end + 2, end = evalStr.find_first_of('\x0d', pos)) {
-#if !defined(NDEBUG)
-                        if (m_guard.isOwnedByCurrentThread()) {
-                                printf("Extempore interpreter server thread trying to relock. Dropping Task!. Let me know andrew@moso.com.au\n");
-                        }
-#endif
                         EXTMonitor::ScopedLock lock(m_guard, true);
                         char c[8];
                         sprintf(c, "%i", sock);
