@@ -3209,11 +3209,13 @@
 (bind-func glfw_create_window
   (let ((window_title:i8* (zalloc 128)))
     (lambda (width height)
+      (sprintf window_title "Extempore OpenGL Window")
       (glfwCreateWindow width height window_title null null))))
 
 (bind-func glfw_create_interaction_window
   (let ((window_title:i8* (zalloc 128)))
     (lambda (width height)
+      (sprintf window_title "Extempore OpenGL Window")
       (register_for_window_events)
       (glfwCreateWindow width height window_title null null))))
 
@@ -3313,8 +3315,12 @@
     (glfw_init)
     (glfw_set_core_profile)
     (let ((window (glfw_create_window width height)))
+      ;; the ShowWindow and SwapBuffers calls are necessary for
+      ;; Windows, otherwise the context becomes unresponsive
+      (glfwShowWindow window)
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
+      (glfwSwapBuffers window)
       window)))
 
 (bind-func glfw_init_and_create_compatibility_window
@@ -3322,8 +3328,10 @@
     (glfw_init)
     ;; (glfw_set_compatibility_profile)
     (let ((window (glfw_create_window width height)))
+      (glfwShowWindow window)
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
+      (glfwSwapBuffers window)
       window)))
 
 (bind-func glfw_init_and_create_interaction_window
@@ -3331,8 +3339,10 @@
     (glfw_init)
     (glfw_set_core_profile)
     (let ((window (glfw_create_interaction_window width height)))
+      (glfwShowWindow window)
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
+      (glfwSwapBuffers window)
       window)))
 
 (bind-func glfw_init_and_create_interaction_compatibility_window
@@ -3340,8 +3350,10 @@
     (glfw_init)
     ;; (glfw_set_compatibility_profile)
     (let ((window (glfw_create_interaction_window width height)))
+      (glfwShowWindow window)
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
+      (glfwSwapBuffers window)
       window)))
 
 (bind-func glfw_init_and_create_fullscreen_window
@@ -3349,8 +3361,10 @@
     (glfw_init)
     (glfw_set_core_profile)
     (let ((window (glfw_create_fullscreen_window)))
+      (glfwShowWindow window)
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
+      (glfwSwapBuffers window)
       window)))
 
 (bind-func glfw_init_and_create_fullscreen_compatibility_window
@@ -3358,8 +3372,10 @@
     (glfw_init)
     ;; (glfw_set_compatibility_profile)
     (let ((window (glfw_create_fullscreen_window)))
+      (glfwShowWindow window)
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
+      (glfwSwapBuffers window)
       window)))
 
 (bind-func glfw_get_framebuffer_width
