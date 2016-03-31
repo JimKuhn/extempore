@@ -66,13 +66,13 @@ namespace extemp {
     {
 	active = true;
 	title = _title;
-	ascii_text_color(0,9,10);
+	ascii_default();
 	printf("\nStarting ");
-	ascii_text_color(1,6,10);
+	ascii_info();
 	printf("%s",title.c_str());	
-	ascii_text_color(0,9,10);
+	ascii_default();
 	printf(" process\n");
-	ascii_text_color(0,9,10);
+	ascii_default();
 	server_socket = 0;
 
 	buf = new char[BUFLENGTH+1];
@@ -93,57 +93,17 @@ namespace extemp {
       SchemeREPL* repl = REPL_MAP[name];
       if(repl) return repl;
       else {
-        // ascii_text_color(1,1,10);
+        // ascii_error();
         // printf("Could not find REPL named '%s'\n",name.c_str());
-        // ascii_text_color(0,9,10);
+        // ascii_default();
         return 0;
       }
     }
 
     std::string& SchemeREPL::getTitle()
     {
-	return title;
+    	return title;
     }
-
-//     void* SchemeREPL::readThread(void* obj)
-//     {
-// 	SchemeREPL* repl = static_cast<SchemeREPL*>(obj);
-// 	while(repl->active) {
-// 	    //NSMutableString* str = [[NSMutableString alloc] init];
-// 	    std::stringstream ss;
-// 	    if(repl->server_socket == 0) {
-// 		ss << "No REPL Connection Established";
-// 		break;
-// 	    }else{
-// 		memset(repl->buf,0,BUFLENGTH+1);
-// 		int lgth = 0;
-// #ifdef EXT_BOOST
-//                	while((lgth = repl->server_socket->read_some(boost::asio::buffer(repl->buf, BUFLENGTH))) == BUFLENGTH) {
-// #else
-// 		while((lgth = read(repl->server_socket, repl->buf, BUFLENGTH)) == BUFLENGTH) {
-// #endif
-
-// 		    if(lgth < 0) {
-// 		      ascii_text_color(1,1,10);
-// 			printf("PROBLEM WITH REPL SOCKET: %s\n",repl->buf);
-// 		      ascii_text_color(0,9,10);
-// 			break;
-// 		    }
-// 		    ss << repl->buf;
-// 		    memset(repl->buf,0,BUFLENGTH+1);
-// 		}
-// 		if(lgth == 0) { // end of stream
-// 		  ascii_text_color(1,3,10);
-// 		    printf("CLOSE REPL READ STREAM %d",lgth);
-// 		  ascii_text_color(0,9,10);
-// 		    return 0;
-// 		}
-// 	    }
-// 	    //printf("repl-result: %s",ss.str().c_str());
-// 	    if(repl->server_socket == 0) break;
-// 	}
-// 	//printf("Exit REPL Thread\n");
-//     }
 
     void SchemeREPL::writeString(std::string& string)
     {
@@ -186,15 +146,10 @@ namespace extemp {
 	struct sockaddr_in sa;
 	struct hostent* hen; /* host-to-IP translation */
 #endif
-	//ascii_text_color(1,9,10);
 	printf("Trying to connect to ");
-	//ascii_text_color(1,6,10);
 	printf("'%s'",hostname.c_str());
-	//ascii_text_color(1,9,10);
 	printf(" on port ");
-	//ascii_text_color(1,6,10);
 	printf("%d\n",port);
-	//ascii_text_color(0,9,10);
 	/* Address resolution stage */	
 
 #ifdef EXT_BOOST
@@ -213,9 +168,9 @@ namespace extemp {
 	hen = gethostbyname(hostname.c_str());
 	if (!hen) {
 #endif
-  	ascii_text_color(1,1,10);
+  	ascii_error();
 	    printf("Could not resolve host name\n");
-	ascii_text_color(0,9,10);
+	ascii_default();
 	    return false;
 	}
         // wait for main server to start up first time out of the gates.
@@ -232,10 +187,10 @@ namespace extemp {
         server_socket->open(boost::asio::ip::tcp::v4());
         server_socket->connect(ep);
 	}catch(std::exception& e){
-	    ascii_text_color(1,1,10);
+	    ascii_error();
 		std::cout << "Connection Error:" << e.what() << std::endl;
 	    //printf("Connection error:%d\n",errno);
-	    ascii_text_color(0,9,10);
+	    ascii_default();
 	    return false;
 	}    
 	rc = server_socket->read_some(boost::asio::buffer(buf,BUFLENGTH));
@@ -248,9 +203,9 @@ namespace extemp {
 	server_socket = socket(AF_INET, SOCK_STREAM, 0);
     
 	if (server_socket < 0) {
-	  ascii_text_color(1,1,10);
+	  ascii_error();
 	    printf("Socket Connection Failed\n");
-	ascii_text_color(0,9,10);
+	ascii_default();
 	    return false;
 	}else{
 	    int flag = 1;
@@ -268,9 +223,9 @@ namespace extemp {
 	rc = connect(server_socket, (struct sockaddr *)&sa, sizeof(sa));
 
 	if(rc) {
-	ascii_text_color(1,1,10);
+	ascii_error();
 	    printf("Connection error:%d\n",errno);
-	ascii_text_color(0,9,10);
+	ascii_default();
 	    return false;
 	}else{
 	  //printf("Connect socket successful\n");
@@ -287,7 +242,7 @@ namespace extemp {
 
 	ascii_text_color(1,2,10);
 	printf("Successfully"); 	
-	ascii_text_color(0,9,10);
+	ascii_default();
 	printf(" connected to remote process\n");
         fflush(NULL);
 	connected = true;

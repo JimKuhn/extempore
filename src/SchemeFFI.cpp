@@ -1,3 +1,5 @@
+// #include <unistd.h>
+
 /*
  * Copyright (c) 2011, Andrew Sorensen
  *
@@ -35,6 +37,8 @@
 ///////////////////
 // LLVM includes //
 ///////////////////
+
+#include <fstream>
 
 // must be included before anything which pulls in <Windows.h>
 #include "llvm/ADT/StringExtras.h"
@@ -112,14 +116,14 @@
 
 #ifdef _WIN32
 #define PRINT_ERROR(format, ...)		\
-    ascii_text_color(1,1,10);			\
+    ascii_error();                   \
     printf(format , __VA_ARGS__);			\
-    ascii_text_color(0,7,10)
+    ascii_normal()
 #else
 #define PRINT_ERROR(format, args...)		\
-    ascii_text_color(1,1,10);			\
+    ascii_error();                   \
     printf(format , ## args);			\
-    ascii_text_color(0,7,10)
+    ascii_normal()
 #endif
 
 char* cstrstrip (char* inputStr)
@@ -589,13 +593,13 @@ namespace extemp {
   pointer SchemeFFI::setDefaultTimeout(scheme* _sc, pointer args)
   {
     long long timeout = ivalue(pair_car(args));
-    SchemeProcess::I(_sc)->setMaxDuration(timeout);
+    _sc->m_process->setMaxDuration(timeout);
     return _sc->T;
   }
 
   pointer SchemeFFI::getDefaultTimeout(scheme* _sc, pointer args)
   {
-    return mk_integer(_sc,SchemeProcess::I(_sc)->getMaxDuration());
+    return mk_integer(_sc, _sc->m_process->getMaxDuration());
   }
 
 #ifdef _WIN32
@@ -613,12 +617,10 @@ namespace extemp {
 	  std::tr2::sys::directory_iterator end_it;
 
 	  pointer list = _sc->NIL;
-	  for(std::tr2::sys::directory_iterator it(bpath); it != end_it; ++it) {
-	    _sc->imp_env->insert(list);
-		pointer tlist = 0;
+        for (std::tr2::sys::directory_iterator it(bpath); it != end_it; ++it) {
+            EnvInjector injector(_sc, list);
 		//tlist = cons(_sc,mk_string(_sc,it->path().leaf().string().c_str()),list);
-		tlist = cons(_sc,mk_string(_sc,it->path().string().c_str()),list);
-	    _sc->imp_env->erase(list);
+            pointer tlist = cons(_sc,mk_string(_sc,it->path().string().c_str()),list);
 	    list = tlist;	    
 	  }
 	  return reverse(_sc,list);
@@ -626,28 +628,22 @@ namespace extemp {
 #else
   pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
   {    
-
-    DIR *dp;
-    struct dirent *ep;     
-    dp = opendir (string_value(pair_car(args)));
-    
+        DIR* dp;
+        struct dirent* ep;
+        dp = opendir(string_value(pair_car(args)));
     pointer list = _sc->NIL;
-    if (dp != NULL)
-      {
-    while ((ep = readdir (dp))) {
-	  _sc->imp_env->insert(list);
-	  pointer tlist = cons(_sc,mk_string(_sc,ep->d_name),list);
-	  _sc->imp_env->erase(list);
+        if (dp) {
+            while ((ep = readdir(dp))) {
+                EnvInjector injector(_sc, list);
+                pointer tlist = cons(_sc, mk_string(_sc,ep->d_name),list);
 	  list = tlist;
 	}
-	
 	(void) closedir (dp);
       }
     else {
       perror ("Couldn't open the directory");
     }
-    
-    return reverse(_sc,list);
+        return reverse(_sc, list);
   }
 #endif
 
@@ -884,7 +880,7 @@ namespace extemp {
 
     pointer SchemeFFI::getNameOfCurrentProcess(scheme* _sc, pointer args)
     {
-	    const char* name = SchemeProcess::I(_sc)->getName().c_str();
+            const char* name = _sc->m_process->getName().c_str();
 		return mk_string(_sc,name);
 	//if(args == _sc->NIL) return mk_string(_sc, name);
 	//else { printf("Error getting name of current process\n"); return _sc->F; }
@@ -1208,9 +1204,9 @@ namespace extemp {
 	std::string s = ss.str();
 	s.erase(0,1);
 	s.erase(s.size()-1,1);
-	ascii_text_color(1,1,10);
+        ascii_error();
 	printf("%s\n",s.c_str());	
-	ascii_text_color(0,7,10);
+        ascii_normal();
         fflush(stdout);	
 	return _sc->T; //mk_string(_sc, s.c_str()); 
     }
@@ -1222,9 +1218,9 @@ namespace extemp {
 	std::string s = ss.str();
 	s.erase(0,1);
 	s.erase(s.size()-1,1);
-	ascii_text_color(1,3,10);
+        ascii_warning();
 	printf("%s\n",s.c_str());
-	ascii_text_color(0,7,10);		
+        ascii_normal();
         fflush(stdout);	
 	return _sc->T; //mk_string(_sc, s.c_str()); 
     }
@@ -1332,9 +1328,8 @@ namespace extemp {
 	    //std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
 	    p=i*2;
 	    if(ovector[p]==-1) {
-		_sc->imp_env->insert(list);
+                EnvInjector injector(_sc, list);
 		pointer tlist = cons(_sc,mk_string(_sc,""),list);
-		_sc->imp_env->erase(list);
 		list = tlist;
 	    }else{
 		int range = ovector[p+1] - ovector[p];				
@@ -1342,9 +1337,8 @@ namespace extemp {
 		memset(b,0,range+1);
 		char* a = data+ovector[p];
 		char* substring = strncpy(b, a, range);
-		_sc->imp_env->insert(list);
+                EnvInjector injector(_sc, list);
 		pointer tlist = cons(_sc,mk_string(_sc,substring),list);
-		_sc->imp_env->erase(list);
 		list = tlist;
 	    }
 	}
@@ -1390,9 +1384,8 @@ namespace extemp {
 	    memset(b,0,range+1);
 	    char* a = data+ovector[0];
 	    char* substring = strncpy(b, a, range);
-	    _sc->imp_env->insert(list);
+            EnvInjector injector(_sc, list);
 	    pointer tlist = cons(_sc,mk_string(_sc,substring),list);
-	    _sc->imp_env->erase(list);
 	    list = tlist;
 	    data = data+range+ovector[0];
 	}
@@ -1442,9 +1435,8 @@ namespace extemp {
 	    char* b = (char*) alloca(range+1);
 	    memset(b,0,range+1);
 	    char* substring = strncpy(b, data, range);
-	    _sc->imp_env->insert(list);
+            EnvInjector injector(_sc, list);
 	    pointer tlist = cons(_sc,mk_string(_sc,substring),list);
-	    _sc->imp_env->erase(list);
 	    list = tlist;
 	    data = data+ovector[1];
 	}
@@ -1545,7 +1537,7 @@ namespace extemp {
 
     pointer SchemeFFI::defaultMallocZone(scheme* _sc, pointer args)
     {
-	return mk_cptr(_sc,SchemeProcess::I(_sc)->getDefaultZone()); //llvm_zone_default());
+        return mk_cptr(_sc,_sc->m_process->getDefaultZone()); //llvm_zone_default());
     }
 	
     pointer SchemeFFI::destroyMallocZone(scheme* _sc, pointer args)
@@ -1617,6 +1609,7 @@ namespace extemp {
     using namespace llvm;
     Module* M = EXTLLVM::I()->M;
     legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
+    legacy::PassManager* PM_NO = extemp::EXTLLVM::I()->PM_NO;
 
 #ifdef EXT_MCJIT
     char modname[256];
@@ -1638,20 +1631,31 @@ namespace extemp {
       }
 
 #else
+    static std::string sInlineString; // This is a hack for now, but it *WORKS*
+    if (sInlineString.empty()) {
+        std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
+        std::stringstream inString;
+        inString << inStream.rdbuf();
+        sInlineString = inString.str();
+    }
     std::string asmcode(assm);
-    int cnt = 0;
-
-    std::unique_ptr<llvm::Module> newModule;
-    do {
+    auto context(LLVMContextCreate());
+    auto newModule(parseAssemblyString(asmcode, pa, *unwrap(context)));
+    bool built(newModule);
+    newModule.reset();
+    LLVMContextDispose(context);
+    if (likely(!built)) {
+        asmcode = sInlineString + asmcode;
+    }
       newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
-
-      if(newModule != NULL) break;
+    int cnt = 0;
+    while (!newModule) {
       std::string err = pa.getMessage().str();
       if(cnt > 1000) {
         std::cout << "MCJIT Compiler Error: could not resolve all external dependencies" << std::endl;
         break;
       }
-      if(err.find("use of undefined value") != std::string::npos) {
+      if (err.find("use of undefined value") != std::string::npos) {
         char symname[1024];
         const char* undef_value_string = "use of undefined value '@(.*)'";
         const char* match1_string = "$1";
@@ -1691,7 +1695,7 @@ namespace extemp {
         std::string stype = ss.str();
 
         stype.resize(stype.length()-1); // drop last '*'
-        std::string exprr("");
+        std::string exprr;
         if(func) {
           Type* rettype = func->getReturnType();
           typestr.clear();
@@ -1712,21 +1716,37 @@ namespace extemp {
           exprr.append(" = external global ");
           exprr.append(stype);          
         }
+// std::cout << "REPLACE " << symname << " WITH " << exprr << " ERR: " << err << std::endl;
         exprr.append("\n\n");        
         exprr.append(asmcode);        
-        asmcode.clear();
-        asmcode.append(exprr);        
+        asmcode.swap(exprr);
         cnt++;
-      }else{
-        break;
+      } else {
+        break; // going to die
       }
-    }while (newModule == 0);
+      newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
+    }
+// std::cout << asmcode;
+        if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);
 
-	if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH.front());
-
-    if(EXTLLVM::OPTIMIZE_COMPILES)
-      {
+// if (newModule) {
+//     char buf[] = "/tmp/pre.XXXXXX";
+//     auto fd(mkstemp(buf));
+//     auto data(asmcode.c_str());
+//     auto len(asmcode.length());
+//     while (len) {
+//         auto written(write(fd, data, len));
+//         len -= written;
+//         data += written;
+//     }
+//     close(fd);
+// }
+    if (newModule) {
+        if(EXTLLVM::OPTIMIZE_COMPILES) {
         PM->run(*newModule);
+        } else {
+            PM_NO->run(*newModule);
+        }
       }
 
 #endif
@@ -2142,7 +2162,8 @@ namespace extemp {
     while(funcargs != func->getArgumentList().end())
       {			
         Argument* a = funcargs;
-        _sc->imp_env->insert(p);					
+        {
+            EnvInjector injector(_sc, p);
         std::string typestr2;
         llvm::raw_string_ostream ss2(typestr2);
         a->getType()->print(ss2);
@@ -2156,7 +2177,7 @@ namespace extemp {
         }
 
         pointer str = mk_string(_sc, tmp_name); //_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
-        _sc->imp_env->erase(p);
+        }
         p = cons(_sc, str, p);			
         funcargs++;
       }
@@ -2848,12 +2869,10 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
   pointer SchemeFFI::lastSampleBlockClock(scheme* _sc, pointer args)
   {
     pointer p1 = mk_integer(_sc,UNIV::TIME);
-    _sc->imp_env->insert(p1);
+    EnvInjector(_sc, p1);
     pointer p2 = mk_real(_sc,AudioDevice::REALTIME + UNIV::CLOCK_OFFSET);
-    _sc->imp_env->insert(p2);
+    EnvInjector(_sc, p2);
     pointer p3 = cons(_sc, p1, p2);
-    _sc->imp_env->erase(p1);
-    _sc->imp_env->erase(p2);
     return p3;
   }
 

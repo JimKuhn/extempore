@@ -1230,7 +1230,6 @@
     ("acosh" . #((213 0 0) "" ()))
     ("acoshf" . #((213 1 1) "" ()))
     ("add_address_table" . #((213 "%clsvar*" "%mzone*" 108 4 108 4 "%clsvar*") "" ()))
-    ("ascii_text_color" . #((213 -1 4 4 4) "" ()))
     ("asinf" . #((213 1 1) "" ()))
     ("asinh" . #((213 0 0) "" ()))
     ("asinhf" . #((213 1 1) "" ()))
@@ -1519,7 +1518,6 @@
     ("llvm_fscanf" . #(varargs "" ()))
     ("llvm_get_function_ptr" . #((213 108 108) "" ()))
     ("llvm_in_channels" . #((213 4) "" ()))
-    ("llvm_memset" . #((213 108 108 4 2) "" ()))
     ("llvm_now" . #((213 2) "" ()))
     ("llvm_peek_zone_stack" . #((213 "%mzone*") "" ()))
     ("llvm_pop_zone_stack" . #((213 "%mzone*") "" ()))
@@ -1548,7 +1546,6 @@
     ("llvm_substring" . #((213 108 108 4 4) "" ()))
     ("llvm_tan" . #((213 0 0) "" ()))
     ("llvm_tanh" . #((213 0 0) "" ()))
-    ("llvm_threads_get_callback_zone" . #((213 "%mzone*") "" ()))
     ("llvm_zone_copy_ptr" . #((213 10 108 108) "" ()))
     ("llvm_zone_create" . #((213 "%mzone*" 2) "" ()))
     ("llvm_zone_destroy" . #((213 -1 "%mzone*") "" ()))
@@ -1575,7 +1572,7 @@
     ("memccpy" . #((213 108 108 108 4 2) "" ()))
     ("memchr" . #((213 108 108 4 2) "" ()))
     ("memcmp" . #((213 4 108 108 2) "" ()))
-    ("memcpy" . #((213 108 108 108 2) "" ()))
+    ("memcpy" . #((213 -1 108 108 2) "" ()))
     ("memmove" . #((213 108 108 108 2) "" ()))
     ("memset" . #((213 108 108 4 2) "" ()))
     ("mk_cptr" . #((213 108 108 108) "" ()))
@@ -2751,11 +2748,12 @@
 
 (define impc:aot:compile-module
   (lambda (module-name module exit-afterwards?)
-    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
+    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc")))
+      (opt-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/opt"))))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
              (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
-             (asm-path (string-append tmp-dir module-name (unix-or-Windows ".s" ".obj")))
+             (asm-path (string-append tmp-dir module-name (unix-or-Windows ".o" ".obj"))) ; could skip .o (straight to .so)
              (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/")))
              (output-shlib-path (string-append output-dir module-name
                                                (cond ((string=? platform "Linux") ".so")
@@ -2767,16 +2765,18 @@
              (optimize-compiles? #t)
              (llc-command
               (unix-or-Windows (string-append
+                                opt-path " -always-inline " bc-path "|"
                                 llc-path
                                 (if optimize-compiles? " -O3 -tailcallopt" "-O0")
                                 " -relocation-model=pic "
+                                " -filetype=obj "
                                 (if (and (string=? (sys:platform) "OSX")
                                          (not (string=? (sys:cmdarg "mcpu") "")))
                                     (string-append "-mcpu="
                                                    (sys:cmdarg "mcpu")
                                                    " ")
                                     "")
-                                bc-path)
+                                "- -o " asm-path)
                                (string-append
                                 llc-path
                                 (if optimize-compiles? " -O3 -tailcallopt" "-O0")
@@ -2786,7 +2786,7 @@
               (unix-or-Windows (string-append
                                 (cond ((string=? platform "Linux")
                                        (string-append "gcc " 
-                                                      (if optimize-compiles? "-O3" "-g -O0")
+                                                      (if optimize-compiles? "-O3 -g" "-g -O0")
                                                       " --shared -fPIC "))
                                       ((string=? platform "OSX")
                                        (string-append "clang "
@@ -2956,6 +2956,7 @@
                   (set! *impc:aot:func-defs-in-mod* '())
                   (if (impc:aot:currently-compiling?)
                       (begin
+                        (llvm:optimize #t); // should this be restored later?
                         ;; this is the 'success' branch
                         (set! *impc:aot:current-lib-name* libname-no-extension)
                         ;; (impc:aot:insert-header libname-no-extension)
@@ -3361,13 +3362,13 @@
         `(print_return)
         `(begin
            ,(if (string? (car ast))
-                (list 'llvm_printf "%s" (car ast))
+                (list 'printf "%s" (car ast))
                 (list 'print (car ast)))
            ,@(flatten-1 (map (lambda (x)
                                (if (string? x)
                                    (list
                                     (list 'print_space)
-                                    (list 'llvm_printf "%s" x))
+                                    (list 'printf "%s" x))
                                    (list
                                     (list 'print_space)
                                     (list 'print x))))
@@ -3380,13 +3381,13 @@
         `(print_return)
         `(begin
            ,(if (string? (car ast))
-                (list 'llvm_printf "%s" (car ast))
+                (list 'printf "%s" (car ast))
                 (list 'print (car ast)))
            ,@(flatten-1 (map (lambda (x)
                                (if (string? x)
                                    (list
                                     ;; (list 'print_space)
-                                    (list 'llvm_printf "%s" x))
+                                    (list 'printf "%s" x))
                                    (list
                                     ;; (list 'print_space)
                                     (list 'print x))))
@@ -3401,13 +3402,13 @@
            (cat
             ,(if (string? (car ast))
                  `(let ((x_t_mst:i8* (salloc 1024)))
-                    (llvm_sprintf x_t_mst "%s" ,(car ast))
+                    (sprintf x_t_mst "%s" ,(car ast))
                     (String x_t_mst))
                  (list 'toString (car ast)))
             ,@(flatten-1 (map (lambda (x)
                                 (if (string? x)
                                     (list `(let ((x_t_mst:i8* (salloc 1024)))
-                                             (llvm_sprintf x_t_mst " %s" ,x)
+                                             (sprintf x_t_mst " %s" ,x)
                                              (String x_t_mst)))
                                     (list
                                      (list 'toString_space)
@@ -3424,7 +3425,7 @@
             ,@(map (lambda (x)
                      (if (string? x)
                          `(let ((xx_t_mst:i8* (salloc 1024)))
-                            (llvm_sprintf xx_t_mst "%s" ,x)
+                            (sprintf xx_t_mst "%s" ,x)
                             (String xx_t_mst))
                          (list 'toString x)))
                    ast))))))
@@ -9084,13 +9085,13 @@ xtlang's `let' syntax is the same as Scheme"
            (n1 (substring n 1 2))
            (name-str (impc:ir:make-const-string (string-append closure-name " Scheme wrapper error: check the arg arity and types\n")))
            (name (impc:ir:gname)))
-      (emit n "_bool = icmp eq i32 " n "_rt_check, 1\n" os)
+      (emit n "_bool = icmp ne i32 " n "_rt_check, 0\n" os)
       (emit "br i1 " n "_bool, label " n "_true, label " n "_false\n" os)
       (emit "\n" n1 "_true:\n" os)
       (emit "br label " n "_continue\n" os)
       (emit "\n" n1 "_false:\n" os)
       (emit name-str os)
-      (emit "call i32 (i8*, ...) @llvm_printf(i8* " (car name) ")\n" os)
+      (emit "call i32 (i8*, ...) @printf(i8* " (car name) ")\n" os)
       (emit n "_errret = call ccc i8* @mk_i64(i8* %_sc, i64 0)\n" os)
       (emit "ret i8* " n "_errret\n" os)
       (emit "\n" n1 "_continue:\n" os)
@@ -9346,9 +9347,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                                 '("%ap" "%bp" "%cp" "%dp" "%ep" "%fp" "%gp" "%hp" "%ip" "%jp" "%kp" "%lp" "%mp" "%np" "%op" "%pp" "%qp" "%rp" "%sp" "%tp")
                                                                                                                 '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
                                         ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                                                      "%_zone = call ccc %mzone* @llvm_threads_get_callback_zone()\n"
-                                                                                      "call ccc void @llvm_push_zone_stack(%mzone* %_zone)\n"
-                                                                                      "call ccc %mzone* @llvm_zone_reset(%mzone* %_zone)\n"
+                                                                                      "%_zone = call ccc %mzone* @llvm_zone_callback_setup()\n"
                                                                                       "%_impz = bitcast %mzone* %_zone to i8*\n"
                                                                                       "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
                                                                                       "%ptrvar = load i8*, i8** %ptr\n"
@@ -9793,7 +9792,7 @@ xtlang's `let' syntax is the same as Scheme"
               (begin (ipc:call procname 'bind-func-ipc
                                (string->symbol (vector-ref (car polytypes) 0)))
                      (ipc:define procname symname (eval symname)))
-              (print-error "No a monomorphic xtlang function:" symname))))))
+              (print-error "Not a monomorphic xtlang function:" symname))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

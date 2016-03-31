@@ -65,7 +65,7 @@
 #include "llvm/MC/MCInstPrinter.h"
 #include "llvm/MC/MCContext.h"
 
-
+#include <fstream>
 #include "stdarg.h"
 #include "EXTLLVM.h"
 #include "EXTThread.h"
@@ -76,6 +76,7 @@
 #include "pcre.h"
 #include "OSC.h"
 #include "math.h"
+#include "BranchPrediction.h"
 
 #ifdef _WIN32
 #include <malloc.h>
@@ -124,8 +125,6 @@ std::map<foreign_func,std::string> LLVM_SCHEME_FF_MAP;
 // this must be global. we should therefore
 // make it thread safe but I'm not going to bother
 // while still testing.
-std::map<void*,uint64_t> LLVM_ZONE_ALLOC_MAP;
-// same as above.
 std::map<std::string,std::string> LLVM_STR_CONST_MAP;
 
 extemp::EXTMutex alloc_mutex("alloc mutex");
@@ -157,7 +156,8 @@ extemp::EXTMutex alloc_mutex("alloc mutex");
 // double (&sqrtd)(double) = sqrt;
 // double (&fabsd)(double) = fabs;
 
-void* malloc16 (size_t s) {
+void* malloc16(size_t s)
+{
   unsigned char *p;
   unsigned char *porig = (unsigned char*) malloc (s + 0x10);   // allocate extra
   if (porig == NULL) return NULL;                              // catch out of memory
@@ -186,7 +186,7 @@ void llvm_scheme_ff_set_name(foreign_func ff,const char* name)
 // LLVM RUNTIME ERROR
 void llvm_runtime_error(int error,void* arg)
 {
-  ascii_text_color(0,2,10);
+  ascii_error();
   switch(error){
   case 1:
     printf("LLVM zptr_copy - invalid zptr! %p\n",arg);
@@ -194,7 +194,7 @@ void llvm_runtime_error(int error,void* arg)
   default:
     break;
   }
-  ascii_text_color(0,7,10);
+  ascii_normal();
   return;
 }
 
@@ -208,117 +208,28 @@ thread_local llvm_zone_stack* tls_llvm_zone_stack = 0;
 thread_local uint64_t tls_llvm_zone_stacksize = 0;
 thread_local llvm_zone_t* tls_llvm_callback_zone = 0;
 
-int LLVM_ZONE_ALIGN = 32;
-int LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN-1;
-
-void llvm_push_zone_stack(llvm_zone_t* z)
-{
-    llvm_zone_stack* stack = (llvm_zone_stack*) malloc(sizeof(llvm_zone_stack));
-    stack->head = z;
-    stack->tail = llvm_threads_get_zone_stack();
-    llvm_threads_set_zone_stack(stack);
-
-#if DEBUG_ZONE_STACK          
-    llvm_threads_inc_zone_stacksize();
-    if(stack->tail) {
-      printf("%p: push new zone %p: %" PRIu64 " onto old zone %p:%lld stacksize:%lld\n",stack,z,z->size,stack->tail->head,stack->tail->head->size,llvm_threads_get_zone_stacksize());
-    } else {
-      printf("%p: push new zone %p:%lld onto empty stack\n",stack,z,z->size);
-    }
-#endif
-    //printf("zones: %lld\n",llvm_threads_get_zone_stacksize());
-    return;
-}
-
-llvm_zone_t* llvm_peek_zone_stack()
-{
-    llvm_zone_t* z = 0;
-    llvm_zone_stack* stack = llvm_threads_get_zone_stack();
-    if(!stack) {  // for the moment create a "DEFAULT" zone if stack is NULL      
-#if DEBUG_ZONE_STACK      
-      printf("TRYING TO PEEK AT A NULL ZONE STACK\n"); 
-#endif
-      llvm_zone_t* z = llvm_zone_create(1024*1024*1); // default root zone is 1M
-      llvm_push_zone_stack(z);
-      stack = llvm_threads_get_zone_stack();
-#if DEBUG_ZONE_STACK      
-      printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
-#endif      
-      return z;
-    }else{
-      z = stack->head;
-#if DEBUG_ZONE_STACK      
-      printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
-#endif
-      return z;
-    }
-}
-
 llvm_zone_t* llvm_pop_zone_stack()
 {
     llvm_zone_stack* stack = llvm_threads_get_zone_stack();
-    if(!stack) {
+    if (unlikely(!stack)) {
 #if DEBUG_ZONE_STACK      
       printf("TRYING TO POP A ZONE FROM AN EMPTY ZONE STACK\n");
 #endif
-      return 0;
+      return nullptr;
     }
     llvm_zone_t* head = stack->head;
     llvm_zone_stack* tail = stack->tail;
 #if DEBUG_ZONE_STACK    
     llvm_threads_dec_zone_stacksize();
-    if(tail == NULL) {
+    if (!tail) {
       printf("%p: popping zone %p:%lld from stack with no tail\n",stack,head,head->size);
-    }else{
+    } else {
       printf("%p: popping new zone %p:%lld back to old zone %p:%lld\n",stack,head,head->size,tail->head,tail->head->size);
     }
 #endif
     free(stack);
     llvm_threads_set_zone_stack(tail);
     return head;
-}
-
-llvm_zone_t* llvm_zone_create(uint64_t size)
-{
-  llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
-  if (zone == NULL)
-    {
-      ascii_text_color(0,3,10);      
-      printf("Catastrophic memory failure!\n");
-      ascii_text_color(0,9,10);
-      exit(1);
-    }
-  if (size > 0) {
-#ifdef _WIN32
-    zone->memory = malloc((size_t) size);
-#else
-    // zone->memory = malloc((size_t) size);
-    posix_memalign(&zone->memory,LLVM_ZONE_ALIGN,(size_t)size);
-#endif
-  }else{
-    zone->memory = NULL;
-  }
-    zone->mark = 0;
-    zone->offset = 0;
-    if(zone->memory == NULL) {
-      //ascii_text_color(0,3,10);      
-      //printf("Failed to allocate memory for Zone!\n");
-      //ascii_text_color(0,9,10);    
-      size = 0;
-    }
-    zone->size = size;
-    zone->cleanup_hooks = NULL;
-    zone->memories = NULL;
-    #if DEBUG_ZONE_ALLOC    
-    printf("CreateZone: %x:%x:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
-    #endif
-    return zone;
-}
-
-llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone)
-{
-    zone->offset = 0;
-    return zone;
 }
 
 void llvm_zone_destroy(llvm_zone_t* zone)
@@ -336,10 +247,10 @@ void llvm_zone_destroy(llvm_zone_t* zone)
 
 void llvm_zone_print(llvm_zone_t* zone)
 {
-  llvm_zone_t* tmp = zone;
-  int64_t total_size = zone->size;
-  int64_t segments = 1;
-  while(tmp->memories != NULL) {
+  auto tmp(zone);
+  auto total_size(zone->size);
+  int64_t segments(1);
+  while (tmp->memories) {
     tmp = tmp->memories;
     total_size += tmp->size;
     segments++;
@@ -348,45 +259,15 @@ void llvm_zone_print(llvm_zone_t* zone)
   return;
 }
 
-// void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
-// {
-//     alloc_mutex.lock();
-// #if DEBUG_ZONE_ALLOC
-//     printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
-// #endif
-//     if(zone->offset+size >= zone->size)
-//     {
-// 	// if LEAKY ZONE is TRUE then just print a warning and just leak the memory
-// #if LEAKY_ZONES
-// 	printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
-//         printf("Leaving a leaky zone can be dangerous ... particularly for concurrency\n");
-//         fflush(NULL);
-// 	return malloc((size_t)size);
-// #else
-// 	printf("\nZone:%p size:%lld is full ... exiting!\n",zone,zone->size,size);
-//         fflush(NULL);
-// 	exit(1);
-// #endif
-//     }
-//     void* newptr = (void*)(((char*)zone->memory)+zone->offset);
-//     memset(newptr,0,size); // clear memory
-//     zone->offset += size; 
-//     // add ptr size to alloc map
-//     LLVM_ZONE_ALLOC_MAP[newptr] = size;
-//     alloc_mutex.unlock();
-//     //extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_set_size(newptr, size);
-//     return newptr;
-// }
-
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
     alloc_mutex.lock();
 #if DEBUG_ZONE_ALLOC
     printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
 #endif
-    if(zone->offset+size >= zone->size)
+    size += LLVM_ZONE_ALIGN; // for storing size information
+    if (unlikely(zone->offset + size >= zone->size))
     {
-
 #if EXTENSIBLE_ZONES // if extensible_zones is true then extend zone size by zone->size
     int old_zone_size = zone->size;
     int iszero = (zone->size == 0) ? 1 : 0;
@@ -411,22 +292,20 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
         printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
       printf("Leaving a leaky zone can be dangerous ... particularly for concurrency\n");
       fflush(NULL);
-	return malloc((size_t)size);
-#else
+        return malloc((size_t)size);  // TODO: what about the stored size????
+    #else
 	printf("\nZone:%p size:%lld is full ... exiting!\n",zone,zone->size,size);
         fflush(NULL);
 	exit(1);
 #endif
     }
-    uint64_t sa = size+LLVM_ZONE_ALIGNPAD;
-    size = sa - sa%LLVM_ZONE_ALIGN; // adjust size to an alignment boundary
-    void* newptr = (void*)(((char*)zone->memory)+zone->offset);
-    memset(newptr,0,size); // clear memory
+    size = (size + LLVM_ZONE_ALIGNPAD) & ~LLVM_ZONE_ALIGNPAD;
+    auto newptr = reinterpret_cast<void*>(reinterpret_cast<char*>(zone->memory) + zone->offset);
+    memset(newptr, 0, size); // clear memory
+    newptr = reinterpret_cast<char*>(newptr) + LLVM_ZONE_ALIGN; // skip past size
+    *(reinterpret_cast<uint64_t*>(newptr) - 1) = size;
     zone->offset += size; 
-    // add ptr size to alloc map
-    LLVM_ZONE_ALLOC_MAP[newptr] = size;
     alloc_mutex.unlock();
-    //extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_set_size(newptr, size);
     return newptr;
 }
 
@@ -442,20 +321,13 @@ uint64_t llvm_zone_mark_size(llvm_zone_t* zone)
 
 void llvm_zone_ptr_set_size(void* ptr, uint64_t size)
 {
-    // not sure if I definitely need this here
-    // probably do though so better safe than sorry
-    alloc_mutex.lock();
-    LLVM_ZONE_ALLOC_MAP[ptr] = size;
-    alloc_mutex.unlock();
-    //printf("set ptr: %p  to size: %lld\n",ptr,size);
-    return;
+    *(reinterpret_cast<uint64_t*>(ptr) - 1) = size;
 }
 
 uint64_t llvm_zone_ptr_size(void* ptr)
 {
     // return ptr size from alloc map
-    return LLVM_ZONE_ALLOC_MAP[ptr];
-    //return extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_get_size(ptr);
+    return *(reinterpret_cast<uint64_t*>(ptr) - 1);
 }
 
 bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
@@ -463,15 +335,14 @@ bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
     uint64_t size1 = llvm_zone_ptr_size(ptr1);
     uint64_t size2 = llvm_zone_ptr_size(ptr2);
 
-    if(size1 != size2) { 
+    if (unlikely(size1 != size2)) {
   //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2); 
       return 1;
     }
-    if(size1 == 0) {
+    if (unlikely(!size1)) {
   //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2); 
       return 1;
     }
-
     //printf("zone_copy_ptr: %p,%p,%lld,%lld\n",ptr2,ptr1,size1,size2);
     memcpy(ptr2, ptr1, size1);
     return 0;		
@@ -479,19 +350,16 @@ bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
 
 bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr)
 {
-    if( (ptr >= zone->memory) && (ptr < ((char*)zone->memory)+zone->size) ) return true;
-    while(zone->memories != NULL) {
+    while (unlikely(zone && (ptr < zone->memory || ptr >= reinterpret_cast<char*>(zone->memory) + zone->size))) {
       zone = zone->memories;
-      if( (ptr >= zone->memory) && (ptr < ((char*)zone->memory)+zone->size) ) return true;
     }
-    return false;
+    return zone;
 }
 
 bool llvm_ptr_in_current_zone(void* ptr)
 {
-  return llvm_ptr_in_zone(llvm_peek_zone_stack(),ptr);
+    return llvm_ptr_in_zone(llvm_peek_zone_stack(), ptr);
 }
-
 
 extemp::CM* FreeWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,freeWithDelay);
 void free_after_delay(char* dat, double delay)
@@ -518,7 +386,7 @@ void llvm_schedule_callback(long long time, void* dat)
 
   uint64_t current_time = time; //task->getStartTime();
   uint64_t duration = 1000000000; //task->getDuration();
-  extemp::TaskScheduler::I()->addTask(current_time, duration, proc->extempore_lang_cb, dat, 0, true);
+  extemp::TaskScheduler::I()->addTask(current_time, duration, proc->getExtemporeCallback(), dat, 0, true);
   return;
 }
 
@@ -552,77 +420,6 @@ char* extitoa(int64_t val) {
   static char buf[32] = {0};
   sprintf(buf,"%" PRId64,val);
   return buf;//&buf[i+1];        
-}
-
-uint64_t string_hash(unsigned char* str) 
-{
-  unsigned long hash = 0;
-  int c;
-  
-  while ((c = *str++))
-    hash = c + (hash << 6) + (hash << 16) - hash;
-  
-  return hash;
-}
-
-int llvm_printf(char* format, ...)
-{
-    va_list ap;
-    va_start(ap,format);
-#ifdef _WIN32
-    char* ret = (char*) _alloca(2048);
-#else
-    char* ret = (char*) alloca(2048);
-#endif
-    int returnval = vsnprintf(ret, 2048, format, ap);
-    printf("%s",ret);
-    fflush(stdout);	
-    va_end(ap);
-    return returnval;
-}
-
-int llvm_fprintf(FILE* stream, char* format, ...)
-{
-    va_list ap;
-    va_start(ap,format);
-    int returnval = vfprintf(stream, format, ap);
-    va_end(ap);
-    return returnval;
-}
-
-int llvm_sprintf(char* str, char* format, ...)
-{
-    va_list ap;
-    va_start(ap,format);
-    int returnval = vsprintf(str, format, ap);
-    //printf("in the wing: %s\n",str);
-    va_end(ap);
-    return returnval;
-}
-
-int llvm_sscanf(char* buffer, char* format, ...)
-{
-    va_list ap;
-    va_start(ap,format);
-#ifdef _WIN32
-    char* ret = (char*) _alloca(2048);
-#else
-    char* ret = (char*) alloca(2048);
-#endif
-    int returnval = sscanf(buffer, format, ap);
-    printf("%s",ret);
-    fflush(stdout);	
-    va_end(ap);
-    return returnval;
-}
-
-int llvm_fscanf(FILE* stream, char* format, ...)
-{
-    va_list ap;
-    va_start(ap,format);
-    int returnval = vfscanf(stream, format, ap);
-    va_end(ap);
-    return returnval;
 }
 
 void llvm_send_udp(char* host, int port, void* message, int message_length)
@@ -729,9 +526,9 @@ long long llvm_get_next_prime(long long start)
 //
 /////////////////////////////////////////////
 
-void* thread_fork(void*(*start_routine)(void*),void* args) {
-	auto thread = new extemp::EXTThread;
-	int result = thread->create(start_routine, args);
+void* thread_fork(void*(*start_routine)(void*), void* args) {
+        auto thread = new extemp::EXTThread(start_routine, args, "fork");
+        int result = thread->start();
 
 #ifdef _EXTTHREAD_DEBUG_
 	if (result)
@@ -850,12 +647,6 @@ int mutex_trylock(void* mutex) {
 //   return ctx;
 // }
 ///////////////////////////////////////////////////
-
-void* llvm_memset(void* ptr, int32_t c, int64_t n)
-{
-    return memset(ptr, c, (size_t)n);
-}
-
 
 // these are helpers for runtime debugging in llvm
 void llvm_print_pointer(void* ptr)
@@ -1208,15 +999,15 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   closure_address_table* addy_table = (closure_address_table*) *(closure+0);
   // check address exists
   if(!check_address_exists(id, addy_table)) {
-    ascii_text_color(0,1,10);
+    ascii_error();
     printf("RunTime Error:");
-    ascii_text_color(0,7,10);
+    ascii_normal();
     printf(" slot");
-    ascii_text_color(1,7,10);
+    ascii_warning();
     printf(" %s.%s ",fname,vname);
-    ascii_text_color(0,7,10);
+    ascii_normal();
     printf("does not exist!\n");
-    ascii_text_color(0,9,10);    
+    ascii_default();
     return _sc->F;
   }
   char* eptr = (char*) *(closure+1);
@@ -1349,8 +1140,8 @@ namespace extemp {
 	
     EXTLLVM EXTLLVM::SINGLETON;
     int64_t EXTLLVM::LLVM_COUNT = 0l;
-    bool EXTLLVM::OPTIMIZE_COMPILES = 0;
-    bool EXTLLVM::VERIFY_COMPILES = 1;
+    bool EXTLLVM::OPTIMIZE_COMPILES = false;
+    bool EXTLLVM::VERIFY_COMPILES = true;
 	
     EXTLLVM::EXTLLVM()
     {
@@ -1372,8 +1163,6 @@ namespace extemp {
     }
 #endif
 
-
-	
   void EXTLLVM::initLLVM()
   {
     if(M == 0) { // Initalize Once Only (not per scheme process)
@@ -1395,7 +1184,7 @@ namespace extemp {
       M = module.get();
       addModule(M);
 
-      if (!extemp::UNIV::ARCH.empty()) M->setTargetTriple(extemp::UNIV::ARCH.front());
+      if (!extemp::UNIV::ARCH.empty()) M->setTargetTriple(extemp::UNIV::ARCH);
 
       // Build engine with JIT
       llvm::EngineBuilder factory(std::move(module));
@@ -1438,9 +1227,9 @@ namespace extemp {
       EE = factory.create(tm);
       EE->DisableLazyCompilation(true);
 
-      ascii_text_color(0,7,10);
+      ascii_normal();
       std::cout << "ARCH           : " << std::flush;
-      ascii_text_color(1,6,10);
+      ascii_info();
       std::cout << std::string(tm->getTargetTriple().normalize()) << std::endl;
 #ifdef _WIN32
       if(!std::string(tm->getTargetFeatureString()).empty())
@@ -1448,14 +1237,14 @@ namespace extemp {
       if(!std::string(tm->getTargetCPU()).empty())
 #endif
         {
-          ascii_text_color(0,7,10);
+          ascii_normal();
           std::cout << "CPU            : " << std::flush;
-          ascii_text_color(1,6,10);
+          ascii_info();
           std::cout << std::string(tm->getTargetCPU()) << std::endl;
         }
       if(!std::string(tm->getTargetFeatureString()).empty())
         {
-          ascii_text_color(0,7,10);
+          ascii_normal();
           std::cout << "ATTRS          : " << std::flush;
 
           const char* data = tm->getTargetFeatureString().data();
@@ -1463,15 +1252,15 @@ namespace extemp {
           for (int i = 0; i < strlen(data); i++) {
             switch (data[i]) {
             case '+': {
-              ascii_text_color(1,2,10);
+              ascii_info();
               break;
             }
             case '-': {
-              ascii_text_color(1,1,10);
+              ascii_error();
               break;
             }
             case ',': {
-              ascii_text_color(0,7,10);
+              ascii_normal();
               break;
             }
             }
@@ -1479,21 +1268,46 @@ namespace extemp {
           }
           std::cout << std::endl;
         }
-      ascii_text_color(0,7,10);
+      ascii_normal();
       std::cout << "LLVM           : " << std::flush;
-      ascii_text_color(1,6,10);
+      ascii_info();
       std::cout << LLVM_VERSION_STRING;
 #ifdef EXT_MCJIT
       std::cout << " MCJIT" << std::endl;
 #else
       std::cout << " JIT" << std::endl;
 #endif          
-      ascii_text_color(0,7,10);
+      ascii_normal();
           
 
 			
 	    //EE = llvm::EngineBuilder(M).create();
+            PM_NO = new llvm::legacy::PassManager();
+            PM_NO->add(llvm::createAlwaysInlinerPass());
 	    PM = new llvm::legacy::PassManager();
+#if 1
+            PM->add(llvm::createAggressiveDCEPass());
+            PM->add(llvm::createAlwaysInlinerPass());
+            PM->add(llvm::createArgumentPromotionPass());
+            PM->add(llvm::createCFGSimplificationPass());
+            PM->add(llvm::createDeadStoreEliminationPass());
+            PM->add(llvm::createFunctionAttrsPass());
+            PM->add(llvm::createFunctionInliningPass());\
+            PM->add(llvm::createGVNPass(true));
+            PM->add(llvm::createIndVarSimplifyPass());
+            PM->add(llvm::createInstructionCombiningPass());
+            PM->add(llvm::createJumpThreadingPass());
+            PM->add(llvm::createLICMPass());
+            PM->add(llvm::createLoopDeletionPass());
+            PM->add(llvm::createLoopRotatePass());
+            PM->add(llvm::createLoopUnrollPass());
+            PM->add(llvm::createMemCpyOptPass());
+            PM->add(llvm::createPromoteMemoryToRegisterPass());
+            PM->add(llvm::createReassociatePass());
+            PM->add(llvm::createScalarReplAggregatesPass());
+            PM->add(llvm::createSCCPPass());
+            PM->add(llvm::createTailCallEliminationPass());
+#else
 	    //PM->add(new llvm::TargetData(*EE->getTargetData()));
       // PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
 
@@ -1508,6 +1322,7 @@ namespace extemp {
 	    PM->add(llvm::createGVNPass());
 	    // Function inlining
 	    PM->add(llvm::createFunctionInliningPass());
+            PM->add(llvm::createAlwaysInlinerPass());
 	    // loop invariants
 	    PM->add(llvm::createLICMPass());
 	    // vars
@@ -1516,29 +1331,29 @@ namespace extemp {
 	    PM->add(llvm::createCFGSimplificationPass());
       //
 	    PM->add(llvm::createPromoteMemoryToRegisterPass());
-
+#endif
       // tell LLVM about some built-in functions
 	    EE->updateGlobalMapping("llvm_disassemble", (uint64_t)&llvm_disassemble);      
 	    EE->updateGlobalMapping("llvm_destroy_zone_after_delay", (uint64_t)&llvm_destroy_zone_after_delay);
 	    EE->updateGlobalMapping("free_after_delay", (uint64_t)&free_after_delay);
 	    EE->updateGlobalMapping("llvm_get_next_prime", (uint64_t)&llvm_get_next_prime);
-	    EE->updateGlobalMapping("llvm_printf", (uint64_t)&llvm_printf);
-	    EE->updateGlobalMapping("llvm_fprintf", (uint64_t)&llvm_fprintf);
-	    EE->updateGlobalMapping("llvm_sprintf", (uint64_t)&llvm_sprintf);
-	    EE->updateGlobalMapping("llvm_sscanf", (uint64_t)&llvm_sscanf);
-	    EE->updateGlobalMapping("llvm_fscanf", (uint64_t)&llvm_fscanf);
+            EE->updateGlobalMapping("llvm_printf", uintptr_t(&printf));
+            EE->updateGlobalMapping("llvm_fprintf", uintptr_t(&fprintf));
+            EE->updateGlobalMapping("llvm_sprintf", uintptr_t(&sprintf));
+            EE->updateGlobalMapping("llvm_sscanf", uintptr_t(&sscanf));
+            EE->updateGlobalMapping("llvm_fscanf", uintptr_t(&fscanf));
 	    EE->updateGlobalMapping("llvm_zone_create", (uint64_t)&llvm_zone_create);
 	    EE->updateGlobalMapping("llvm_zone_destroy", (uint64_t)&llvm_zone_destroy);
 	    EE->updateGlobalMapping("llvm_zone_print", (uint64_t)&llvm_zone_print);
 	    EE->updateGlobalMapping("llvm_runtime_error", (uint64_t)&llvm_runtime_error);
 	    EE->updateGlobalMapping("llvm_send_udp", (uint64_t)&llvm_send_udp);
-	    EE->updateGlobalMapping("llvm_threads_get_callback_zone", (uint64_t)&llvm_threads_get_callback_zone);
 	    EE->updateGlobalMapping("llvm_schedule_callback", (uint64_t)&llvm_schedule_callback);
 	    EE->updateGlobalMapping("llvm_get_function_ptr", (uint64_t)&llvm_get_function_ptr);
-	    EE->updateGlobalMapping("llvm_peek_zone_stack", (uint64_t)&llvm_peek_zone_stack);
+            EE->updateGlobalMapping("llvm_peek_zone_stack_extern", (uint64_t)&llvm_peek_zone_stack);
 	    EE->updateGlobalMapping("llvm_pop_zone_stack", (uint64_t)&llvm_pop_zone_stack);
-	    EE->updateGlobalMapping("llvm_push_zone_stack", (uint64_t)&llvm_push_zone_stack);
+            EE->updateGlobalMapping("llvm_push_zone_stack_extern", (uint64_t)&llvm_push_zone_stack);
 	    EE->updateGlobalMapping("llvm_zone_malloc", (uint64_t)&llvm_zone_malloc);
+            EE->updateGlobalMapping("llvm_zone_callback_setup", uintptr_t(&llvm_zone_callback_setup));
 	    EE->updateGlobalMapping("get_address_table", (uint64_t)&get_address_table);
 	    EE->updateGlobalMapping("check_address_type", (uint64_t)&check_address_type);
 	    EE->updateGlobalMapping("check_address_exists", (uint64_t)&check_address_exists);
@@ -1550,7 +1365,6 @@ namespace extemp {
 	    EE->updateGlobalMapping("llvm_print_i64", (uint64_t)&llvm_print_i64);
 	    EE->updateGlobalMapping("llvm_print_f32", (uint64_t)&llvm_print_f32);
 	    EE->updateGlobalMapping("llvm_print_f64", (uint64_t)&llvm_print_f64);
-	    EE->updateGlobalMapping("ascii_text_color", (uint64_t)&ascii_text_color);
 	    EE->updateGlobalMapping("llvm_samplerate", (uint64_t)&llvm_samplerate);
 	    EE->updateGlobalMapping("llvm_frames", (uint64_t)&llvm_frames);
 	    EE->updateGlobalMapping("llvm_channels", (uint64_t)&llvm_channels);
@@ -1564,7 +1378,6 @@ namespace extemp {
 	    EE->updateGlobalMapping("llvm_zone_ptr_size", (uint64_t)&llvm_zone_ptr_size);
 	    EE->updateGlobalMapping("llvm_ptr_in_zone", (uint64_t)&llvm_ptr_in_zone);
 	    EE->updateGlobalMapping("llvm_ptr_in_current_zone", (uint64_t)&llvm_ptr_in_current_zone);
-	    EE->updateGlobalMapping("llvm_memset", (uint64_t)&llvm_memset);
 	    EE->updateGlobalMapping("extitoa", (uint64_t)&extitoa);
 	    EE->updateGlobalMapping("string_hash", (uint64_t)&string_hash);
 	    EE->updateGlobalMapping("swap64i", (uint64_t)&swap64i);
@@ -1643,10 +1456,26 @@ namespace extemp {
       EE->updateGlobalMapping("llvm_atan2", (uint64_t)&llvm_atan2);
       EE->updateGlobalMapping("sys_sharedir", (uint64_t)&sys_sharedir);
       EE->updateGlobalMapping("sys_slurp_file", (uint64_t)&sys_slurp_file);
+
 #ifdef EXT_MCJIT
       extemp::EXTLLVM::I()->EE->finalizeObject();
 #endif
       return;
     }
   }
+}
+
+extern "C" {
+
+llvm_zone_t* llvm_peek_zone_stack_extern()
+{
+  return llvm_peek_zone_stack();
+}
+
+void llvm_push_zone_stack_extern (llvm_zone_t* z)
+{
+  llvm_push_zone_stack(z);
+}
+
+
 }
