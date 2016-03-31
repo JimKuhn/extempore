@@ -6,31 +6,31 @@
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -59,6 +59,7 @@
 #include "llvm/Support/MutexGuard.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Target/TargetOptions.h"
 #ifdef EXT_MCJIT
 #include "llvm/IR/LegacyPassManager.h"
@@ -75,6 +76,7 @@
 #include "TaskScheduler.h"
 #include "SchemeProcess.h"
 #include "SchemeREPL.h"
+#include <unordered_set>
 //#include "sys/mman.h"
 
 #ifdef _WIN32
@@ -87,13 +89,12 @@
 #include <dirent.h>
 #endif
 
-#include <sstream>
-#include <string.h>
-
 // setting this define should make call_compiled thread safe BUT ...
 // also extremely SLOW !
 
 #define LLVM_EE_LOCK
+
+#include <regex>
 
 ////////////////////////////////
 
@@ -104,7 +105,7 @@
 #else
 #include <time.h>
 #endif
- 
+
 #ifdef _WIN32
 //#include <unistd.h>
 #include <malloc.h>
@@ -161,15 +162,12 @@ static inline std::string xtm_ftostr(const llvm::APFloat& V) {
   return "<unknown format in ftostr>"; // error
 }
 
-
-
-
 #define nelem(table) sizeof(table) / sizeof(table[0])
 
 namespace extemp {
-	
+
     SchemeFFI SchemeFFI::SINGLETON;
-    std::unordered_map<std::string,std::pair<std::string,std::string>> SchemeFFI::IMPCIR_DICT;  
+    std::unordered_map<std::string,std::pair<std::string,std::string>> SchemeFFI::IMPCIR_DICT;
     char* SchemeFFI::tmp_str_a = (char*) malloc(1024);
     char* SchemeFFI::tmp_str_b = (char*) malloc(4096);
   std::unordered_map<std::string,std::string> SchemeFFI::LLVM_ALIAS_TABLE;
@@ -320,7 +318,7 @@ namespace extemp {
       { "llvm:print-all-closures",         &SchemeFFI::llvm_print_all_closures },
       { "llvm:print-closure",    &SchemeFFI::llvm_print_closure },
       { "llvm:get-closure-work-name", &SchemeFFI::llvm_closure_last_name },
-      { "llvm:disassemble",           &SchemeFFI::llvm_disasm },      
+      { "llvm:disassemble",           &SchemeFFI::llvm_disasm },
 	    { "llvm:bind-symbol",			      &SchemeFFI::bind_symbol },
 	    { "llvm:update-mapping",			  &SchemeFFI::update_mapping },
 	    { "llvm:add-llvm-alias",        &SchemeFFI::add_llvm_alias },
@@ -329,7 +327,7 @@ namespace extemp {
 	    { "llvm:get-global-module",     &SchemeFFI::get_global_module},
       { "llvm:export-module",         &SchemeFFI::export_llvmmodule_bitcode },
 	    { "impc:ir:getname",			      &SchemeFFI::impcirGetName },
-	    { "impc:ir:gettype",			      &SchemeFFI::impcirGetType },		
+	    { "impc:ir:gettype",			      &SchemeFFI::impcirGetType },
 	    { "impc:ir:addtodict",			    &SchemeFFI::impcirAdd },
 	    //#ifdef EXT_BOOST
 	    //#else
@@ -338,11 +336,11 @@ namespace extemp {
 	    { "clock:get-offset",           &SchemeFFI::getClockOffset},
       { "clock:adjust-offset",        &SchemeFFI::adjustClockOffset},
 	    { "clock:clock",                &SchemeFFI::getClockTime},
-      { "clock:ad:clock",             &SchemeFFI::lastSampleBlockClock},    
+      { "clock:ad:clock",             &SchemeFFI::lastSampleBlockClock},
 	    //#endif
-           
 
-	    		
+
+
 	};
 
 	for (i = 0; i < nelem(integerTable); i++) {
@@ -368,7 +366,7 @@ namespace extemp {
     {
 	scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), arg);
     }
-	
+
     void SchemeFFI::addForeignFunc(scheme* sc, char* symbol_name, foreign_func func)
     {
 	scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
@@ -391,9 +389,9 @@ namespace extemp {
 
     void SchemeFFI::addGlobalCptr(scheme* sc, char* symbol_name, void* ptr)
     {
-	scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_cptr(sc, ptr));		
+	scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_cptr(sc, ptr));
     }
-	
+
     ///////////////////////////////////////////////////////
     //
     // MISC STUFF
@@ -413,31 +411,31 @@ namespace extemp {
     }
 
     pointer SchemeFFI::dataGETi64(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
 	int64_t offset = ivalue(pair_cadr(args));
-	int64_t* ptr = (int64_t*) (cptr+offset); 
+	int64_t* ptr = (int64_t*) (cptr+offset);
 	return mk_integer(_sc,ptr[0]);
     }
 
     pointer SchemeFFI::dataGETdouble(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
 	int64_t offset = ivalue(pair_cadr(args));
-	double* ptr = (double*) (cptr+offset); 
+	double* ptr = (double*) (cptr+offset);
 	return mk_real(_sc,ptr[0]);
     }
 
     pointer SchemeFFI::dataGETfloat(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
 	int64_t offset = ivalue(pair_cadr(args));
-	float* ptr = (float*) (cptr+offset); 
+	float* ptr = (float*) (cptr+offset);
 	return mk_real(_sc,ptr[0]);
     }
 
     pointer SchemeFFI::dataSETi64(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
 	int64_t offset = ivalue(pair_cadr(args));
 	int64_t* ptr = (int64_t*) (cptr+offset);
@@ -446,7 +444,7 @@ namespace extemp {
     }
 
     pointer SchemeFFI::dataSETdouble(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
 	int64_t offset = ivalue(pair_cadr(args));
 	double* ptr = (double*) (cptr+offset);
@@ -455,7 +453,7 @@ namespace extemp {
     }
 
     pointer SchemeFFI::dataSETfloat(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
 	int64_t offset = ivalue(pair_cadr(args));
 	float* ptr = (float*) (cptr+offset);
@@ -506,7 +504,7 @@ namespace extemp {
 	}
 
 	std::string tmp = ss.str();
-	// replace io string in place	
+	// replace io string in place
 	int l = tmp.length();
 	char* s = (char*) malloc(l+1);
 	strcpy(s,tmp.c_str());
@@ -518,14 +516,14 @@ namespace extemp {
     }
 
     pointer SchemeFFI::makeCptr(scheme* _sc, pointer args)
-    {                                                     
-         long num_bytes = ivalue(pair_car(args));            
-         void* ptr = malloc(num_bytes);                      
-         memset(ptr,0,num_bytes);                            
-         return mk_cptr(_sc, ptr);                           
-    }                                                     
+    {
+         long num_bytes = ivalue(pair_car(args));
+         void* ptr = malloc(num_bytes);
+         memset(ptr,0,num_bytes);
+         return mk_cptr(_sc, ptr);
+    }
 
-  pointer SchemeFFI::pathExpansion(scheme* _sc, pointer args) {    
+  pointer SchemeFFI::pathExpansion(scheme* _sc, pointer args) {
   #ifdef _WIN32
     char* path = string_value(pair_car(args));
     char* exp_path = path;
@@ -534,24 +532,24 @@ namespace extemp {
 	memset(exp_path,0,8192);
     char* path = string_value(pair_car(args));
     if(path[0] == '~') {
-      char* h = getenv("HOME");      
+      char* h = getenv("HOME");
       strcpy(exp_path,h);
       strcat(exp_path,&path[1]);
     }else{
       realpath(path,exp_path);
     }
-    
-  #endif  
+
+  #endif
     return mk_string(_sc,exp_path);
   }
-  
-  pointer SchemeFFI::command(scheme* _sc, pointer args) {    
+
+  pointer SchemeFFI::command(scheme* _sc, pointer args) {
     // NOTE: doesn't work for Windows yet
     int res = system(string_value(pair_car(args)));
     return mk_integer(_sc,res);
   }
 
-  pointer SchemeFFI::commandOutput(scheme* _sc, pointer args) {    
+  pointer SchemeFFI::commandOutput(scheme* _sc, pointer args) {
 
     char outbuf[8192];
     memset(outbuf,0,8192);
@@ -574,7 +572,7 @@ namespace extemp {
         return mk_string(_sc,outbuf);
       }
     else
-      return _sc->F;     
+      return _sc->F;
   }
 
   pointer SchemeFFI::setEnv(scheme* _sc, pointer args) {
@@ -621,13 +619,13 @@ namespace extemp {
             EnvInjector injector(_sc, list);
 		//tlist = cons(_sc,mk_string(_sc,it->path().leaf().string().c_str()),list);
             pointer tlist = cons(_sc,mk_string(_sc,it->path().string().c_str()),list);
-	    list = tlist;	    
+	    list = tlist;
 	  }
 	  return reverse(_sc,list);
 	}
 #else
   pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
-  {    
+  {
         DIR* dp;
         struct dirent* ep;
         dp = opendir(string_value(pair_car(args)));
@@ -674,13 +672,13 @@ namespace extemp {
     pointer SchemeFFI::impcirGetType(scheme* _sc, pointer args)
     {
 		std::string key(string_value(pair_car(args)));
-		return mk_string(_sc, IMPCIR_DICT[key].second.c_str());	
+		return mk_string(_sc, IMPCIR_DICT[key].second.c_str());
     }
 
     pointer SchemeFFI::impcirGetName(scheme* _sc, pointer args)
     {
 		std::string key(string_value(pair_car(args)));
-		return mk_string(_sc, IMPCIR_DICT[key].first.c_str());	
+		return mk_string(_sc, IMPCIR_DICT[key].first.c_str());
     }
 
     pointer SchemeFFI::impcirAdd(scheme* _sc, pointer args)
@@ -690,7 +688,7 @@ namespace extemp {
 		std::string key(string_value(pair_car(args)));
 		std::string name(string_value(pair_cadr(args)));
 		std::string type(string_value(pair_caddr(args)));
-		//std::cout << "ADDING IN C++ "  << key << " " << name << " " << type << std::endl; 
+		//std::cout << "ADDING IN C++ "  << key << " " << name << " " << type << std::endl;
 		std::pair<std::string,std::string> p(name,type);
 		IMPCIR_DICT[previous] = IMPCIR_DICT[current];
 		IMPCIR_DICT[current] = p;
@@ -779,7 +777,7 @@ namespace extemp {
     repl->writeString(str);
     return _sc->T;
   }
-    
+
   pointer SchemeFFI::ipcDefine(scheme* _sc, pointer args)
   {
     std::string process(string_value(pair_car(args)));
@@ -838,7 +836,7 @@ namespace extemp {
     SchemeREPL::I(process)->writeString(expr);
     return _sc->T;
     }
-    
+
   pointer SchemeFFI::ipcLoad(scheme* _sc, pointer args)
   {
     std::string process(string_value(pair_car(args)));
@@ -906,23 +904,23 @@ namespace extemp {
       return assoc_strcmp_all(_sc,key,alist);
     }
 
-    // number stuff	
+    // number stuff
     pointer SchemeFFI::randomReal(scheme* _sc, pointer args)
     {
 	return mk_real(_sc,UNIV::random());
     }
-	
+
     pointer SchemeFFI::randomInt(scheme* _sc, pointer args)
     {
 	return mk_integer(_sc,UNIV::random(ivalue(pair_car(args))));
     }
-	
+
     pointer SchemeFFI::integerToReal(scheme* _sc, pointer args)
     {
 	double val = (double) ivalue(pair_car(args));
 	return mk_real(_sc,val);
     }
-	
+
     pointer SchemeFFI::rationalToReal(scheme* _sc, pointer args)
     {
 	return mk_real(_sc, rvalue(pair_car(args)));
@@ -939,7 +937,7 @@ namespace extemp {
     pointer SchemeFFI::rationalToNumerator(scheme* _sc, pointer args)
     {
         pointer rat = pair_car(args);
-        if(!is_rational(rat)) 
+        if(!is_rational(rat))
           return mk_integer(_sc, ivalue(rat));
         return mk_integer(_sc,rat->_object._number.value.ratvalue.n);
     }
@@ -950,13 +948,13 @@ namespace extemp {
         if(!is_rational(rat)) return mk_integer(_sc,1);
         return mk_integer(_sc,rat->_object._number.value.ratvalue.d);
     }
-	
+
     pointer SchemeFFI::realToInteger(scheme* _sc, pointer args)
     {
 	long long int val = (long long int) rvalue(pair_car(args));
 	return mk_integer(_sc,val);
     }
-	
+
   pointer SchemeFFI::openDynamicLib(scheme* _sc, pointer args)
   {
     //void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
@@ -995,8 +993,8 @@ namespace extemp {
 #endif
 	return _sc->T;
     }
-	
-	
+
+
     pointer SchemeFFI::pointerSize(scheme* _sc, pointer args)
     {
 #ifdef TARGET_64BIT
@@ -1013,8 +1011,8 @@ namespace extemp {
 #else
       return _sc->F;
 #endif
-    }  
-  
+    }
+
     pointer SchemeFFI::cmdarg(scheme* _sc, pointer args)
     {
       char* key = string_value(pair_car(args));
@@ -1054,7 +1052,7 @@ namespace extemp {
     {
       char* str = string_value(pair_car(args));
       size_t lth = 0;
-      unsigned char* res = base64_decode(str,strlen(str),&lth);      
+      unsigned char* res = base64_decode(str,strlen(str),&lth);
       return mk_string(_sc,(char*)res);
     }
 
@@ -1081,18 +1079,18 @@ namespace extemp {
       char* str = string_value(pair_car(args));
       // unsigned long hash = 0;
       // int c;
-  
+
   //     while ((c = *str++))
 	// hash = c + (hash << 6) + (hash << 16) - hash;
-  
+
       return mk_integer(_sc,string_hash((unsigned char*) str));
     }
-	
+
     pointer SchemeFFI::stringStrip(scheme* _sc, pointer args)
     {
 	return mk_string(_sc,cstrstrip(string_value(pair_car(args))));
     }
-	
+
     pointer SchemeFFI::stringJoin(scheme* _sc, pointer args)
     {
 	pointer array = pair_car(args);
@@ -1119,18 +1117,18 @@ namespace extemp {
 	    if(pair_cdr(array) != _sc->NIL) strcat(result,joinstr);
 	}
 	return mk_string(_sc,result);
-    }	
-		
+    }
+
     pointer SchemeFFI::getClosureEnv(scheme* _sc, pointer args)
     {
 	return closure_env(pair_car(args));
     }
-	
+
     pointer SchemeFFI::getTime(scheme* _sc, pointer args)
     {
 	return mk_integer(_sc, extemp::UNIV::TIME);
-    }	
-	
+    }
+
     pointer SchemeFFI::sexprToString(scheme* _sc, pointer args)
     {
 	std::stringstream ss;
@@ -1138,16 +1136,16 @@ namespace extemp {
 	std::string s = ss.str();
 	s.erase(0,1);
 	s.erase(s.size()-1,1);
-	return mk_string(_sc, s.c_str()); 		
+	return mk_string(_sc, s.c_str());
     }
-	
+
     pointer SchemeFFI::print(scheme* _sc, pointer args)
     {
 	if(args == _sc->NIL) {
 	    printf("\r\n");
 	    fflush(stdout);
 	    return _sc->T;
-	}	    
+	}
 	std::stringstream ss;
 	UNIV::printSchemeCell(_sc, ss, args);
 	std::string s = ss.str();
@@ -1155,16 +1153,16 @@ namespace extemp {
 	s.erase(s.size()-1,1);
 	printf("%s\r\n",s.c_str());
 	fflush(stdout);
-	return _sc->T; 
+	return _sc->T;
     }
-	
+
     pointer SchemeFFI::print_no_new_line(scheme* _sc, pointer args)
     {
 	if(args == _sc->NIL) {
 	    printf("\r\n");
 	    fflush(stdout);
 	    return _sc->T;
-	}	    
+	}
 	std::stringstream ss;
 	UNIV::printSchemeCell(_sc, ss, args, false, false);
 	std::string s = ss.str();
@@ -1172,7 +1170,7 @@ namespace extemp {
 	s.erase(s.size()-1,1);
 	printf("%s",s.c_str());
 	fflush(stdout);
-	return _sc->T; 
+	return _sc->T;
     }
 
     pointer SchemeFFI::printFull(scheme* _sc, pointer args)
@@ -1182,10 +1180,10 @@ namespace extemp {
 	std::string s = ss.str();
 	s.erase(0,1);
 	s.erase(s.size()-1,1);
-	printf("%s\n",s.c_str());		
-	return _sc->T; 
-    }	
-	
+	printf("%s\n",s.c_str());
+	return _sc->T;
+    }
+
     pointer SchemeFFI::printFullNoQuotes(scheme* _sc, pointer args)
     {
 	std::stringstream ss;
@@ -1193,22 +1191,22 @@ namespace extemp {
 	std::string s = ss.str();
 	s.erase(0,1);
 	s.erase(s.size()-1,1);
-	printf("%s\n",s.c_str());		
-	return _sc->T; //mk_string(_sc, s.c_str()); 
-    }		
-	
+	printf("%s\n",s.c_str());
+	return _sc->T; //mk_string(_sc, s.c_str());
+    }
+
     pointer SchemeFFI::printError(scheme* _sc, pointer args)
-    {	
+    {
 	std::stringstream ss;
 	UNIV::printSchemeCell(_sc, ss, args, true);
 	std::string s = ss.str();
 	s.erase(0,1);
 	s.erase(s.size()-1,1);
         ascii_error();
-	printf("%s\n",s.c_str());	
+	printf("%s\n",s.c_str());
         ascii_normal();
-        fflush(stdout);	
-	return _sc->T; //mk_string(_sc, s.c_str()); 
+        fflush(stdout);
+	return _sc->T; //mk_string(_sc, s.c_str());
     }
 
     pointer SchemeFFI::printNotification(scheme* _sc, pointer args)
@@ -1221,21 +1219,21 @@ namespace extemp {
         ascii_warning();
 	printf("%s\n",s.c_str());
         ascii_normal();
-        fflush(stdout);	
-	return _sc->T; //mk_string(_sc, s.c_str()); 
+        fflush(stdout);
+	return _sc->T; //mk_string(_sc, s.c_str());
     }
-	
+
     pointer SchemeFFI::callCPPAtTime(scheme* _sc, pointer args)
-    {	
+    {
 	if(is_cptr(pair_caddr(args)) == false) {
 	    printf("Bad task needs valid CM ptr");
 	    return _sc->F;
 	}
-		
+
 	int task_type = ivalue(pair_cadr(args));
-		
+
 	bool is_callback = (task_type == 2) ? true : false;
-		
+
 	// is_render_thread_type are for tasks that must be called in the render thread
 	// primarily for midi calls to an AU that must occur on the audio thread
 	bool is_render_thread_type = (task_type == 1) ? true : false;
@@ -1243,86 +1241,86 @@ namespace extemp {
 	if(is_render_thread_type) {
 	    if(is_pair(pair_car(args))) { //check for tag based call
 		std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;
-	    }else{ 
-		std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;				
-	    }		
+	    }else{
+		std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;
+	    }
 	}else{
-	    if(is_pair(pair_car(args))) { 
+	    if(is_pair(pair_car(args))) {
 		extemp::TaskScheduler::I()->addTask(ivalue(pair_caar(args)), ivalue(pair_cdar(args)), (extemp::CM*)(cptr_value(pair_caddr(args))), new SchemeObj(_sc, pair_cadddr(args), pair_caddddr(args)), 0, is_callback);
-	    }else{ 
+	    }else{
 		extemp::TaskScheduler::I()->addTask(ivalue(pair_car(args)), ivalue(pair_car(args))+_sc->call_default_time, (extemp::CM*)(cptr_value(pair_caddr(args))), new SchemeObj(_sc, pair_cadddr(args), pair_caddddr(args)), 0, is_callback);
-	    }		
+	    }
 	}
 	return _sc->T;
-    }	
-	
-	
+    }
+
+
     ///////////////////////////////////////////////////////
     //
     // REGEX STUFF
     //
     //////////////////////////////////////////////////////
-	
-    pointer SchemeFFI::regex_match(scheme* _sc, pointer args)	
+
+    pointer SchemeFFI::regex_match(scheme* _sc, pointer args)
     {
 	char* data = string_value(pair_car(args));
-	char* pattern = string_value(pair_cadr(args));		
-	
-	pcre *re; 
-	const char *error; 
+	char* pattern = string_value(pair_cadr(args));
+
+	pcre *re;
+	const char *error;
 	int erroffset;
 
-	re = pcre_compile(	pattern, /* the pattern */ 
-			0, /* default options */ 
-			&error, /* for error message */ 
-			&erroffset, /* for error offset */ 
+	re = pcre_compile(	pattern, /* the pattern */
+			0, /* default options */
+			&error, /* for error message */
+			&erroffset, /* for error offset */
 			NULL); /* use default character tables */
-	
-	int rc;
-	int ovector[30]; 
-	rc = pcre_exec(	re, /* result of pcre_compile() */ 
-			NULL, /* we didn’t study the pattern */ 
-			data, /* the subject string */ 
-			strlen(data), /* the length of the subject string */ 
-			0, /* start at offset 0 in the subject */ 
-			0, /* default options */ 
-			ovector, /* vector of integers for substring information */ 
-			30); /* number of elements (NOT size in bytes) */
-					
-	return (rc>=0) ? _sc->T : _sc->F;
-    }	
 
-    pointer SchemeFFI::regex_matched(scheme* _sc, pointer args)	
+	int rc;
+	int ovector[30];
+	rc = pcre_exec(	re, /* result of pcre_compile() */
+			NULL, /* we didn’t study the pattern */
+			data, /* the subject string */
+			strlen(data), /* the length of the subject string */
+			0, /* start at offset 0 in the subject */
+			0, /* default options */
+			ovector, /* vector of integers for substring information */
+			30); /* number of elements (NOT size in bytes) */
+
+	return (rc>=0) ? _sc->T : _sc->F;
+    }
+
+    pointer SchemeFFI::regex_matched(scheme* _sc, pointer args)
     {
 	char* data = string_value(pair_car(args));
-	char* pattern = string_value(pair_cadr(args));		
-		
-	pcre *re; 
-	const char *error; 
-	int erroffset; 
-	re = pcre_compile(	pattern, /* the pattern */ 
-				0, /* default options */ 
-				&error, /* for error message */ 
-				&erroffset, /* for error offset */ 
+	char* pattern = string_value(pair_cadr(args));
+
+	pcre *re;
+	const char *error;
+	int erroffset;
+	re = pcre_compile(	pattern, /* the pattern */
+				0, /* default options */
+				&error, /* for error message */
+				&erroffset, /* for error offset */
 				NULL); /* use default character tables */
-		
-	int rc; 
-	int ovector[60]; 
-	rc = pcre_exec(	re, /* result of pcre_compile() */ 
-			NULL, /* we didn’t study the pattern */ 
-			data, /* the subject string */ 
-			strlen(data), /* the length of the subject string */ 
-			0, /* start at offset 0 in the subject */ 
-			0, /* default options */ 
-			ovector, /* vector of integers for substring information */ 
+
+	int rc;
+	int ovector[60];
+	rc = pcre_exec(	re, /* result of pcre_compile() */
+			NULL, /* we didn’t study the pattern */
+			data, /* the subject string */
+			strlen(data), /* the length of the subject string */
+			0, /* start at offset 0 in the subject */
+			0, /* default options */
+			ovector, /* vector of integers for substring information */
 			60); /* number of elements (NOT size in bytes) */
-						
+
 	// make pointer to hold return results
 	pointer list = _sc->NIL;
-		
+
 	// if failed to match return empty list
 	if(rc<0) return list;
-		
+
 	for(int i=0, p=0;i<rc;i++)
 	{
 	    //std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
@@ -1332,7 +1330,7 @@ namespace extemp {
 		pointer tlist = cons(_sc,mk_string(_sc,""),list);
 		list = tlist;
 	    }else{
-		int range = ovector[p+1] - ovector[p];				
+		int range = ovector[p+1] - ovector[p];
 		char* b = (char*) alloca(range+1);
 		memset(b,0,range+1);
 		char* a = data+ovector[p];
@@ -1342,39 +1340,39 @@ namespace extemp {
 		list = tlist;
 	    }
 	}
-		
+
 	return reverse(_sc,list);
-    }	
-	
-    pointer SchemeFFI::regex_match_all(scheme* _sc, pointer args)	
+    }
+
+    pointer SchemeFFI::regex_match_all(scheme* _sc, pointer args)
     {
 	char* data = string_value(pair_car(args));
-	char* pattern = string_value(pair_cadr(args));		
-		
-	pcre *re; 
-	const char *error; 
-	int erroffset; 
-	re = pcre_compile(	pattern, /* the pattern */ 
-				0, /* default options */ 
-				&error, /* for error message */ 
-				&erroffset, /* for error offset */ 
+	char* pattern = string_value(pair_cadr(args));
+
+	pcre *re;
+	const char *error;
+	int erroffset;
+	re = pcre_compile(	pattern, /* the pattern */
+				0, /* default options */
+				&error, /* for error message */
+				&erroffset, /* for error offset */
 				NULL); /* use default character tables */
-		
-	// pointer to hold return results		
+
+	// pointer to hold return results
 	pointer list = _sc->NIL;
-	int rc; 
-	int ovector[60];			
-		
+	int rc;
+	int ovector[60];
+
 	while(true) {
-	    rc = pcre_exec(	re, /* result of pcre_compile() */ 
-				NULL, /* we didn’t study the pattern */ 
-				data, /* the subject string */ 
-				strlen(data), /* the length of the subject string */ 
-				0, /* start at offset 0 in the subject */ 
-				0, /* default options */ 
-				ovector, /* vector of integers for substring information */ 
+	    rc = pcre_exec(	re, /* result of pcre_compile() */
+				NULL, /* we didn’t study the pattern */
+				data, /* the subject string */
+				strlen(data), /* the length of the subject string */
+				0, /* start at offset 0 in the subject */
+				0, /* default options */
+				ovector, /* vector of integers for substring information */
 				60); /* number of elements (NOT size in bytes) */
-							
+
 	    //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << std::endl;
 	    if(rc<1) {
 		return reverse(_sc,list);
@@ -1389,40 +1387,40 @@ namespace extemp {
 	    list = tlist;
 	    data = data+range+ovector[0];
 	}
-		
+
 	// shouldn't ever reach here!
 	return _sc->NIL;
     }
-	
-    pointer SchemeFFI::regex_split(scheme* _sc, pointer args)	
+
+    pointer SchemeFFI::regex_split(scheme* _sc, pointer args)
     {
 	char* data = string_value(pair_car(args));
 	char* pattern = string_value(pair_cadr(args));
-		
-	pcre *re; 
-	const char *error; 
-	int erroffset; 
-	re = pcre_compile(	pattern, /* the pattern */ 
-				0, /* default options */ 
-				&error, /* for error message */ 
-				&erroffset, /* for error offset */ 
+
+	pcre *re;
+	const char *error;
+	int erroffset;
+	re = pcre_compile(	pattern, /* the pattern */
+				0, /* default options */
+				&error, /* for error message */
+				&erroffset, /* for error offset */
 				NULL); /* use default character tables */
-		
-	// pointer to hold return results		
+
+	// pointer to hold return results
 	pointer list = _sc->NIL;
-	int rc; 
-	int ovector[60];			
-		
+	int rc;
+	int ovector[60];
+
 	while(true) {
-	    rc = pcre_exec(	re, /* result of pcre_compile() */ 
-				NULL, /* we didn’t study the pattern */ 
-				data, /* the subject string */ 
-				strlen(data), /* the length of the subject string */ 
-				0, /* start at offset 0 in the subject */ 
-				0, /* default options */ 
-				ovector, /* vector of integers for substring information */ 
+	    rc = pcre_exec(	re, /* result of pcre_compile() */
+				NULL, /* we didn’t study the pattern */
+				data, /* the subject string */
+				strlen(data), /* the length of the subject string */
+				0, /* start at offset 0 in the subject */
+				0, /* default options */
+				ovector, /* vector of integers for substring information */
 				60); /* number of elements (NOT size in bytes) */
-							
+
 	    //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << std::endl;
 	    if(rc<1) {
 		if(strlen(data)>0) // append remaining chars if any left
@@ -1440,41 +1438,41 @@ namespace extemp {
 	    list = tlist;
 	    data = data+ovector[1];
 	}
-		
+
 	// shouldn't ever reach here!
 	return _sc->NIL;
     }
-	
-    pointer SchemeFFI::regex_replace(scheme* _sc, pointer args)	
+
+    pointer SchemeFFI::regex_replace(scheme* _sc, pointer args)
     {
 	char* data = string_value(pair_car(args));
 	char* pattern = string_value(pair_cadr(args));
 	char* replace = string_value(pair_caddr(args));
-		
+
 	pcre *re;
-	const char *error; 
-	int erroffset; 
-	re = pcre_compile(	pattern, /* the pattern */ 
-				0, /* default options */ 
-				&error, /* for error message */ 
-				&erroffset, /* for error offset */ 
+	const char *error;
+	int erroffset;
+	re = pcre_compile(	pattern, /* the pattern */
+				0, /* default options */
+				&error, /* for error message */
+				&erroffset, /* for error offset */
 				NULL); /* use default character tables */
-		
-	int rc; 
+
+	int rc;
 	int ovector[60];
-		
-	rc = pcre_exec(	re, /* result of pcre_compile() */ 
-			NULL, /* we didn’t study the pattern */ 
-			data, /* the subject string */ 
-			strlen(data), /* the length of the subject string */ 
-			0, /* start at offset 0 in the subject */ 
-			0, /* default options */ 
-			ovector, /* vector of integers for substring information */ 
+
+	rc = pcre_exec(	re, /* result of pcre_compile() */
+			NULL, /* we didn’t study the pattern */
+			data, /* the subject string */
+			strlen(data), /* the length of the subject string */
+			0, /* start at offset 0 in the subject */
+			0, /* default options */
+			ovector, /* vector of integers for substring information */
 			60); /* number of elements (NOT size in bytes) */
 
 	// no match found return original string
 	if(rc<1) return mk_string(_sc,data);
-					
+
 	// ok we have a match
 	// first replace any groups in replace string (i.e. $1 $2 ...)
 	char* res = (char*) "";
@@ -1495,7 +1493,7 @@ namespace extemp {
 	    res = tmp;
 	    p = strtok(NULL, sep);
 	}while(p);
-		
+
 	// now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
 	int lgth = (strlen(data)-range)+strlen(res)+1;
 	range = ovector[1] - ovector[0];
@@ -1503,8 +1501,8 @@ namespace extemp {
 	memset(result,0,lgth);
 	memcpy(result,data,ovector[0]);
 	memcpy(result+ovector[0],res,strlen(res));
-	memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);		
-		
+	memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);
+
 	return mk_string(_sc,result);
     }
 
@@ -1539,9 +1537,9 @@ namespace extemp {
     {
         return mk_cptr(_sc,_sc->m_process->getDefaultZone()); //llvm_zone_default());
     }
-	
+
     pointer SchemeFFI::destroyMallocZone(scheme* _sc, pointer args)
-    {		
+    {
 	llvm_zone_t* ptr = (llvm_zone_t*) cptr_value(pair_car(args));
 	if(pair_cdr(args) != _sc->NIL)
 	{
@@ -1555,14 +1553,14 @@ namespace extemp {
     }
 
     pointer SchemeFFI::resetMallocZone(scheme* _sc, pointer args)
-    {		
+    {
 	llvm_zone_t* zone = (llvm_zone_t*) cptr_value(pair_car(args));
 	llvm_zone_reset(zone);
 	return _sc->T;
     }
 
     pointer SchemeFFI::copyToDefaultZone(scheme* _sc, pointer args)
-    {		
+    {
 	return _sc->NIL;
     }
 
@@ -1581,7 +1579,7 @@ namespace extemp {
         llvm_push_zone_stack((llvm_zone_t*)cptr_value(pair_car(args)));
         return _sc->T;
     }
-	
+
     ////////////////////////////////////////////
     //
     // LLVM STUFF
@@ -1590,13 +1588,13 @@ namespace extemp {
 
     pointer SchemeFFI::optimizeCompiles(scheme* _sc, pointer args)
     {
-        EXTLLVM::OPTIMIZE_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0; 
+        EXTLLVM::OPTIMIZE_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0;
         return _sc->T;
     }
 
     pointer SchemeFFI::verifyCompiles(scheme* _sc, pointer args)
     {
-        EXTLLVM::VERIFY_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0; 
+        EXTLLVM::VERIFY_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0;
         return _sc->T;
     }
 
@@ -1632,133 +1630,102 @@ namespace extemp {
 
 #else
     static std::string sInlineString; // This is a hack for now, but it *WORKS*
+    static std::unordered_set<std::string> sInlineSyms;
     if (sInlineString.empty()) {
         std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
         std::stringstream inString;
         inString << inStream.rdbuf();
         sInlineString = inString.str();
+        std::regex globalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)");
+        std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), globalSymRegex, 1),
+                std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
     }
     std::string asmcode(assm);
     auto context(LLVMContextCreate());
     auto newModule(parseAssemblyString(asmcode, pa, *unwrap(context)));
     bool built(newModule);
     newModule.reset();
-    LLVMContextDispose(context);
     if (likely(!built)) {
-        asmcode = sInlineString + asmcode;
+        LLVMContextDispose(context);
+        std::regex globalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::ECMAScript);
+        std::vector<std::string> symbols;
+        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), globalSymRegex, 1),
+                std::sregex_token_iterator(), std::inserter(symbols, symbols.begin()));
+        std::sort(symbols.begin(), symbols.end());
+        auto end(std::unique(symbols.begin(), symbols.end()));
+        std::unordered_set<std::string> ignoreSyms;
+        globalSymRegex = std::regex("define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::ECMAScript);
+        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), globalSymRegex, 1),
+                std::sregex_token_iterator(), std::inserter(ignoreSyms, ignoreSyms.begin()));
+        std::string declarations;
+        llvm::raw_string_ostream dstream(declarations);
+        for (auto iter = symbols.begin(); iter != end; ++iter) {
+            const char* sym(iter->c_str());
+            if (sInlineSyms.find(sym) != sInlineSyms.end() || ignoreSyms.find(sym) != ignoreSyms.end()) {
+                continue;
+            }
+            auto gv = extemp::EXTLLVM::I()->getGlobalValue(sym);
+            if (!gv) {
+                continue;
+            }
+            auto func(extemp::EXTLLVM::I()->getFunction(sym));
+            if (func) {
+                dstream << "declare ";
+                std::string type;
+                llvm::raw_string_ostream typeStream(type);
+                func->getReturnType()->print(typeStream);
+                auto str(typeStream.str());
+                std::string::size_type pos(str.find('='));
+                if (pos != std::string::npos) {
+                    str.erase(pos);
+                }
+                dstream << str << " @" << sym << " (";
+                bool first(true);
+                for (const auto& arg : func->getArgumentList()) {
+                    if (!first) {
+                        dstream << ", ";
+                    } else {
+                        first = false;
+                    }
+                    arg.getType()->print(dstream);
+                }
+                dstream << ")\n";
+                // func->print(dstream);
+            } else {
+                gv->print(dstream);
+                dstream << '\n';
+            }
+        }
+// std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
+        asmcode = dstream.str() + sInlineString + asmcode;
     }
-      newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
-    int cnt = 0;
-    while (!newModule) {
-      std::string err = pa.getMessage().str();
-      if(cnt > 1000) {
-        std::cout << "MCJIT Compiler Error: could not resolve all external dependencies" << std::endl;
-        break;
-      }
-      if (err.find("use of undefined value") != std::string::npos) {
-        char symname[1024];
-        const char* undef_value_string = "use of undefined value '@(.*)'";
-        const char* match1_string = "$1";
-        const char* eq_type_string = " = type ";
-        rreplace((char*)undef_value_string,(char*)err.c_str(),(char*)match1_string,symname);
-        GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(symname);
-        if(gv == NULL){
-          std::cout << "MCJIT compiler error: \"" << symname << "\" not defined in LLVM" << std::endl;
-          return _sc->F;
-        }
-        Function* func = extemp::EXTLLVM::I()->getFunction(symname);
-        const char* tmp_name = NULL;
-      
-        if(func != NULL) {
-          Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
-          int cntt = 0;
-          while(funcargs != func->getArgumentList().end())
-            {			
-              Argument* a = funcargs;
-              std::string typestr2;
-              llvm::raw_string_ostream ss2(typestr2);
-              llvm::Type* t = a->getType();
-              t->print(ss2);
-              tmp_name = ss2.str().c_str();
-              if(a->getType()->isStructTy()) {	      
-                rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
-              }
-              funcargs++;
-              cntt++;
-            }          
-        }
-      
-        GlobalValue* vvv = gv;
-        std::string typestr;
-        llvm::raw_string_ostream ss(typestr);
-        vvv->getType()->print(ss);
-        std::string stype = ss.str();
+    newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
+if (!newModule) {
+std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
+std::cout << pa.getMessage().str() << std::endl;
+abort();
+}
+    if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);
 
-        stype.resize(stype.length()-1); // drop last '*'
-        std::string exprr;
-        if(func) {
-          Type* rettype = func->getReturnType();
-          typestr.clear();
-          llvm::raw_string_ostream sts(typestr);
-          rettype->print(sts);
-          std::size_t pos = sts.str().find(" = type");
-          std::string rettypestr = sts.str();                    
-          if (pos > 0) {
-            rettypestr = sts.str().substr(0, pos);
-          }
-          std::string argstypestr = stype.substr(rettypestr.length()+1,stype.length());
-          sprintf(tmpbuf,"declare %s @%s%s",rettypestr.c_str(),symname,argstypestr.c_str());
-          
-          exprr.append(tmpbuf);
-        } else {
-          exprr.append("@");
-          exprr.append(symname);
-          exprr.append(" = external global ");
-          exprr.append(stype);          
-        }
-// std::cout << "REPLACE " << symname << " WITH " << exprr << " ERR: " << err << std::endl;
-        exprr.append("\n\n");        
-        exprr.append(asmcode);        
-        asmcode.swap(exprr);
-        cnt++;
-      } else {
-        break; // going to die
-      }
-      newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
-    }
-// std::cout << asmcode;
-        if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);
-
-// if (newModule) {
-//     char buf[] = "/tmp/pre.XXXXXX";
-//     auto fd(mkstemp(buf));
-//     auto data(asmcode.c_str());
-//     auto len(asmcode.length());
-//     while (len) {
-//         auto written(write(fd, data, len));
-//         len -= written;
-//         data += written;
-//     }
-//     close(fd);
-// }
     if (newModule) {
         if(EXTLLVM::OPTIMIZE_COMPILES) {
-        PM->run(*newModule);
+            PM->run(*newModule);
         } else {
             PM_NO->run(*newModule);
         }
       }
 
 #endif
-  
+
     //std::stringstream ss;
     if(newModule == 0)
       {
+ // std::cout << "CODE: \n" << asmcode << std::endl;
         std::string errstr;
         llvm::raw_string_ostream ss(errstr);
         pa.print("LLVM IR",ss);
         printf("%s\n",ss.str().c_str());
-#ifndef EXT_MCJIT    
+#ifndef EXT_MCJIT
         // if the number of functions in module has changed when
         // calling runFunction then we assume a stub was made and
         // appended to the end of the modules function list. we remove
@@ -1776,7 +1743,7 @@ namespace extemp {
       if (extemp::EXTLLVM::VERIFY_COMPILES) {
         if (verifyModule(*M)) {
           std::cout << "\nInvalid LLVM IR\n";
-#ifndef EXT_MCJIT        
+#ifndef EXT_MCJIT
           if(num_of_funcs != M->getFunctionList().size()) {
             iplist<Function>::iterator iter = M->getFunctionList().end();
             Function* func = dyn_cast<Function>(--iter);
@@ -1784,9 +1751,9 @@ namespace extemp {
             func->dropAllReferences();
             func->removeFromParent();
           }
-#endif        
+#endif
           return _sc->F;
-        } 
+        }
       }
 #ifdef EXT_MCJIT
       llvm::Module *modulePtr = newModule.get();
@@ -1803,7 +1770,7 @@ namespace extemp {
 #endif
     }
   }
-	
+
     pointer SchemeFFI::ff_set_name(scheme* _sc, pointer args)
     {
        pointer x = pair_car(args);
@@ -1831,7 +1798,7 @@ namespace extemp {
       {
         return _sc->F;
       }
-    return mk_cptr(_sc, func); 				
+    return mk_cptr(_sc, func);
   }
 
   pointer SchemeFFI::get_globalvar(scheme* _sc, pointer args)
@@ -1840,12 +1807,12 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
-    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));   
+    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));
     if(var == 0)
       {
         return _sc->F;
-      }				
-    return mk_cptr(_sc, var); 				
+      }
+    return mk_cptr(_sc, var);
   }
 
 
@@ -1855,11 +1822,11 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
-      }			
+      }
 
     int cc = func->getCallingConv();
     return mk_integer(_sc, cc);
@@ -1871,11 +1838,11 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));  
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
-      }	
+      }
     return func->isVarArg() ? _sc->T : _sc->F;
   }
 
@@ -1892,7 +1859,7 @@ namespace extemp {
     Module* M = NULL;
     std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
     for (int i=0;i<Ms.size();i++) {
-      M = Ms[i];    
+      M = Ms[i];
       for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
         const llvm::Function* func = GI;
         if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
@@ -1900,7 +1867,7 @@ namespace extemp {
           std::string str;
           llvm::raw_string_ostream ss(str);
           ss << *func;
-          printf("\n---------------------------------------------------\n%s",str.c_str());        
+          printf("\n---------------------------------------------------\n%s",str.c_str());
         }
       }
     }
@@ -1921,7 +1888,7 @@ namespace extemp {
     Module* M = NULL;
     std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
     for (int i=0;i<Ms.size();i++) {
-      M = Ms[i];    
+      M = Ms[i];
       for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
         const llvm::Function* func = GI;
         if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
@@ -1939,7 +1906,7 @@ namespace extemp {
   {
     using namespace llvm;
     char* fname = string_value(pair_car(args));
-    
+
     Module* M = NULL;
     std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
     for (int i=0;i<Ms.size();i++) {
@@ -1959,7 +1926,7 @@ namespace extemp {
     }
     return _sc->T;
   }
-  
+
 
   pointer SchemeFFI::llvm_disasm(scheme* _sc, pointer args)
   {
@@ -1973,15 +1940,15 @@ namespace extemp {
     }
     if (syntax > 1) {
       std::cout << "Syntax argument must be either 0: at&t or 1: intel" << std::endl;
-      std::cout << "The default is 1: intel" << std::endl;      
+      std::cout << "The default is 1: intel" << std::endl;
       syntax = 1;
     }
     pointer name = SchemeFFI::llvm_closure_last_name(_sc, args);
     unsigned char* fptr = (unsigned char*) cptr_value(SchemeFFI::get_function_pointer(_sc,cons(_sc,name,pair_cdr(args))));
     char* dasm = llvm_disassemble(fptr,syntax); //,bytes,x64);
     return mk_string(_sc,dasm);
-  }  
-  
+  }
+
   pointer SchemeFFI::get_struct_size(scheme* _sc, pointer args)
   {
     using namespace llvm;
@@ -2036,7 +2003,7 @@ namespace extemp {
     const StructLayout* sl = layout->getStructLayout(type);
     long size = sl->getSizeInBytes();
     delete layout;
-    return mk_integer(_sc,size);       
+    return mk_integer(_sc,size);
   }
 
   pointer SchemeFFI::get_function_type(scheme* _sc, pointer args)
@@ -2045,11 +2012,11 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));  
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
-      }			
+      }
 
     std::string typestr;
     llvm::raw_string_ostream ss(typestr);
@@ -2085,8 +2052,8 @@ namespace extemp {
     if(m == 0)
       {
         return _sc->F;
-      }			
-        
+      }
+
     char* filename = string_value(pair_cadr(args));
 #ifdef _WIN32
     std::string str;
@@ -2128,7 +2095,7 @@ namespace extemp {
     }
     llvm::WriteBitcodeToFile(m,ss);
 #endif
-    return _sc->T;    
+    return _sc->T;
   }
 
   pointer SchemeFFI::get_function_args(scheme* _sc, pointer args)
@@ -2137,7 +2104,7 @@ namespace extemp {
 
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
@@ -2156,11 +2123,11 @@ namespace extemp {
     }
 
     pointer str = mk_string(_sc, tmp_name); //_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
-    pointer p = cons(_sc, str, _sc->NIL); 
+    pointer p = cons(_sc, str, _sc->NIL);
 
     Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
     while(funcargs != func->getArgumentList().end())
-      {			
+      {
         Argument* a = funcargs;
         {
             EnvInjector injector(_sc, p);
@@ -2170,7 +2137,7 @@ namespace extemp {
 
         tmp_name = ss2.str().c_str();
 
-        if(a->getType()->isStructTy()) {	      
+        if(a->getType()->isStructTy()) {
           rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
           //printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
           tmp_name = tmp_str_a;
@@ -2178,10 +2145,10 @@ namespace extemp {
 
         pointer str = mk_string(_sc, tmp_name); //_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
         }
-        p = cons(_sc, str, p);			
+        p = cons(_sc, str, p);
         funcargs++;
       }
-    return reverse(_sc, p);				
+    return reverse(_sc, p);
   }
 
     pointer SchemeFFI::remove_global_var(scheme* _sc, pointer args)
@@ -2189,56 +2156,56 @@ namespace extemp {
 	// Create some module to put our function into it.
 	using namespace llvm;
 
-	// Module* M = EXTLLVM::I()->M;  
+	// Module* M = EXTLLVM::I()->M;
 	// llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
-	llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));  
+	llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));
 	if(var == 0)
 	{
 	    return _sc->F;
-	}		
-	var->dropAllReferences();		
+	}
+	var->dropAllReferences();
 	var->removeFromParent();
 	return _sc->T;
-    }	
+    }
 
   pointer SchemeFFI::remove_function(scheme* _sc, pointer args)
   {
     // Create some module to put our function into it.
     using namespace llvm;
 
-    //Module* M = EXTLLVM::I()->M;		
+    //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
-      }		
+      }
     if(func->mayBeOverridden()) {
-	    func->dropAllReferences();		
+	    func->dropAllReferences();
 	    func->removeFromParent();
 	    return _sc->T;
     }else{
 	    printf("Cannot remove function with dependencies\n");
 	    return _sc->F;
     }
-  }		
+  }
 
   pointer SchemeFFI::erase_function(scheme* _sc, pointer args)
   {
     // Create some module to put our function into it.
-    using namespace llvm;		
+    using namespace llvm;
     //Module* M = EXTLLVM::I()->M;
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));      
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
       }
-#ifndef EXT_MCJIT    
+#ifndef EXT_MCJIT
     extemp::EXTLLVM::I()->EE->lock.acquire();
     extemp::EXTLLVM::I()->EE->freeMachineCodeForFunction(func);
     extemp::EXTLLVM::I()->EE->lock.release();
-#endif    
+#endif
     func->deleteBody();
     func->eraseFromParent();
 
@@ -2249,11 +2216,11 @@ namespace extemp {
     {
 	using namespace llvm;
 	uint32_t** closure = (uint32_t**) cptr_value(pair_car(args));
-	void* eptr = (void*) *(closure+0);		
+	void* eptr = (void*) *(closure+0);
 	int64_t (*fptr)(void*, int64_t) = (int64_t (*)(void*, int64_t)) *(closure+1);
 	return mk_integer(_sc, (*fptr)(eptr,ivalue(pair_cadr(args))));
     }
-	
+
   pointer SchemeFFI::get_global_variable_type(scheme* _sc, pointer args)
   {
     using namespace llvm;
@@ -2261,22 +2228,22 @@ namespace extemp {
     //Module* M = EXTLLVM::I()->M;
     //Module::global_iterator i = M->global_begin();
     //GlobalVariable* var = M->getNamedGlobal(std::string(string_value(pair_car(args))));
-    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));      
+    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));
     if(var == 0)
       {
         return _sc->F;
-      }				
+      }
     std::string typestr;
     llvm::raw_string_ostream ss(typestr);
     var->getType()->print(ss);
     return mk_string(_sc, ss.str().c_str()); //var->getType()->getDescription().c_str());
-  }	
+  }
 
   pointer SchemeFFI::get_function_pointer(scheme* _sc, pointer args)
   {
     using namespace llvm;
 
-    llvm::Function* func = EXTLLVM::I()->getFunction(string_value(pair_car(args)));        
+    llvm::Function* func = EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
         return _sc->F;
@@ -2293,7 +2260,7 @@ namespace extemp {
     }
 
     return mk_cptr(_sc, p);
-  }		
+  }
 
   pointer SchemeFFI::llvm_call_void_native(scheme* _sc, pointer args)
   {
@@ -2303,7 +2270,7 @@ namespace extemp {
     char name[1024];
     sprintf(name,"%s_native",string_value(pair_car(args)));
     //llvm::Function* func = M->getFunction(std::string(name));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(name);     
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(name);
     //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     //func->setCallingConv(CallingConv::C); //kCStackBased);
     if(func == 0)
@@ -2320,16 +2287,16 @@ namespace extemp {
 
     void(*f)(void) = (void(*)(void)) p;
     f();
-        
+
     return _sc->T;
-  }		
-	
+  }
+
   pointer SchemeFFI::recompile_and_link_function(scheme* _sc, pointer args)
   {
     using namespace llvm;
-		
+
     //Module* M = EXTLLVM::I()->M;
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));    
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     //llvm::Function* func = M->getFunction(fname); //std::string(string_value(pair_car(args))));
     //func->setCallingConv(CallingConv::C); //kCStackBased);
     if(func == 0)
@@ -2344,41 +2311,41 @@ namespace extemp {
     try{
       EXTLLVM* xll = EXTLLVM::I();
       ExecutionEngine* EE = xll->EE;
-      
+
 #ifdef EXT_MCJIT
       void* p = NULL;
-#else      
+#else
       EE->lock.acquire();
       void* p = EE->recompileAndRelinkFunction(func);
       EE->lock.release();
-#endif      
+#endif
     }catch(std::exception& e) {
       std::cout << "EXCEPT: " << e.what() << std::endl;
     }
-		
+
     if(p==NULL) {
 	    return _sc->F;
     }
-		
+
     //const llvm::GlobalValue* f2 = NativeScheme::I()->EE->getGlobalValueAtAddress(p);
     //std::cout << "FUNC: " << func << "  fptr: " << p << "   f2: " << f2 << std::endl;
-		
+
     return mk_cptr(_sc, p);
   }
 
     //
     // This will not be threadsafe whenever a bind-func is done!
-    // 
+    //
     pointer SchemeFFI::call_compiled(scheme* _sc, pointer args)
     {
 	using namespace llvm;
 
 	ExecutionEngine* EE = EXTLLVM::I()->EE;
 
-#ifdef LLVM_EE_LOCK	
+#ifdef LLVM_EE_LOCK
   llvm::MutexGuard locked(EE->lock);
 #endif
-	
+
         Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = (Function*) cptr_value(pair_car(args));
 	if(func == 0)
@@ -2386,7 +2353,7 @@ namespace extemp {
 	    //std::cout << "no such function\n" << std::endl;
 	    printf("No such function\n");
 	    return _sc->F;
-	}				
+	}
 	func->getArgumentList();
 	args = pair_cdr(args);
 
@@ -2397,7 +2364,7 @@ namespace extemp {
 	if(lgth != func->getArgumentList().size())
 	{
 	    printf("Wrong number of arguments for function!\n");
-	    return _sc->F;			
+	    return _sc->F;
 	}
 	std::vector<llvm::GenericValue> fargs(lgth);
 	//std::cout << "ARGS: " << lgth << std::endl;
@@ -2412,9 +2379,9 @@ namespace extemp {
 		    return _sc->F;
 		}
 		int width = a->getType()->getPrimitiveSizeInBits();
-		//std::cout << "TYPE: " << a->getType()->getTypeID() << std::endl;				
+		//std::cout << "TYPE: " << a->getType()->getTypeID() << std::endl;
 		fargs[i].IntVal = APInt(width,ivalue(p));
-	    }			
+	    }
 	    else if(is_real(p))
 	    {
 
@@ -2437,11 +2404,11 @@ namespace extemp {
 		if(a->getType()->getTypeID() != Type::PointerTyID)
 		{
 		    printf("Bad argument type %i\n",i);
-		    return _sc->F;					
+		    return _sc->F;
 		}
-		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
+		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl;
 		fargs[i].PointerVal = string_value(p);
-	    }						
+	    }
 	    else if(is_cptr(p))
 	    {
 		if(a->getType()->getTypeID() != Type::PointerTyID)
@@ -2453,7 +2420,7 @@ namespace extemp {
 		//fargs[i].PointerVal = (void*)p;
 	    }
 	    else if(is_closure(p))
-	    {			
+	    {
 		//ascii_print_color(1,1,10); // error color
 		printf("Bad argument at index %i you can't pass in a scheme closure.\n",i);
 		//ascii_print_color(0,9,10);
@@ -2465,7 +2432,7 @@ namespace extemp {
 		//ascii_print_color(0,9,10); // default
 		return _sc->F;
 	    }
-		    
+
 	}
   GenericValue gv = EE->runFunction(func,fargs);
 
@@ -2486,21 +2453,21 @@ namespace extemp {
 	    return _sc->F;
 	}
     }
-	
+
     // this all here to conver 32bit floats (as a string) into llvms hex float 32 notation :(
     pointer SchemeFFI::llvm_convert_float_constant(scheme* _sc, pointer args)
-    {		
+    {
 	char* floatin = string_value(pair_car(args));
 	char floatout[256];
         // if already converted to hex value just return Hex String Unchanged
-        if(floatin[1]=='x') return pair_car(args); 
+        if(floatin[1]=='x') return pair_car(args);
 #ifdef _WIN32
 	float f = (float) strtod(floatin, (char**) &floatout);
-#else        
+#else
 	float f = strtof(floatin, (char**) &floatout);
 #endif
 	llvm::APFloat apf(f);
-		
+
 	bool ignored;
 	bool isDouble = false; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
 	double Val = isDouble ? apf.convertToDouble() :
@@ -2509,7 +2476,7 @@ namespace extemp {
         // apf.convertToHexString(hexstr,0,false,llvm::APFloat::rmTowardZero);
         // std::string StrVal(hexstr);
 	std::string StrVal = xtm_ftostr(apf);
-		
+
 	// Check to make sure that the stringized number is not some string like
 	// "Inf" or NaN, that atof will accept, but the lexer will not.  Check
 	// that the string matches the "[-+]?[0-9]" regex.
@@ -2522,7 +2489,7 @@ namespace extemp {
 	      return mk_string(_sc, StrVal.c_str());
 	    }
 	}
-		
+
 	// Otherwise we could not reparse it to exactly the same value, so we must
 	// output the string in hexadecimal format!  Note that loading and storing
 	// floating point types changes the bits of NaNs on some hosts, notably
@@ -2533,7 +2500,7 @@ namespace extemp {
 	// Floats are represented in ASCII IR as double, convert.
 	//if (!isDouble) apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
 	apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
-		
+
 	char tmpstr[256];
 	tmpstr[0] = '0';
 	tmpstr[1] = 'x';
@@ -2542,23 +2509,23 @@ namespace extemp {
 	strcat(tmpstr, v);
 	//std::cout << "STR: " << tmpstr << "  v: " << v <<  std::endl;
 	return mk_string(_sc, tmpstr);
-    }	
+    }
 
 
      // this all here to conver 64bit floats (as a string) into llvms hex floating point notation :(
      pointer SchemeFFI::llvm_convert_double_constant(scheme* _sc, pointer args)
-     {		
+     {
  	char* floatin = string_value(pair_car(args));
  	char floatout[256];
         // if already converted to hex value just return Hex String Unchanged
-        if(floatin[1]=='x') return pair_car(args); 
+        if(floatin[1]=='x') return pair_car(args);
  #ifdef _WIN32
  	double f = strtod(floatin, (char**) &floatout);
  #else
  	double f = strtod(floatin, (char**) &floatout);
  #endif
- 	llvm::APFloat apf(f); 
- 		
+ 	llvm::APFloat apf(f);
+
 	bool ignored;
 	bool isDouble = true; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
  	double Val = isDouble ? apf.convertToDouble() : apf.convertToFloat();
@@ -2567,7 +2534,7 @@ namespace extemp {
         // apf.convertToHexString(hexstr,0,false,llvm::APFloat::rmTowardZero);
         // std::string StrVal(hexstr);
  	std::string StrVal = xtm_ftostr(apf);
- 		
+
  	// Check to make sure that the stringized number is not some string like
  	// "Inf" or NaN, that atof will accept, but the lexer will not.  Check
  	// that the string matches the "[-+]?[0-9]" regex.
@@ -2580,7 +2547,7 @@ namespace extemp {
  		return mk_string(_sc, StrVal.c_str());
  	    }
  	}
- 		
+
  	// Otherwise we could not reparse it to exactly the same value, so we must
  	// output the string in hexadecimal format!  Note that loading and storing
  	// floating point types changes the bits of NaNs on some hosts, notably
@@ -2591,7 +2558,7 @@ namespace extemp {
  	// Floats are represented in ASCII IR as double, convert.
  	//if (!isDouble) apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
  	//apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
- 		
+
  	char tmpstr[256];
  	tmpstr[0] = '0';
  	tmpstr[1] = 'x';
@@ -2600,35 +2567,35 @@ namespace extemp {
  	strcat(tmpstr, v);
  	//std::cout << "STR: " << tmpstr << "  v: " << v <<  std::endl;
  	return mk_string(_sc, tmpstr);
-     }	
- 
+     }
+
 
     pointer SchemeFFI::llvm_count_set(scheme* _sc, pointer args)
     {
         EXTLLVM::LLVM_COUNT = ivalue(pair_car(args));
-	return mk_integer(_sc, EXTLLVM::LLVM_COUNT);		
+	return mk_integer(_sc, EXTLLVM::LLVM_COUNT);
     }
 
 
     pointer SchemeFFI::llvm_count_inc(scheme* _sc, pointer args)
     {
 	EXTLLVM::LLVM_COUNT++;
-	return mk_integer(_sc, EXTLLVM::LLVM_COUNT);		
+	return mk_integer(_sc, EXTLLVM::LLVM_COUNT);
     }
 
     pointer SchemeFFI::llvm_count(scheme* _sc, pointer args)
     {
 	return mk_integer(_sc, EXTLLVM::LLVM_COUNT);
     }
-	
+
     pointer SchemeFFI::printLLVMModule(scheme* _sc, pointer args)
     {
 	llvm::Module* M = EXTLLVM::I()->M;
 	std::string str;
 	llvm::raw_string_ostream ss(str);
-		
+
 	if(list_length(_sc, args) > 0) {
-    llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(args)));    
+    llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(args)));
     //llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(args))));
 	    if(val == NULL) {
 		std::cerr << "No such value found in LLVM Module" << std::endl;
@@ -2639,7 +2606,7 @@ namespace extemp {
 	} else {
 	    ss << *M;
 	}
-		
+
 	printf("%s",str.c_str());
 	return _sc->T;
     }
@@ -2648,19 +2615,19 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 {
   //llvm::Module* M = EXTLLVM::I()->M;
   //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));      
+  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
 	std::string str;
 	llvm::raw_string_ostream ss(str);
 	ss << *func;
 	printf("%s",str.c_str());
-	return _sc->T;		
+	return _sc->T;
 }
 
     pointer SchemeFFI::symbol_pointer(scheme* _sc, pointer args)
     {
 	void* library = cptr_value(pair_car(args));
 	char* symname = string_value(pair_cadr(args));
-		
+
 #ifdef _WIN32
         void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
 #else
@@ -2671,7 +2638,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 	}
 	return mk_cptr(_sc,ptr);
     }
-	
+
   pointer SchemeFFI::bind_symbol(scheme* _sc, pointer args)
   {
     void* library = cptr_value(pair_car(args));
@@ -2681,7 +2648,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
     llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
 
     llvm::MutexGuard locked(EE->lock);
-		
+
 #ifdef _WIN32
     void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
 #else
@@ -2727,7 +2694,7 @@ pointer SchemeFFI::get_llvm_alias(scheme* _sc, pointer args)
 	if (iter != LLVM_ALIAS_TABLE.end()) {
     return mk_string(_sc, iter->second.c_str());
   }
-  return _sc->F; 
+  return _sc->F;
 }
 
 pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
@@ -2735,8 +2702,8 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
 	char* n = string_value(pair_car(args));
 	char nk[256];
 	char* name = nk;
-	strcpy(name,n);        
-	if (name[0] == '%') name = name+1;	
+	strcpy(name,n);
+	if (name[0] == '%') name = name+1;
 
 	int ptrdepth = 0;
 	while(name[strlen(name)-1] == '*') {
@@ -2744,16 +2711,16 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
     ptrdepth++;
 	}
 
-	//llvm::Module* M = EXTLLVM::I()->M;	
+	//llvm::Module* M = EXTLLVM::I()->M;
 	//const llvm::Type* tt = M->getTypeByName(name);
-  const llvm::Type* tt = extemp::EXTLLVM::I()->getNamedType(name);  
+  const llvm::Type* tt = extemp::EXTLLVM::I()->getNamedType(name);
 
 	if(tt) {
 	  //return mk_string(_sc,M->getTypeName(tt).c_str());
 	  std::string typestr;
 	  llvm::raw_string_ostream ss(typestr);
 	  tt->print(ss);
-	  
+
 
 	  const char* tmp_name = ss.str().c_str();
 	  if(tt->isStructTy()) {
@@ -2761,7 +2728,7 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
 	    rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
 	    tmp_name = tmp_str_b;
 	  }
-	  
+
 	  //add back any requried '*'s
 	  if(ptrdepth>0) {
 	    char tmpstr[256];
@@ -2774,16 +2741,16 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
 	  }
 	  return mk_string(_sc,tmp_name);
 	} else {
-	  return _sc->NIL; 
+	  return _sc->NIL;
 	}
 }
-	
+
     ////////////////////////////////////////////////////////////
     //
     //  DSP BITS
     //
     ////////////////////////////////////////////////////////////
-	
+
     pointer SchemeFFI::setDSPClosure(scheme* _sc, pointer args)
     {
 	AudioDevice::I()->setDSPClosure(cptr_value(pair_car(args)));
@@ -2795,13 +2762,13 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
       AudioDevice::I()->setDSPMTClosure(cptr_value(pair_car(args)),ivalue(pair_cadr(args)));
 	return _sc->T;
     }
-	
+
     pointer SchemeFFI::setDSPWrapper(scheme* _sc, pointer args)
     {
 	AudioDevice::I()->setDSPWrapper((dsp_f_ptr)cptr_value(pair_car(args)));
 	return _sc->T;
     }
-	
+
     pointer SchemeFFI::setDSPWrapperArray(scheme* _sc, pointer args)
     {
 	AudioDevice::I()->setDSPWrapperArray((dsp_f_ptr_array)cptr_value(pair_car(args)));
