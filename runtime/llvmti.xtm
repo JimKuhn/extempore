@@ -2543,10 +2543,18 @@
 
 (define *impc:aot:current-output-port* #f)
 (define *impc:aot:current-lib-name* "xtmdylib")
+(define *impc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
 (define *impc:aot:func-defs-in-mod* '())
 ;; should be a cons pair e.g. '(libGLU .
 ;; "/System/Library/Frameworks/OpenGL.framework/OpenGL")
 (define *impc:aot:current-load-dylib-info* #f)
+
+(define impc:aot:add-win-link-library
+  (lambda (libname)
+    (if (not (regex:match? libname "opengl32"))
+        (set! *impc:aot:win-link-libraries*
+              (cons (regex:replace (sanitize-platform-path libname) "dll$" "lib")
+                    *impc:aot:win-link-libraries*)))))
 
 (define impc:aot:currently-compiling?
   (lambda ()
@@ -2693,12 +2701,12 @@
 (define get-llvm-path
   (lambda ()
     (sanitize-platform-path
-     ;; otherwise have a gewd look
-     (let ((path_from_env (sys:command-output (unix-or-Windows "echo $EXT_LLVM_DIR" "echo %EXT_LLVM_DIR%"))))
-       (if (not (or (string=? path_from_env "") (string=? path_from_env "%EXT_LLVM_DIR%")))
-           path_from_env
-           ;; otherwise, it should be in SHARE_DIR/llvm-build
-           (string-append (sys:share-dir) "/llvm"))))))
+     (if (file-exists? (string-append (sys:share-dir) "/llvm"))
+         (string-append (sys:share-dir) "/llvm")
+         (let ((path_from_env (sys:command-output (unix-or-Windows "echo $EXT_LLVM_DIR" "echo %EXT_LLVM_DIR%"))))
+           (if (not (or (string=? path_from_env "") (string=? path_from_env "%EXT_LLVM_DIR%")))
+               path_from_env
+               #f))))))
 
 ;; insert arbitrary sexp into the AOT-compilation
 ;; file, otherwise do nothing
@@ -2754,12 +2762,7 @@
                                                      ((string=? platform "OSX") ".dylib")
                                                      ((string=? platform "Windows") ".dll"))))
              (link-libs (if (string=? platform "Windows")
-                            (cl:remove-if-not
-                             (lambda (s)
-                               (and (regex:match? s "\\.lib$")
-                                    (not (regex:match? s (string-append module-name "\\.lib$")))))
-                             (append (sys:directory-list output-dir)
-                                     (sys:directory-list (string-append (sys:share-dir) "\\libs\\platform-shlibs\\"))))
+                            *impc:aot:win-link-libraries*
                             '()))
              (optimize-compiles? #t)
              (llc-command
@@ -10033,8 +10036,6 @@ xtlang's `let' syntax is the same as Scheme"
   ;; (println 'bind-type args)
   (if (null? args)
       (impc:compiler:print-compiler-error "Bind type missing arguments! (symbol type [docstring])"))
-  (if (regex:match? (symbol->string (car args)) "^[a-z].*")
-      (print-with-colors 'cyan 'black #t (print "Note: by convention XTLang prefers capitalized named types\nYour reference constructor will be capitalized, your value constructor lower case.\n")))
   (let* ((symbol (car args))
          (type_1 (cadr args))
          (type (string->symbol
@@ -10345,6 +10346,7 @@ xtlang's `let' syntax is the same as Scheme"
                   (interaction-environment))
             (set! *impc:aot:current-load-dylib-info*
                   (cons library (cdr dylib-pair)))
+            (impc:aot:add-win-link-library (cdr dylib-pair))
             (impc:compiler:print-dylib-loading-details-to-log (cdr dylib-pair))
             #t)
           (begin
