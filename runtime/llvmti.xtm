@@ -2748,8 +2748,7 @@
 
 (define impc:aot:compile-module
   (lambda (module-name module exit-afterwards?)
-    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc")))
-      (opt-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/opt"))))
+    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
              (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))

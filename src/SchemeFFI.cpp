@@ -1630,6 +1630,7 @@ namespace extemp {
 
 #else
     static std::string sInlineString; // This is a hack for now, but it *WORKS*
+    static std::string sInlineBitcode;
     static std::unordered_set<std::string> sInlineSyms;
     if (sInlineString.empty()) {
         std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
@@ -1640,6 +1641,14 @@ namespace extemp {
         std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), globalSymRegex, 1),
                 std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
     }
+    // if (sInlineBitcode.empty()) { // currently screws up declarations
+    //     auto newModule(parseAssemblyString(sInlineString, pa, getGlobalContext()));
+    //     if (newModule) {
+    //         std::string bitcode;
+    //         llvm::raw_string_ostream bitstream(sInlineBitcode);
+    //         llvm::WriteBitcodeToFile(newModule.get(), bitstream);
+    //     }
+    // }
     std::string asmcode(assm);
     auto context(LLVMContextCreate());
     auto newModule(parseAssemblyString(asmcode, pa, *unwrap(context)));

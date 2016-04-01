@@ -612,3 +612,4 @@ declare i64 @llvm_now()
 declare i8* @memset(i8* %dest, i32 %val, i64 %len)
 
 declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1)
+
