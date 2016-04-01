@@ -1633,29 +1633,52 @@ namespace extemp {
     static std::string sInlineBitcode;
     static std::unordered_set<std::string> sInlineSyms;
     if (sInlineString.empty()) {
-        std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
-        std::stringstream inString;
-        inString << inStream.rdbuf();
-        sInlineString = inString.str();
+        {
+            std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
+            std::stringstream inString;
+            inString << inStream.rdbuf();
+            sInlineString = inString.str();
+        }
         std::regex globalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)");
         std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), globalSymRegex, 1),
                 std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
+        {
+            std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
+            std::stringstream inString;
+            inString << inStream.rdbuf();
+            std::string tString = inString.str();
+            std::copy(std::sregex_token_iterator(tString.begin(), tString.end(), globalSymRegex, 1),
+                    std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
+        }
     }
-    // if (sInlineBitcode.empty()) { // currently screws up declarations
-    //     auto newModule(parseAssemblyString(sInlineString, pa, getGlobalContext()));
-    //     if (newModule) {
-    //         std::string bitcode;
-    //         llvm::raw_string_ostream bitstream(sInlineBitcode);
-    //         llvm::WriteBitcodeToFile(newModule.get(), bitstream);
-    //     }
-    // }
+    if (sInlineBitcode.empty()) {
+        // need to avoid parsing the types twice
+        static bool first(true);
+        if (!first) {
+            auto newModule(parseAssemblyString(sInlineString, pa, getGlobalContext()));
+            if (newModule) {
+                std::string bitcode;
+                llvm::raw_string_ostream bitstream(sInlineBitcode);
+                llvm::WriteBitcodeToFile(newModule.get(), bitstream);
+                std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
+                std::stringstream inString;
+                inString << inStream.rdbuf();
+                sInlineString = inString.str();
+            } else {
+std::cout << pa.getMessage().str() << std::endl;
+                abort();
+            }
+        } else {
+            first = false;
+        }
+    }
     std::string asmcode(assm);
     auto context(LLVMContextCreate());
     auto newModule(parseAssemblyString(asmcode, pa, *unwrap(context)));
     bool built(newModule);
     newModule.reset();
+    LLVMContextDispose(context);
     if (likely(!built)) {
-        LLVMContextDispose(context);
         std::regex globalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::ECMAScript);
         std::vector<std::string> symbols;
         std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), globalSymRegex, 1),
@@ -1706,9 +1729,18 @@ namespace extemp {
             }
         }
 // std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
-        asmcode = dstream.str() + sInlineString + asmcode;
+        auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), getGlobalContext()));
+        if (likely(modOrErr)) {
+            newModule = std::move(modOrErr.get());
+            asmcode = sInlineString + dstream.str() + asmcode;
+            if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
+std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
+                newModule.reset();
+            }
+        }
+    } else {
+        newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
     }
-    newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
 if (!newModule) {
 std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
 std::cout << pa.getMessage().str() << std::endl;
