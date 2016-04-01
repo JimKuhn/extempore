@@ -54,6 +54,11 @@ if(NOT CMAKE_BUILD_TYPE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+if(NOT LLVM_BUILD_TYPE)
+  message(STATUS "Building 'Release' LLVM configuration")
+  set(LLVM_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
+
 # # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 # set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/extras/cmake CACHE PATH
 #   "path to Extempore's cmake modules")
@@ -274,7 +279,7 @@ if(DOWNLOAD_LLVM)
       -DCMAKE_OSX_SYSROOT=macosx
       -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
       -DLLVM_TARGETS_TO_BUILD=X86
-      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
       -DLLVM_ENABLE_ZLIB=OFF
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
@@ -288,7 +293,7 @@ if(DOWNLOAD_LLVM)
       PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
       CMAKE_ARGS
       -DLLVM_TARGETS_TO_BUILD=X86
-      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
       -DLLVM_ENABLE_ZLIB=OFF
       -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
