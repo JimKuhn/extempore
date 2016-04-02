@@ -1719,7 +1719,15 @@ std::cout << pa.getMessage().str() << std::endl;
                     } else {
                         first = false;
                     }
-                    arg.getType()->print(dstream);
+                    std::string type;
+                    llvm::raw_string_ostream typeStream(type);
+                    arg.getType()->print(typeStream);
+                    auto str(typeStream.str());
+                    std::string::size_type pos(str.find('='));
+                    if (pos != std::string::npos) {
+                        str.erase(pos);
+                    }
+                    dstream << str;
                 }
                 dstream << ")\n";
                 // func->print(dstream);
