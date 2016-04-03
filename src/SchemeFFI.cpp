@@ -1601,6 +1601,7 @@ namespace extemp {
 #ifdef EXT_MCJIT
   static long long llvm_emitcounter = 0;
 #endif
+static bool sEmitCode = false;
   pointer SchemeFFI::jitCompileIRString(scheme* _sc, pointer args)
   {
     // Create some module to put our function into it.
@@ -1729,8 +1730,10 @@ std::cout << pa.getMessage().str() << std::endl;
                     }
                     dstream << str;
                 }
+                if (func->isVarArg()) {
+                    dstream << ", ...";
+                }
                 dstream << ")\n";
-                // func->print(dstream);
             } else {
                 gv->print(dstream);
                 dstream << '\n';
@@ -1741,6 +1744,9 @@ std::cout << pa.getMessage().str() << std::endl;
         if (likely(modOrErr)) {
             newModule = std::move(modOrErr.get());
             asmcode = sInlineString + dstream.str() + asmcode;
+if (sEmitCode) {
+    std::cout << "EMITTING\n" << asmcode << "DONE EMITTING\n";
+}
             if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
 std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
                 newModule.reset();
