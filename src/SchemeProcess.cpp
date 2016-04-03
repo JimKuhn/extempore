@@ -68,7 +68,7 @@ extern llvm_zone_t* llvm_zone_create(uint64_t);
 
 namespace extemp {
 
-thread_local SchemeProcess* SchemeProcess::sm_current = 0;
+__thread SchemeProcess* SchemeProcess::sm_current = 0;
 std::map<std::string, SchemeProcess*> SchemeProcess::sm_nameMap;
 const char* SchemeProcess::sm_banner = "\n"
         "##########################################\n"

@@ -71,9 +71,9 @@ struct llvm_zone_stack
     llvm_zone_stack* tail;
 };
 
-extern thread_local llvm_zone_stack* tls_llvm_zone_stack;
-extern thread_local uint64_t tls_llvm_zone_stacksize;
-extern thread_local llvm_zone_t* tls_llvm_callback_zone;
+extern __thread llvm_zone_stack* tls_llvm_zone_stack;
+extern __thread uint64_t tls_llvm_zone_stacksize;
+extern __thread llvm_zone_t* tls_llvm_callback_zone;
 
 /* extern double (&cosd)(double); */
 /* extern double (&tand)(double); */

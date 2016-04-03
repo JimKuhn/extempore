@@ -113,7 +113,7 @@ private:
     char            m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH];
 
     static const char*                           sm_banner;
-    static thread_local SchemeProcess*           sm_current;
+    static __thread SchemeProcess*           sm_current;
     static std::map<std::string, SchemeProcess*> sm_nameMap;
 private:
     void schemeCallback(TaskI* Task) {
