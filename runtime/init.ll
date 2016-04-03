@@ -630,3 +630,8 @@ declare i32 @get_address_offset(i64, %clsvar*) nounwind
 declare i1 @check_address_type(i64, %clsvar*, i8*) nounwind
 declare i1 @check_address_exists(i64, %clsvar*) nounwind
 
+declare i32 @printf(i8* noalias nocapture, ...)
+declare i32 @sprintf(i8*, i8* noalias nocapture, ...)
+declare i32 @sscanf(i8*, i8* noalias nocapture, ...)
+declare i32 @fprintf(i8*, i8* noalias nocapture, ...)
+declare i32 @fscanf(i8*, i8* noalias nocapture, ...)
