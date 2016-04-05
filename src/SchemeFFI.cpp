@@ -1601,6 +1601,20 @@ namespace extemp {
 #ifdef EXT_MCJIT
   static long long llvm_emitcounter = 0;
 #endif
+
+static std::string SanitizeType(llvm::Type* Type)
+{
+    std::string type;
+    llvm::raw_string_ostream typeStream(type);
+    Type->print(typeStream);
+    auto str(typeStream.str());
+    std::string::size_type pos(str.find('='));
+    if (pos != std::string::npos) {
+        str.erase(pos - 1);
+    }
+    return str;
+}
+
   pointer SchemeFFI::jitCompileIRString(scheme* _sc, pointer args)
   {
     // Create some module to put our function into it.
@@ -1702,16 +1716,7 @@ std::cout << pa.getMessage().str() << std::endl;
             }
             auto func(extemp::EXTLLVM::I()->getFunction(sym));
             if (func) {
-                dstream << "declare ";
-                std::string type;
-                llvm::raw_string_ostream typeStream(type);
-                func->getReturnType()->print(typeStream);
-                auto str(typeStream.str());
-                std::string::size_type pos(str.find('='));
-                if (pos != std::string::npos) {
-                    str.erase(pos);
-                }
-                dstream << str << " @" << sym << " (";
+                dstream << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
                 bool first(true);
                 for (const auto& arg : func->getArgumentList()) {
                     if (!first) {
@@ -1719,13 +1724,12 @@ std::cout << pa.getMessage().str() << std::endl;
                     } else {
                         first = false;
                     }
-                    arg.getType()->print(dstream);
+                    dstream << SanitizeType(arg.getType());
                 }
                 dstream << ")\n";
-                // func->print(dstream);
             } else {
-                gv->print(dstream);
-                dstream << '\n';
+                auto str(SanitizeType(gv->getType()));
+                dstream << '@' << sym << " = external global " << str.substr(0, str.length() - 1) << '\n';
             }
         }
 // std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
@@ -1741,14 +1745,8 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     } else {
         newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
     }
-if (!newModule) {
-std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
-std::cout << pa.getMessage().str() << std::endl;
-abort();
-}
-    if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);
-
     if (newModule) {
+        if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);
         if(EXTLLVM::OPTIMIZE_COMPILES) {
             PM->run(*newModule);
         } else {
@@ -1761,7 +1759,8 @@ abort();
     //std::stringstream ss;
     if(newModule == 0)
       {
- // std::cout << "CODE: \n" << asmcode << std::endl;
+// std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
+// std::cout << pa.getMessage().str() << std::endl << pa.getLineNo() << std::endl;
         std::string errstr;
         llvm::raw_string_ostream ss(errstr);
         pa.print("LLVM IR",ss);
