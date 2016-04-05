@@ -1615,6 +1615,8 @@ static std::string SanitizeType(llvm::Type* Type)
     return str;
 }
 
+static bool sEmitCode = false;
+
   pointer SchemeFFI::jitCompileIRString(scheme* _sc, pointer args)
   {
     // Create some module to put our function into it.
@@ -1726,6 +1728,9 @@ std::cout << pa.getMessage().str() << std::endl;
                     }
                     dstream << SanitizeType(arg.getType());
                 }
+                if (func->isVarArg()) {
+                    dstream << ", ...";
+                }
                 dstream << ")\n";
             } else {
                 auto str(SanitizeType(gv->getType()));
@@ -1737,6 +1742,9 @@ std::cout << pa.getMessage().str() << std::endl;
         if (likely(modOrErr)) {
             newModule = std::move(modOrErr.get());
             asmcode = sInlineString + dstream.str() + asmcode;
+if (sEmitCode) {
+    std::cout << "EMITTING\n" << asmcode << "DONE EMITTING\n";
+}
             if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
 std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
                 newModule.reset();

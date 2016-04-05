@@ -204,9 +204,9 @@ void llvm_runtime_error(int error,void* arg)
 // but currently isn't!
 // FIX ME!!
 
-thread_local llvm_zone_stack* tls_llvm_zone_stack = 0;
-thread_local uint64_t tls_llvm_zone_stacksize = 0;
-thread_local llvm_zone_t* tls_llvm_callback_zone = 0;
+__thread llvm_zone_stack* tls_llvm_zone_stack = 0;
+__thread uint64_t tls_llvm_zone_stacksize = 0;
+__thread llvm_zone_t* tls_llvm_callback_zone = 0;
 
 llvm_zone_t* llvm_pop_zone_stack()
 {
