@@ -5,26 +5,10 @@ option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
-option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
-option(EXTENDED_DEPS "download & build deps for aot_extended" ON)
+option(BUILD_DEPS "download & build deps for aot_extended" ON)
 
-if(PACKAGE)
-  # this needs to be set before project() is called
-  set(CMAKE_OSX_SYSROOT macosx)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
-  message(STATUS "Building Extempore for binary distribution")
-  # need deps if we're packaging
-  set(EXTENDED_DEPS ON CACHE BOOL "" FORCE)
-  if(IN_TREE)
-    set(IN_TREE OFF CACHE BOOL "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" FORCE)
-  endif()
-endif()
-
-project(Extempore VERSION 0.6.1)
-if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
-  message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
-endif()
+# option wrangling
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
@@ -43,6 +27,49 @@ else()
     set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
       "path to Extempore's shared runtime files")
   endif()
+endif()
+
+if(PACKAGE)
+  # this needs to be set before project() is called
+  set(CMAKE_OSX_SYSROOT macosx)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
+  message(STATUS "Building Extempore for binary distribution")
+  # need deps if we're packaging
+  set(BUILD_DEPS ON CACHE BOOL "" FORCE)
+  if(IN_TREE)
+    set(IN_TREE OFF CACHE BOOL "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" FORCE)
+  endif()
+endif()
+
+# logic for deciding whether to download & build LLVM
+if(BUILD_DEPS)
+  if(WIN32)
+    set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
+  else()
+    set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+  endif()
+  set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
+  if(WIN32)
+    set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
+  else()
+    set(EXT_PLATFORM_SHLIBS_DIR ${EXT_SHARE_DIR}/libs/platform-shlibs)
+  endif()
+  if(PACKAGE)
+    set(EXT_DEPS_C_FLAGS "${CMAKE_C_FLAGS_RELEASE} -mtune=generic")
+    set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
+    message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
+  endif()
+elseif(DEFINED ENV{EXT_LLVM_DIR})
+  # if there's an EXT_LLVM_DIR environment variable, use that
+  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
+else()
+  message(FATAL_ERROR "Environment variable EXT_LLVM_DIR must be set if you're using BUILD_DEPS=OFF")
+endif()
+
+project(Extempore VERSION 0.6.1)
+
+if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
+  message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
 endif()
 
 # Set a default build type if none was specified
@@ -232,41 +259,13 @@ endif()
 # if you need to build LLVM by hand, the command will be something like
 # cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-3.8.0-release
 
-# assume that if we can find llvm-config, we already have a working LLVM install
-find_program(LLVM_CONFIG llvm-config
-  ${EXT_LLVM_DIR}/bin
-  NO_DEFAULT_PATH)
-
-# logic for deciding whether to download & build LLVM
-if(EXTENDED_DEPS)
-  set(DOWNLOAD_LLVM ON)
-  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
-  set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
-  if(WIN32)
-    set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
-  else()
-    set(EXT_PLATFORM_SHLIBS_DIR ${EXT_SHARE_DIR}/libs/platform-shlibs)
-  endif()
-  if(PACKAGE)
-    set(EXT_DEPS_C_FLAGS "${CMAKE_C_FLAGS_RELEASE} -mtune=generic")
-    set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
-    message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
-  endif()
-elseif(DEFINED ENV{EXT_LLVM_DIR} AND LLVM_CONFIG)
-  # if there's an environment variable, use that
-  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
-  set(DOWNLOAD_LLVM OFF)
-else()
-  message(FATAL_ERROR "Environment variable EXT_LLVM_DIR must be set if you're using EXTENDED_DEPS=OFF")
-endif()
-
-if(DOWNLOAD_LLVM)
+if(BUILD_DEPS)
   message(STATUS "Downloading and building LLVM (patched for Extempore)")
   include(ExternalProject)
   find_program(PATCH_PROGRAM patch)
 
   if(NOT PATCH_PROGRAM)
-    message(FATAL_ERROR "Cannot find \"patch\", which is required to patch LLVM")
+    message(WARNING "Cannot find \"patch.exe\", which is required to patch LLVM")
   endif()
 
   if(PACKAGE)
@@ -298,18 +297,23 @@ if(DOWNLOAD_LLVM)
       -DLLVM_ENABLE_ZLIB=OFF
       -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
   endif()
-  add_custom_target(LLVM_install
-    COMMENT "This is necessary to get CMake to install LLVM (needed to build Extempore) before the Extempore install step"
-    DEPENDS LLVM
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/llvm/src/LLVM-build/cmake_install.cmake)
+  if(WIN32)
+    add_custom_target(LLVM_install
+      COMMENT "This is necessary to get CMake to install LLVM (needed to build Extempore) before the Extempore install step"
+      DEPENDS LLVM
+      COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/llvm/src/LLVM-build/cmake_install.cmake)
+  else()
+    ExternalProject_Add_StepTargets(LLVM install)
   endif()
+endif()
 
 # the ordering of these libs matters, especially with the gcc linker.
 # Check the output of "llvm-config --libnames" to be sure
 set(EXT_LLVM_LIBRARIES "LLVMLTO;LLVMObjCARCOpts;LLVMLinker;LLVMBitWriter;LLVMIRReader;LLVMAsmParser;LLVMOption;LLVMTableGen;LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMX86Desc;LLVMMCDisassembler;LLVMX86Info;LLVMX86AsmPrinter;LLVMX86Utils;LLVMMCJIT;LLVMipo;LLVMVectorize;LLVMInterpreter;LLVMExecutionEngine;LLVMRuntimeDyld;LLVMCodeGen;LLVMTarget;LLVMScalarOpts;LLVMObject;LLVMMCParser;LLVMBitReader;LLVMInstCombine;LLVMInstrumentation;LLVMTransformUtils;LLVMipa;LLVMMC;LLVMAnalysis;LLVMCore;LLVMSupport")
 
 foreach(llvm_lib ${EXT_LLVM_LIBRARIES})
-  list(APPEND LLVM_LIBRARIES "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${llvm_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  get_filename_component(LLVM_LIB_FULLPATH "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${llvm_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}" ABSOLUTE)
+  list(APPEND LLVM_LIBRARIES ${LLVM_LIB_FULLPATH})
 endforeach()
 
 #########
@@ -356,8 +360,12 @@ endif()
 
 add_dependencies(extempore pcre portaudio)
 
-if(DOWNLOAD_LLVM)
-  add_dependencies(extempore LLVM LLVM_install)
+if(BUILD_DEPS)
+  if(WIN32)
+    add_dependencies(extempore LLVM_install)
+  else()
+    add_dependencies(extempore LLVM)
+  endif()
 endif()
 
 target_include_directories(extempore
@@ -615,7 +623,7 @@ add_custom_target(clean_aot
 # deps for AOT-extended #
 #########################
 
-if(EXTENDED_DEPS)
+if(BUILD_DEPS)
 
   include(ExternalProject)
 
@@ -679,13 +687,16 @@ if(EXTENDED_DEPS)
 
   ExternalProject_Add(assimp
     PREFIX assimp
-    URL https://github.com/assimp/assimp/archive/v3.1.1.zip
+    URL https://github.com/assimp/assimp/archive/v3.2.zip
     CMAKE_ARGS
     -DCMAKE_OSX_SYSROOT=macosx
     -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DASSIMP_BUILD_ASSIMP_TOOLS=OFF
+    -DASSIMP_BUILD_SAMPLES=OFF
+    -DASSIMP_BUILD_TESTS=OFF
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
   if(WIN32)
@@ -769,36 +780,34 @@ if(EXTENDED_DEPS)
       COMMAND ${CMAKE_COMMAND} -E copy libapr-1${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
   elseif(WIN32)
+    if(NOT MSVC14)
+      message(WARNING "Assimp 3.2 automatically appends vc130-mt to the dll/lib files, unless you're on an older version of MSVC - if that's the case, just move the files in manually")
+    endif()
     add_custom_target(extended_deps
-      COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
+      COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile apr
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy
-                                  bin/assimp.dll
-                                  lib/kiss_fft.dll
-                                  lib/nanovg.dll
-                                  lib/portmidi.dll
-                                  # lib/libsndfile-1.dll
-                                  lib/stb_image.dll
-                                  lib/glfw3.dll
-                                  bin/libapr-1.dll
-                                  #on Windows, move the .lib files as well
-                                  lib/assimp.lib
-                                  lib/kiss_fft.lib
-                                  lib/nanovg.lib
-                                  lib/portmidi.lib
-                                  # lib/libsndfile-1.lib
-                                  lib/stb_image.lib
-                                  lib/glfw3dll.lib
-                                  lib/libapr-1.lib
-                                  # destination
-                                  ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy bin/assimp-vc130-mt.dll ${EXT_PLATFORM_SHLIBS_DIR}/assimp.dll
+      COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy bin/libapr-1.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/assimp-vc130-mt.lib ${EXT_PLATFORM_SHLIBS_DIR}/assimp.lib
+      COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      # glfw3 has different base names for the .dll and .lib, so fix that
+      COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}/glfw3.lib
+      COMMAND ${CMAKE_COMMAND} -E copy lib/libapr-1.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
   endif()
 
-  add_dependencies(aot_extended extended_deps)
+endif(BUILD_DEPS)
 
-endif(EXTENDED_DEPS)
+add_dependencies(aot_extended extended_deps)
 
 #########
 # tests #

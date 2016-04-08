@@ -52,13 +52,17 @@
 namespace extemp
 {
 
-__thread EXTThread* EXTThread::sm_current = 0;
+#ifdef _WIN32
+  __declspec( thread ) EXTThread* EXTThread::sm_current = 0;
+#else
+  __thread EXTThread* EXTThread::sm_current = 0;
+#endif
 
 EXTThread::~EXTThread()
 {
 #ifdef _EXTTHREAD_DEBUG_
     if (m_initialised && !m_detached && !m_joined) {
-        dprintf(2, "Resource leak destroying EXTThread: creator has not joined nor detached thread.\n");
+        printf("Resource leak destroying EXTThread: creator has not joined nor detached thread.\n");
     }
 #endif
 }
@@ -76,7 +80,7 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
 #ifdef _WIN32
         std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
         m_thread = std::thread(fn);
-    result = 0;
+        result = 0;
 #else
         result = pthread_create(&m_thread, NULL, Trampoline, this);
         if (!result && !m_name.empty()) {
@@ -87,7 +91,7 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
 	}
 #ifdef _EXTTHREAD_DEBUG_
     if (result) {
-        dprintf(2, "Error creating thread: %d\n", result);
+        printf("Error creating thread: %d\n", result);
 	}
 #endif
 	return result;
@@ -96,7 +100,7 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
 int EXTThread::kill()
 {
 #ifdef _WIN32
-		return 0;
+	return 0;
 #else
     return pthread_cancel(m_thread);
 #endif
@@ -116,7 +120,7 @@ int EXTThread::detach()
 	}
 #ifdef _EXTTHREAD_DEBUG_
     if (result) {
-        dprintf(2, "Error detaching thread: %d\n", result);
+        printf("Error detaching thread: %d\n", result);
 	}
 #endif
 	return result;
@@ -128,7 +132,7 @@ int EXTThread::join()
     if (m_initialised) {
 #ifdef _WIN32
         m_thread.join();
-            result = 0;
+        result = 0;
 #else
         result = pthread_join(m_thread, NULL);
 #endif
@@ -136,7 +140,7 @@ int EXTThread::join()
 	}
 #ifdef _EXTTHREAD_DEBUG_
     if (result) {
-        dprintf(2, "Error joining thread: %d\n", result);
+        printf("Error joining thread: %d\n", result);
 	}
 #endif
 	return result;
@@ -159,7 +163,7 @@ int EXTThread::setPriority(int Priority, bool Realtime)
     }
     int result = pthread_setschedparam(thread, policy, &param);
     if (result) {
-      dprintf(2, "Error: failed to set thread priority: %s\n", strerror(result));
+      printf("Error: failed to set thread priority: %s\n", strerror(result));
       return 0;
     }
     return 1;
@@ -176,12 +180,12 @@ int EXTThread::setPriority(int Priority, bool Realtime)
                                (thread_policy_t)&ttcpolicy,
                                THREAD_TIME_CONSTRAINT_POLICY_COUNT);
     if (result != KERN_SUCCESS) {
-        dprintf(2, "Error: failed to set thread priority: %s\n", strerror(result));
+        printf("Error: failed to set thread priority: %s\n", strerror(result));
         return 0;
       }
     return 1;
 #else
-    dprintf(2, "Error: cannot set thread priority on Windows\n");
+    printf("Error: cannot set thread priority on Windows\n");
     return 0;
 #endif
 }

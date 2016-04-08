@@ -2698,7 +2698,7 @@
 (define get-llvm-path
   (lambda ()
     (sanitize-platform-path
-     (if (file-exists? (string-append (sys:share-dir) "/llvm"))
+     (if (not (null? (sys:directory-list (string-append (sys:share-dir) "/llvm"))))
          (string-append (sys:share-dir) "/llvm")
          (let ((path_from_env (sys:command-output (unix-or-Windows "echo $EXT_LLVM_DIR" "echo %EXT_LLVM_DIR%"))))
            (if (not (or (string=? path_from_env "") (string=? path_from_env "%EXT_LLVM_DIR%")))
@@ -7998,23 +7998,26 @@ xtlang's `let' syntax is the same as Scheme"
 
 (define impc:ti:dotimes-check
   (lambda (ast vars kts request?)
-    (let ((a (impc:ti:type-check (cadr (cadr ast)) vars kts
-                                 (cl:sort (list *impc:ir:fp64* *impc:ir:fp32*
-                                                *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8*) <))))
-      ;; if numeric? and multiple choice - then force a type!
-      (if (number? (cadr (cadr ast)))
-          (cond ((equal? (cl:sort a <)
-                         (cl:sort (list *impc:ir:fp64* *impc:ir:fp32* *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8*) <))
-                 (set! a (list *impc:ir:si64*)))
-                ((equal? (cl:sort a <)
-                         (cl:sort (list *impc:ir:fp64* *impc:ir:fp32*) <))
-                 (set! a (list *impc:ir:fp64*)))
-                (else 'leave-a-alone)))
+    (let ((a (impc:ti:type-check (car (cadr ast)) vars kts #f))
+          (b (impc:ti:type-check (cadr (cadr ast)) vars kts #f)))
+      (if (and (not (impc:ir:type? b))
+               (= (length b) 1))
+          (set! b (car b)))
+      (if (and (not (impc:ir:type? a))
+               (= (length a) 1))
+          (set! a (car a)))
+      (if (and (impc:ir:type? a)
+               (list? b)
+               (member a b))
+          (set! b a))
       ;; (car (cadr ast)) should be a symbol that we want to update with a
       (if (not (symbol? (car (cadr ast))))
           (impc:compiler:print-badly-formed-expression-error 'dotimes ast))
-      (impc:ti:update-var (car (cadr ast)) vars kts a)
-      ;; stretch over body code but don't worry about return types
+      (impc:ti:update-var (car (cadr ast)) vars kts b)
+      (if (and (symbol? (cadr (cadr ast)))
+               (impc:ir:type? a))
+          (impc:ti:update-var (cadr (cadr ast)) vars kts a))
+      ;; check over body code but don't worry about return types
       (impc:ti:type-check (caddr ast) vars kts #f)
       ;; dotimes returns void
       (list *impc:ir:void*))))
