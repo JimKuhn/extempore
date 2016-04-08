@@ -65,7 +65,7 @@ public:
 private:
     std::string          m_name;
     bool                 m_initialised;
-#ifdef EXT_BOOST
+#ifdef _WIN32
     std::recursive_mutex m_mutex;
 #else
     pthread_mutex_t      m_mutex;
@@ -86,7 +86,7 @@ public:
     friend class EXTCondition;
 };
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 
 inline void EXTMutex::init(bool Recursive = true): m_initialised(true)
 {
