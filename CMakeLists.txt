@@ -687,7 +687,7 @@ if(BUILD_DEPS)
 
   ExternalProject_Add(assimp
     PREFIX assimp
-    URL https://github.com/assimp/assimp/archive/v3.2.zip
+    URL https://github.com/assimp/assimp/archive/v3.1.1.zip
     CMAKE_ARGS
     -DCMAKE_OSX_SYSROOT=macosx
     -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
