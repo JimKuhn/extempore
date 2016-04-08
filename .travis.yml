@@ -1,0 +1,12 @@
+sudo: required
+
+language: c++
+
+services:
+  - docker
+
+before_install:
+  - docker build -t jkuhn/extempore ci
+
+script:
+  - docker run jkuhn/extempore extempore --noaudio --run extempore/tests/all-core.xtm

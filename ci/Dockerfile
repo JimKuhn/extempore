@@ -15,7 +15,7 @@ sudo apt-get update\n\
 sudo apt-get install -y --no-install-recommends build-essential g++ cmake\n\
 sudo apt-get clean\n\
 '|/bin/bash -l
-RUN git clone --depth 1 git://github.com/digego/extempore
+RUN git clone --depth 1 git://github.com/JimKuhn/extempore
 RUN mkdir extempore/cmake-build && cd extempore/cmake-build && cmake ..
 RUN sudo apt-get install -y --no-install-recommends libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp3v5 libglfw3 libportmidi-dev && sudo apt-get clean
 RUN sudo apt-get install -y --no-install-recommends python && sudo apt-get clean
