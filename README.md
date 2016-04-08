@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/JimKuhn/extempore.svg?branch=master)](https://travis-ci.org/JimKuhn/extempore)
+
 Extempore is a systems programming language designed to support the
 programming of real-time systems *in real-time*. Extempore promotes
 human orchestration as a meta model of real-time man-machine
