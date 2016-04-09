@@ -22,9 +22,10 @@ before_install:
   - sudo apt-get install -y --no-install-recommends build-essential g++ libasound2-dev libgl1-mesa-dev python libxrandr-dev libxinerama-dev libxcursor-dev libcurl3 zlib1g-dev
   - mkdir cmake && wget --no-check-certificate -O- https://cmake.org/files/v3.5/cmake-3.5.1-Linux-x86_64.tar.gz|tar xzf - --strip-components=1 -C cmake
   - export PATH=$(pwd)/cmake/bin:$PATH
-  - mkdir cmake-build && cd cmake-build && cmake -DCMAKE_BUILD_TYPE=Release .. && cd ..
+  - mkdir cmake-build && cd cmake-build && cmake -DCMAKE_BUILD_TYPE=Release .. && make BUILD_DEPS
 
 script:
+  - cd cmake-build && ldd deps-install/lib/libnanovg.so & cd ..
   - cd cmake-build
   - make -j $(($(nproc) + 1))
   - make aot_extended
