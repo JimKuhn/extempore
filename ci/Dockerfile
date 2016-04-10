@@ -25,5 +25,5 @@ RUN cd extempore/cmake-build && make -j $(($(nproc) + 1)) extempore
 RUN cd extempore/cmake-build && make -j $(($(nproc) + 1)) extended_deps
 RUN cd extempore/cmake-build && make aot_extended
 
-EXPOSE 7099
-CMD ["extempore"]
+EXPOSE 7099 7098 7097
+CMD ["extempore/cmake-build/extempore"]
