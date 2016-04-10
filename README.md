@@ -37,6 +37,8 @@ To see Extempore in action, check out these videos:
 
 # Installation
 
+[![Join the chat at https://gitter.im/JimKuhn/extempore](https://badges.gitter.im/JimKuhn/extempore.svg)](https://gitter.im/JimKuhn/extempore?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 *These are the quick-start options---see* [install.rst](./docs/install.rst)
 *for details in how to build from source.*
 
