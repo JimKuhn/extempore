@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/JimKuhn/extempore.svg?branch=master)](https://travis-ci.org/JimKuhn/extempore)
+[![Join the chat at https://gitter.im/JimKuhn/extempore](https://badges.gitter.im/JimKuhn/extempore.svg)](https://gitter.im/JimKuhn/extempore?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Extempore is a systems programming language designed to support the
 programming of real-time systems *in real-time*. Extempore promotes
@@ -36,8 +37,6 @@ To see Extempore in action, check out these videos:
 - [a more technical intro](http://vimeo.com/20502359)
 
 # Installation
-
-[![Join the chat at https://gitter.im/JimKuhn/extempore](https://badges.gitter.im/JimKuhn/extempore.svg)](https://gitter.im/JimKuhn/extempore?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 *These are the quick-start options---see* [install.rst](./docs/install.rst)
 *for details in how to build from source.*
