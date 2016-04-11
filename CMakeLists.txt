@@ -263,7 +263,7 @@ if(PACKAGE)
 endif()
 
 ##############
-# LLVM 3.7.0 #
+# LLVM 3.8.0 #
 ##############
 
 # if you need to build LLVM by hand, the command will be something like
@@ -280,9 +280,9 @@ if(BUILD_LLVM)
   if(PACKAGE)
     ExternalProject_Add(LLVM
       PREFIX llvm
-      URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
-      URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
-      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
+      URL http://www.llvm.org/releases/3.8.0/llvm-3.8.0.src.tar.xz
+      URL_MD5 07a7a74f3c6bd65de4702bf941b511a0
+      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
       CMAKE_ARGS
       -DCMAKE_OSX_SYSROOT=macosx
       -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
@@ -296,12 +296,10 @@ if(BUILD_LLVM)
   else()
     ExternalProject_Add(LLVM
       PREFIX llvm
-      URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
-      URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
-      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
-      BUILD_COMMAND $(MAKE) all llc
+      URL http://www.llvm.org/releases/3.8.0/llvm-3.8.0.src.tar.xz
+      URL_MD5 07a7a74f3c6bd65de4702bf941b511a0
+      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
       CMAKE_ARGS
-      -DLLVM_BUILD_TOOLS=OFF
       -DLLVM_TARGETS_TO_BUILD=X86
       -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
@@ -320,8 +318,7 @@ endif()
 
 # the ordering of these libs matters, especially with the gcc linker.
 # Check the output of "llvm-config --libnames" to be sure
-set(EXT_LLVM_LIBRARIES "LLVMLTO;LLVMObjCARCOpts;LLVMLinker;LLVMBitWriter;LLVMIRReader;LLVMAsmParser;LLVMOption;LLVMTableGen;LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMX86Desc;LLVMMCDisassembler;LLVMX86Info;LLVMX86AsmPrinter;LLVMX86Utils;LLVMMCJIT;LLVMipo;LLVMVectorize;LLVMInterpreter;LLVMExecutionEngine;LLVMRuntimeDyld;LLVMCodeGen;LLVMTarget;LLVMScalarOpts;LLVMObject;LLVMMCParser;LLVMBitReader;LLVMInstCombine;LLVMInstrumentation;LLVMTransformUtils;LLVMipa;LLVMMC;LLVMAnalysis;LLVMCore;LLVMSupport")
-
+set(EXT_LLVM_LIBRARIES "LLVMLTO;LLVMObjCARCOpts;LLVMSymbolize;LLVMDebugInfoPDB;LLVMDebugInfoDWARF;LLVMMIRParser;LLVMLibDriver;LLVMOption;LLVMTableGen;LLVMOrcJIT;LLVMPasses;LLVMipo;LLVMVectorize;LLVMLinker;LLVMIRReader;LLVMAsmParser;LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMX86Desc;LLVMMCDisassembler;LLVMX86Info;LLVMX86AsmPrinter;LLVMX86Utils;LLVMMCJIT;LLVMLineEditor;LLVMDebugInfoCodeView;LLVMInterpreter;LLVMExecutionEngine;LLVMRuntimeDyld;LLVMCodeGen;LLVMTarget;LLVMScalarOpts;LLVMInstCombine;LLVMInstrumentation;LLVMProfileData;LLVMObject;LLVMMCParser;LLVMTransformUtils;LLVMMC;LLVMBitWriter;LLVMBitReader;LLVMAnalysis;LLVMCore;LLVMSupport")
 foreach(llvm_lib ${EXT_LLVM_LIBRARIES})
   get_filename_component(LLVM_LIB_FULLPATH "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${llvm_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}" ABSOLUTE)
   list(APPEND LLVM_LIBRARIES ${LLVM_LIB_FULLPATH})

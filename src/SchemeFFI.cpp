@@ -43,6 +43,7 @@
 // must be included before anything which pulls in <Windows.h>
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/AsmParser/Parser.h"
+#include "llvm-c/Core.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
@@ -1909,7 +1910,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     for (int i=0;i<Ms.size();i++) {
       M = Ms[i];
       for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
-        const llvm::Function* func = GI;
+        const llvm::Function* func = &*GI;
         if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
           //printf("HIT %s\n",func->getName().data());
           std::string str;
@@ -1938,7 +1939,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     for (int i=0;i<Ms.size();i++) {
       M = Ms[i];
       for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
-        const llvm::Function* func = GI;
+        const llvm::Function* func = &*GI;
         if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
           last_name = (char*)func->getName().data();
         }
@@ -1960,7 +1961,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     for (int i=0;i<Ms.size();i++) {
       M = Ms[i];
       for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
-        const llvm::Function* func = GI;
+        const llvm::Function* func = &*GI;
         if (func->hasName() && strcmp(func->getName().data(),fname)==0) {
           std::string str;
           llvm::raw_string_ostream ss(str);
@@ -2176,7 +2177,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
     while(funcargs != func->getArgumentList().end())
       {
-        Argument* a = funcargs;
+        Argument* a = &*funcargs;
         {
             EnvInjector injector(_sc, p);
         std::string typestr2;
@@ -2418,7 +2419,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 	//std::cout << "ARGS: " << lgth << std::endl;
 	for(int i=0;i<lgth;i++,++funcargs)
 	{
-	    Argument* a = funcargs;
+	    Argument* a = &*funcargs;
 	    pointer p = list_ref(_sc, i, args);
 	    if(is_integer(p)) {
 		if(a->getType()->getTypeID() != Type::IntegerTyID)

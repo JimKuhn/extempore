@@ -541,10 +541,7 @@ void* thread_fork(void*(*start_routine)(void*), void* args) {
 }
 
 void thread_destroy(void* thread) {
-
   delete static_cast<extemp::EXTThread*>(thread);
-
-	return;
 }
 
 int thread_join(void* thread) {
@@ -1303,7 +1300,7 @@ namespace extemp {
             PM->add(llvm::createArgumentPromotionPass());
             PM->add(llvm::createCFGSimplificationPass());
             PM->add(llvm::createDeadStoreEliminationPass());
-            PM->add(llvm::createFunctionAttrsPass());
+            // PM->add(llvm::createFunctionAttrsPass());
             PM->add(llvm::createFunctionInliningPass());\
             PM->add(llvm::createGVNPass(true));
             PM->add(llvm::createIndVarSimplifyPass());
@@ -1447,7 +1444,7 @@ namespace extemp {
 	    EE->updateGlobalMapping("free16", (uint64_t)&free16);
 	    EE->updateGlobalMapping("list_ref", (uint64_t)&list_ref);
 	    EE->updateGlobalMapping("thread_fork", (uint64_t)&thread_fork);
-	    EE->updateGlobalMapping("thread_destroy", (uint64_t)&thread_destroy);      
+	    EE->updateGlobalMapping("thread_destroy", (uint64_t)&thread_destroy);
 	    EE->updateGlobalMapping("thread_join", (uint64_t)&thread_join);
 	    EE->updateGlobalMapping("thread_kill", (uint64_t)&thread_kill);
 	    EE->updateGlobalMapping("thread_self", (uint64_t)&thread_self);
