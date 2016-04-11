@@ -1669,6 +1669,7 @@
     ("tgamma" . #((213 0 0) "" ()))
     ("tgammaf" . #((213 1 1) "" ()))
     ("thread_fork" . #((213 108 108 108) "" ()))
+    ("thread_destroy" . #((213 -1 108) "" ()))
     ("thread_join" . #((213 4 108) "" ()))
     ("thread_kill" . #((213 4 108) "" ()))
     ("thread_self" . #((213 108) "" ()))
@@ -2697,13 +2698,16 @@
 
 (define get-llvm-path
   (lambda ()
-    (sanitize-platform-path
-     (if (not (null? (sys:directory-list (string-append (sys:share-dir) "/llvm"))))
-         (string-append (sys:share-dir) "/llvm")
-         (let ((path_from_env (sys:command-output (unix-or-Windows "echo $EXT_LLVM_DIR" "echo %EXT_LLVM_DIR%"))))
-           (if (not (or (string=? path_from_env "") (string=? path_from_env "%EXT_LLVM_DIR%")))
-               path_from_env
-               #f))))))
+    (let ((path_from_env (sys:command-output (unix-or-Windows "echo $EXT_LLVM_DIR" "echo %EXT_LLVM_DIR%"))))
+      (cond
+       ((not (or (string=? path_from_env "") (string=? path_from_env "%EXT_LLVM_DIR%")))
+        (sanitize-platform-path path_from_env))
+       ((not (null? (sys:directory-list (string-append (sys:share-dir) "/llvm"))))
+        (sanitize-platform-path (string-append (sys:share-dir) "/llvm")))
+       (else
+        (print-with-colors 'yellow 'default #t (print "Warning"))
+        (print " could not find llvm path\n")
+        #f)))))
 
 ;; insert arbitrary sexp into the AOT-compilation
 ;; file, otherwise do nothing

@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
 
-option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
 option(ASIO "use the ASIO Portaudio backend" OFF)
@@ -8,7 +7,11 @@ option(JACK "use the Jack Portaudio backend" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
 option(BUILD_DEPS "download & build deps for aot_extended" ON)
 
-# option wrangling
+####################
+# option wrangling #
+####################
+
+# share directory
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
@@ -29,6 +32,8 @@ else()
   endif()
 endif()
 
+# packaging (binary distribution)
+
 if(PACKAGE)
   # this needs to be set before project() is called
   set(CMAKE_OSX_SYSROOT macosx)
@@ -41,13 +46,23 @@ if(PACKAGE)
   endif()
 endif()
 
-# logic for deciding whether to download & build LLVM
+# LLVM
+
+if(DEFINED ENV{EXT_LLVM_DIR})
+  # if there's an EXT_LLVM_DIR environment variable, use that
+  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
+  set(BUILD_LLVM OFF)
+elseif(WIN32)
+  set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
+  set(BUILD_LLVM ON)
+else()
+  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+  set(BUILD_LLVM ON)
+endif()
+
+# building external shared library dependencies
+
 if(BUILD_DEPS)
-  if(WIN32)
-    set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
-  else()
-    set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
-  endif()
   set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
   if(WIN32)
     set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
@@ -59,11 +74,6 @@ if(BUILD_DEPS)
     set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
     message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
   endif()
-elseif(DEFINED ENV{EXT_LLVM_DIR})
-  # if there's an EXT_LLVM_DIR environment variable, use that
-  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
-else()
-  message(FATAL_ERROR "Environment variable EXT_LLVM_DIR must be set if you're using BUILD_DEPS=OFF")
 endif()
 
 project(Extempore VERSION 0.6.1)
@@ -259,8 +269,7 @@ endif()
 # if you need to build LLVM by hand, the command will be something like
 # cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-3.8.0-release
 
-if(BUILD_DEPS)
-  message(STATUS "Downloading and building LLVM (patched for Extempore)")
+if(BUILD_LLVM)
   include(ExternalProject)
   find_program(PATCH_PROGRAM patch)
 
@@ -323,6 +332,26 @@ endforeach()
 # *must* have Boost on Windows
 if(WIN32)
   set(BOOST ON)
+  if(NOT BOOST_DIR)
+    # if BOOST_DIR has been set elsewhere, assume it's all present and
+    # correct and go with that. Otherwise, download boost with nuget
+    # commandline tool and stick it in ${CMAKE_SOURCE_DIR}/boost
+    set(BOOST_DIR ${CMAKE_SOURCE_DIR}/boost)
+    # check nuget commandline tool is installed
+    find_program(NUGET nuget)
+    if(NOT NUGET)
+      message(FATAL "Cannot find nuget command line tool.\nEither install it with e.g. choco install nuget.commandline, or get boost some other way and set the -DBOOST_DIR variable")
+    else()
+      if(NOT IS_DIRECTORY ${BOOST_DIR})
+        # if directory exists, assume this step has already been done
+        message(STATUS "Downloading boost components into ${CMAKE_SOURCE_DIR}/boost with \"nuget install\"")
+        file(MAKE_DIRECTORY ${BOOST_DIR})
+        execute_process(
+          COMMAND ${NUGET} install -Version 1.59 boost-vc140
+          WORKING_DIRECTORY ${BOOST_DIR})
+      endif()
+    endif()
+  endif()
 endif()
 
 #############
@@ -360,7 +389,7 @@ endif()
 
 add_dependencies(extempore pcre portaudio)
 
-if(BUILD_DEPS)
+if(BUILD_LLVM)
   if(WIN32)
     add_dependencies(extempore LLVM_install)
   else()
@@ -381,12 +410,7 @@ target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 
 # compiler options
 
-if(MCJIT)
-  target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
-  message(STATUS "Using the new LLVM MCJIT backend...")
-else()
-  message(STATUS "Using the old LLVM JIT backend...")
-endif()
+target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
 
 if(PACKAGE)
   target_compile_definitions(extempore
@@ -459,23 +483,11 @@ if(WIN32)
     ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
 endif()
 
-# boost (messily hardcoded for version 1.59 and Visual Studio 14)
-
 if(BOOST)
-  if(NOT BOOST_DIR)
-    message(STATUS "Searching for boost libs in ${CMAKE_SOURCE_DIR}/boost")
-    set(BOOST_DIR ${CMAKE_SOURCE_DIR}/boost)
-  endif()
-  target_compile_definitions(extempore PRIVATE -DEXT_BOOST -DBOOST_EXCEPTION_DISABLE)
-  # asio header
-  find_path(BOOST_ASIO_INCLUDE_DIR
-    NAMES boost/asio.hpp
-    PATHS ${BOOST_DIR}/boost.1.59.0.0/lib/native/include)
-  if(BOOST_ASIO_INCLUDE_DIR)
-    target_include_directories(extempore PRIVATE ${BOOST_ASIO_INCLUDE_DIR})
-  else()
-    message(FATAL_ERROR "Cannot find boost/asio.hpp header")
-  endif()
+  target_include_directories(extempore
+    PRIVATE ${BOOST_DIR}/boost.1.59.0.0/lib/native/include)
+  target_compile_definitions(extempore
+    PRIVATE -DEXT_BOOST -DBOOST_EXCEPTION_DISABLE)
   target_link_libraries(extempore
     PRIVATE ${BOOST_DIR}/boost_date_time-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_date_time-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
     PRIVATE ${BOOST_DIR}/boost_regex-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_regex-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
@@ -562,17 +574,22 @@ else(WIN32)
   function(aotcompile_lib lib group port) # deps are optional, and go at the end
     get_filename_component(basename ${lib} NAME_WE)
     set(targetname aot_${basename})
-    add_custom_target(${targetname}
-      COMMAND extempore --nobase
-                        $<$<NOT:$<PLATFORM_ID:Windows>>:--noaudio>
-                        $<$<AND:$<PLATFORM_ID:Darwin>,$<BOOL:PACKAGE>>:--mcpu=generic>
-                        $<$<BOOL:PACKAGE>:--attr=none>
-                        --port=${port}
-                        --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
-      BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
-      WORKING_DIRECTORY ${EXT_SHARE_DIR}
-      VERBATIM)
-    add_dependencies(${targetname} extempore)
+    if(PACKAGE)
+      add_custom_target(${targetname}
+        COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${port}
+        --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
+        BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
+        WORKING_DIRECTORY ${EXT_SHARE_DIR}
+        VERBATIM)
+    else(PACKAGE)
+      add_custom_target(${targetname}
+        COMMAND extempore --nobase --noaudio --port=${port}
+        --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
+        BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
+        WORKING_DIRECTORY ${EXT_SHARE_DIR}
+        VERBATIM)
+    endif(PACKAGE)
+  add_dependencies(${targetname} extempore)
     add_dependencies(${group} ${targetname})
     foreach(dep ${ARGN})
       add_dependencies(${targetname} aot_${dep})
@@ -752,7 +769,7 @@ if(BUILD_DEPS)
     ExternalProject_Add(sndfile
       PREFIX libsndfile
       URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
-      CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite
+      CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
       BUILD_COMMAND make CFLAGS=${EXT_DEPS_C_FLAGS}
       INSTALL_COMMAND make install
       BUILD_IN_SOURCE ON)
@@ -783,21 +800,18 @@ if(BUILD_DEPS)
       COMMAND ${CMAKE_COMMAND} -E copy libapr-1${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
   elseif(WIN32)
-    if(NOT MSVC14)
-      message(WARNING "Assimp 3.2 automatically appends vc130-mt to the dll/lib files, unless you're on an older version of MSVC - if that's the case, just move the files in manually")
-    endif()
     add_custom_target(extended_deps
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile apr
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy bin/assimp-vc130-mt.dll ${EXT_PLATFORM_SHLIBS_DIR}/assimp.dll
+      COMMAND ${CMAKE_COMMAND} -E copy bin/assimp-vc130-mt.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy bin/libapr-1.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/assimp-vc130-mt.lib ${EXT_PLATFORM_SHLIBS_DIR}/assimp.lib
+      COMMAND ${CMAKE_COMMAND} -E copy lib/assimp-vc130-mt.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
