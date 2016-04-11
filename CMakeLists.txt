@@ -299,7 +299,9 @@ if(BUILD_LLVM)
       URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
       URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
       PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
+      BUILD_COMMAND $(MAKE) all llc
       CMAKE_ARGS
+      -DLLVM_BUILD_TOOLS=OFF
       -DLLVM_TARGETS_TO_BUILD=X86
       -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
@@ -770,7 +772,7 @@ if(BUILD_DEPS)
       PREFIX libsndfile
       URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
       CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
-      BUILD_COMMAND make CFLAGS=${EXT_DEPS_C_FLAGS}
+      BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
       INSTALL_COMMAND make install
       BUILD_IN_SOURCE ON)
 
@@ -778,7 +780,7 @@ if(BUILD_DEPS)
       PREFIX apr
       URL http://mirror.ventraip.net.au/apache/apr/apr-1.5.2.tar.gz
       CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --enable-threads --disable-static
-      BUILD_COMMAND make
+      BUILD_COMMAND $(MAKE)
       INSTALL_COMMAND make install
       BUILD_IN_SOURCE ON)
   endif()
