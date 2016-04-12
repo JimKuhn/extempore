@@ -135,14 +135,14 @@ extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, boo
 }
 
 extern "C" {
-//////////////////////////////////////////////////////////////////
-//  CLOCK/TIME
-#ifdef EXT_BOOST
+// clock/time
+#ifdef _WIN32
 #include <chrono>
 
 inline double getRealTime()
 {
-    return std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    return double(std::chrono::high_resolution_clock::now().time_since_epoch().count()) *
+            system_clock::period::num / system_clock::period::den;
 }
 
 #elif __linux__

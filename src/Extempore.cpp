@@ -138,131 +138,141 @@ int main(int argc, char** argv)
     // redirect stderr to NULL
     freopen("/dev/null", "w", stderr);
 
-	// signal handlers for OSX/Linux
+        // signal handlers for OSX/Linux
     if (signal(SIGINT, sig_handler) == SIG_ERR) {
-		printf("\nWarning: can't catch SIGINT.\n");
+                printf("\nWarning: can't catch SIGINT.\n");
     }
     if (signal(SIGTERM, sig_handler) == SIG_ERR) {
-		printf("\nWarning: can't catch SIGTERM.\n");
+                printf("\nWarning: can't catch SIGTERM.\n");
     }
 #else
-	// evil windows termination code
+        // evil windows termination code
     SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE );
 #endif
 
     CSimpleOptA args(argc, argv, g_rgOptions);
     while (args.Next()) {
-      if (args.LastError() == SO_SUCCESS) {
-	switch(args.OptionId()) {
-	case OPT_SHAREDIR:
-    extemp::UNIV::SHARE_DIR = std::string(args.OptionArg());
-	  break;
-        case OPT_SAMPLERATE:
-	  extemp::UNIV::SAMPLERATE = atoi(args.OptionArg());
-	  break;
-        case OPT_FRAMES:
-	  extemp::UNIV::FRAMES = atoi(args.OptionArg());
-	  break;
-        case OPT_CHANNELS:
-	  extemp::UNIV::CHANNELS = atoi(args.OptionArg());
-	  break;
-        case OPT_IN_CHANNELS:
-	  extemp::UNIV::IN_CHANNELS = atoi(args.OptionArg());
-	  break;
-        case OPT_INITEXPR:
-          initexpr = std::string(args.OptionArg());
-    break;
-        case OPT_INITFILE:
-                initexpr = std::string("(sys:load \"") + args.OptionArg() + "\")";
-	  break;
-  case OPT_NOBASE:
+        if (args.LastError() == SO_SUCCESS) {
+            switch(args.OptionId()) {
+            case OPT_SHAREDIR:
+                extemp::UNIV::SHARE_DIR = std::string(args.OptionArg());
+                break;
+            case OPT_SAMPLERATE:
+                extemp::UNIV::SAMPLERATE = atoi(args.OptionArg());
+                break;
+            case OPT_FRAMES:
+                extemp::UNIV::FRAMES = atoi(args.OptionArg());
+                break;
+            case OPT_CHANNELS:
+                extemp::UNIV::CHANNELS = atoi(args.OptionArg());
+                break;
+            case OPT_IN_CHANNELS:
+                extemp::UNIV::IN_CHANNELS = atoi(args.OptionArg());
+                break;
+            case OPT_INITEXPR:
+                initexpr = std::string(args.OptionArg());
+                break;
+            case OPT_INITFILE:
+                {
+                    size_t start_pos = 0;
+                    std::string str(args.OptionArg());
+                    std::string from("\\");
+                    std::string to("\\\\");
+                    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+                        str.replace(start_pos, from.length(), to);
+                        start_pos += to.length();
+                    }
+                    initexpr = std::string("(sys:load \"") + str + std::string("\")");
+                }
+                break;
+            case OPT_NOBASE:
                 extemp::UNIV::EXT_LOADBASE = false;
-    break;
-	case OPT_PORT:
-	  primary_port = atoi(args.OptionArg());
-	  utility_port = primary_port-1;
-    break;
-  case OPT_TERM:
+                break;
+            case OPT_PORT:
+                primary_port = atoi(args.OptionArg());
+                utility_port = primary_port - 1;
+                break;
+            case OPT_TERM:
                 if (!strcmp(args.OptionArg(), "cmd")) {
-	    extemp::UNIV::EXT_TERM = 1;
+                    extemp::UNIV::EXT_TERM = 1;
                 } else if (!strcmp(args.OptionArg(), "basic")) {
-      extemp::UNIV::EXT_TERM = 2;
-                }else if (strcmp(args.OptionArg(), "nocolor")) {
-      extemp::UNIV::EXT_TERM = 3;
+                    extemp::UNIV::EXT_TERM = 2;
+                } else if (strcmp(args.OptionArg(), "nocolor")) {
+                        extemp::UNIV::EXT_TERM = 3;
                 } else {
-	    extemp::UNIV::EXT_TERM = 0;
-	  }
-          break;
-	case OPT_NO_AUDIO:
+                    extemp::UNIV::EXT_TERM = 0;
+                }
+                break;
+            case OPT_NO_AUDIO:
                 extemp::UNIV::AUDIO_NONE = true;
-    break;
-	case OPT_TIME_DIV:
-	  extemp::UNIV::TIME_DIVISION = atoi(args.OptionArg());
-    break;
-	case OPT_DEVICE:
-	  extemp::UNIV::AUDIO_DEVICE = atoi(args.OptionArg());
-          break;
-	case OPT_IN_DEVICE:
-	  extemp::UNIV::AUDIO_IN_DEVICE = atoi(args.OptionArg());
-          break;
+                break;
+            case OPT_TIME_DIV:
+                extemp::UNIV::TIME_DIVISION = atoi(args.OptionArg());
+                break;
+            case OPT_DEVICE:
+                extemp::UNIV::AUDIO_DEVICE = atoi(args.OptionArg());
+                break;
+            case OPT_IN_DEVICE:
+                extemp::UNIV::AUDIO_IN_DEVICE = atoi(args.OptionArg());
+                break;
             case OPT_LATENCY:
                 extemp::UNIV::AUDIO_OUTPUT_LATENCY = atoi(args.OptionArg()) / 1000.0;
                 break;
 #if !( defined (___ALSA_AUDIO___) || defined (COREAUDIO))
-	case OPT_PRT_DEVICES:
-          extemp::AudioDevice::printDevices();
-	  return 0;
+            case OPT_PRT_DEVICES:
+                extemp::AudioDevice::printDevices();
+                return 0;
 #endif
-        case OPT_REALTIME:
+            case OPT_REALTIME:
 #ifdef _WIN32
-          SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
+                SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
 #else
-	  std::cout << "Realtime priority setting not available on your platform" << std::endl;
+                std::cout << "Realtime priority setting not available on your platform" << std::endl;
 #endif
-    break;
-  case OPT_ARCH:
+                break;
+            case OPT_ARCH:
                 extemp::UNIV::ARCH = args.OptionArg();
-    break;
-  case OPT_CPU:
+                break;
+            case OPT_CPU:
                 extemp::UNIV::CPU = args.OptionArg();
-    break;
-  case OPT_ATTR:
+                break;
+            case OPT_ATTR:
                 extemp::UNIV::ATTRS.push_back(args.OptionArg());
-    break;
-        case OPT_HELP:
-	default:
-	  std::cout << "Extempore's command line options: " << std::endl;
-	  std::cout << "            --help: prints this menu" << std::endl;
-	  std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
-	  std::cout << "            --port: port for primary process [7099]" << std::endl;
-	  std::cout << "            --term: either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor" << std::endl;
-	  std::cout << "        --sharedir: location of the Extempore share dir (which contains runtime/, libs/, examples/, etc.)" << std::endl;
-	  std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
-	  std::cout << "           --nobase: don't load base lib on startup" << std::endl;
-	  std::cout << "      --samplerate: audio samplerate" << std::endl;
-	  std::cout << "          --frames: attempts to force frames [128]" << std::endl;
-	  std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
-	  std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
-	  std::cout << "         --noaudio: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
-    std::cout << "         --timediv: timed sub divisions of FRAMES for scheduling engine (1 = no division which is the defaul)" << std::endl;
-	  std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
+                break;
+            case OPT_HELP:
+            default:
+                std::cout << "Extempore's command line options: " << std::endl;
+                std::cout << "            --help: prints this menu" << std::endl;
+                std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
+                std::cout << "            --port: port for primary process [7099]" << std::endl;
+                std::cout << "            --term: either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor" << std::endl;
+                std::cout << "        --sharedir: location of the Extempore share dir (which contains runtime/, libs/, examples/, etc.)" << std::endl;
+                std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
+                std::cout << "           --nobase: don't load base lib on startup" << std::endl;
+                std::cout << "      --samplerate: audio samplerate" << std::endl;
+                std::cout << "          --frames: attempts to force frames [128]" << std::endl;
+                std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
+                std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
+                std::cout << "         --noaudio: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
+                std::cout << "         --timediv: timed sub divisions of FRAMES for scheduling engine (1 = no division which is the defaul)" << std::endl;
+                std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
                 std::cout << "         --latency: attempts to force audio output latency" << std::endl;
-	  std::cout << "        --indevice: the index of the audio input device to use" << std::endl;
-    std::cout << "            --arch: the target architecture [current host]" << std::endl;
-    std::cout << "             --cpu: the target cpu [current host]" << std::endl;
-    std::cout << "            --attr: additional target attributes (allows multiple)" << std::endl;
-	  std::cout << "   --print-devices: print the available audio devices to console" << std::endl;
-	  return 0;
-	}
-      } else {
-        std::string key(args.OptionText());
+                std::cout << "        --indevice: the index of the audio input device to use" << std::endl;
+                std::cout << "            --arch: the target architecture [current host]" << std::endl;
+                std::cout << "             --cpu: the target cpu [current host]" << std::endl;
+                std::cout << "            --attr: additional target attributes (allows multiple)" << std::endl;
+                std::cout << "   --print-devices: print the available audio devices to console" << std::endl;
+                return 0;
+            }
+        } else {
+            std::string key(args.OptionText());
             std::string val = (!args.OptionArg()) ? "" : args.OptionArg();
             if (key.substr(0, 2) != "--") {
-            std::cout << "Poorly formed argument: " << key << std::endl;
-            return 1;
+                std::cout << "Poorly formed argument: " << key << std::endl;
+                return 1;
+            }
+            extemp::UNIV::CMDPARAMS[key.substr(2)] = val;
         }
-        extemp::UNIV::CMDPARAMS[key.substr(2)] = val;
-      }
     }
     ascii_normal();
     std::cout << std::endl;
@@ -273,11 +283,11 @@ int main(int argc, char** argv)
     std::cout << std::endl;
     ascii_default();
 #if defined(_WIN32) && defined(EXT_MCJIT)
-	// on Windows with MCJIT we need to add "-elf" to the target triple, see
-	// http://lists.cs.uiuc.edu/pipermail/llvmdev/2013-December/068407.html
-	if (extemp::UNIV::ARCH.empty()) {
+        // on Windows with MCJIT we need to add "-elf" to the target triple, see
+        // http://lists.cs.uiuc.edu/pipermail/llvmdev/2013-December/068407.html
+        if (extemp::UNIV::ARCH.empty()) {
         extemp::UNIV::ARCH.push_back(llvm::sys::getProcessTriple() + "-elf");
-	};
+        };
 #endif
 
     extemp::TaskScheduler::I()->start();

@@ -22,8 +22,3 @@ RUN sudo apt-get install -y --no-install-recommends libasound2-dev libgl1-mesa-d
 RUN sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev
 
 RUN cd extempore/cmake-build && make -j $(($(nproc) + 1)) extempore
-RUN cd extempore/cmake-build && make -j $(($(nproc) + 1)) extended_deps
-RUN cd extempore/cmake-build && make aot_extended
-
-EXPOSE 7099 7098 7097
-CMD ["extempore/cmake-build/extempore"]

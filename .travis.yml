@@ -1,31 +1,46 @@
-sudo: required
-dist: trusty
+sudo: false
 
 language: cpp
 
 compiler:
   - gcc
+  - clang
 
 addons:
   apt:
     sources:
     - ubuntu-toolchain-r-test
+    - llvm-toolchain-precise-3.8
     packages:
     - gcc-5
     - g++-5
+    - clang-3.8
+    - build-essential
+    - libasound2-dev
+    - libgl1-mesa-dev
+    - python
+    - libxrandr-dev
+    - libxinerama-dev
+    - libxcursor-dev
+    - libcurl3
+    - zlib1g-dev
 
 before_install:
-  - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
-  - sudo apt-get -qq update
-  - sudo apt-get remove -y cmake
-  - sudo apt-get install -y --no-install-recommends build-essential g++ libasound2-dev libgl1-mesa-dev python libxrandr-dev libxinerama-dev libxcursor-dev libcurl3 zlib1g-dev
   - mkdir cmake && wget --no-check-certificate -O- https://cmake.org/files/v3.5/cmake-3.5.1-Linux-x86_64.tar.gz|tar xzf - --strip-components=1 -C cmake
   - export PATH=$(pwd)/cmake/bin:$PATH
+
+install:  
+  - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
+  - if [ "$CXX" = "clang++" ]; then export CXX="clang++-3.8" CC="clang-3.8"; fi
   - mkdir cmake-build && cd cmake-build && cmake -DCMAKE_BUILD_TYPE=Release .. && cd ..
 
 script:
   - cd cmake-build
+  - set -e
   - make -j $(($(nproc) + 1)) extempore
   - make -j $(($(nproc) + 1)) extended_deps
   - make aot_extended
   - ./extempore --noaudio --run ../tests/all-core.xtm
+
+after_success:  
+  - ../docker/trigger.sh
