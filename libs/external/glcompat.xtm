@@ -14,12 +14,10 @@
 
 (sys:load-preload-check 'gl)
 
-(bind-func check-forced-gl-getprocaddress
-  (lambda ()
-    (not (null? (getenv "EXTEMPORE_FORCE_GL_GETPROCADDRESS")))))
+(define forced-gl-getprocaddress #f)
 
 (sys:load
- (cond ((or (eq? (check-forced-gl-getprocaddress) 0) (string=? (sys:platform) "Windows"))
+  (cond ((or forced-gl-getprocaddress (string=? (sys:platform) "Windows"))
          "libs/external/gl/glcompat-getprocaddress.xtm")
        ((string=? (sys:platform) "OSX")
          "libs/external/gl/glcompat-directbind.xtm")
