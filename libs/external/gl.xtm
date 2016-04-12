@@ -19,7 +19,7 @@
     (not (null? (getenv "EXTEMPORE_FORCE_GL_GETPROCADDRESS")))))
 
 (sys:load
- (cond ((or (eq? check-forced-gl-getprocaddress 0) (string=? (sys:platform) "Windows"))
+ (cond ((or (eq? (check-forced-gl-getprocaddress) 0) (string=? (sys:platform) "Windows"))
          "libs/external/gl/glcore-getprocaddress.xtm")
        ((string=? (sys:platform) "OSX")
          "libs/external/gl/glcore-directbind.xtm")
