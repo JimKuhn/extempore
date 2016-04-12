@@ -612,16 +612,7 @@ else(WIN32)
   aotcompile_lib(libs/external/portmidi.xtm aot_extended 17081 base)
   aotcompile_lib(libs/external/stb_image.xtm aot_extended 17077 base)
   aotcompile_lib(libs/external/glfw3.xtm aot_extended 17075 base)
-  if(EXISTS "/etc/os-release")
-    EXECUTE_PROCESS(
-      COMMAND grep ^VERSION_ID /etc/os-release
-      COMMAND awk -F= "{ print $2 }"
-      COMMAND tr -d "\n\" "
-      OUTPUT_VARIABLE SYSTEM_VER
-      RESULT_VARIABLE SYSTEM_VER_RESULT
-  )
-  endif()
-  if(WIN32 OR SYSTEM_VER STREQUAL "12.04")
+  if(WIN32 OR DEFINED ENV{EXTEMPORE_FORCE_GL_GETPROCADDRESS})
     set(GL_BIND_METHOD getprocaddress)
   else()
     set(GL_BIND_METHOD directbind)
