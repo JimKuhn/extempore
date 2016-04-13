@@ -62,14 +62,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Target/TargetOptions.h"
-#ifdef EXT_MCJIT
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
-#else
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/ExecutionEngine/JIT.h"
-#include "llvm/PassManager.h"
-#endif
 
 #include "SchemeFFI.h"
 #include "AudioDevice.h"
@@ -1007,13 +1001,8 @@ namespace extemp {
 
     pointer SchemeFFI::mcjitEnabled(scheme* _sc, pointer args)
     {
-#ifdef EXT_MCJIT
       return _sc->T;
-#else
-      return _sc->F;
-#endif
     }
-
     pointer SchemeFFI::cmdarg(scheme* _sc, pointer args)
     {
       char* key = string_value(pair_car(args));
@@ -1599,9 +1588,7 @@ namespace extemp {
         return _sc->T;
     }
 
-#ifdef EXT_MCJIT
   static long long llvm_emitcounter = 0;
-#endif
 
 static std::string SanitizeType(llvm::Type* Type)
 {
@@ -1626,26 +1613,15 @@ static bool sEmitCode = false;
     legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
     legacy::PassManager* PM_NO = extemp::EXTLLVM::I()->PM_NO;
 
-#ifdef EXT_MCJIT
     char modname[256];
     sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
     char tmpbuf[1024];
-#endif
 
     char* assm = string_value(pair_car(args));
     SMDiagnostic pa;
     //ParseError pa;
     long long num_of_funcs = M->getFunctionList().size();
 
-#ifndef EXT_MCJIT
-    std::unique_ptr<llvm::Module> newModule = ParseAssemblyString(assm, M, pa, getGlobalContext());
-
-    if(EXTLLVM::OPTIMIZE_COMPILES)
-      {
-        PM->run(*M);
-      }
-
-#else
     static std::string sInlineString; // This is a hack for now, but it *WORKS*
     static std::string sInlineBitcode;
     static std::unordered_set<std::string> sInlineSyms;
@@ -1763,8 +1739,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
         }
       }
 
-#endif
-
     //std::stringstream ss;
     if(newModule == 0)
       {
@@ -1774,37 +1748,14 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
         llvm::raw_string_ostream ss(errstr);
         pa.print("LLVM IR",ss);
         printf("%s\n",ss.str().c_str());
-#ifndef EXT_MCJIT
-        // if the number of functions in module has changed when
-        // calling runFunction then we assume a stub was made and
-        // appended to the end of the modules function list. we remove
-        // this function now that we no longer need it!
-        if(num_of_funcs != M->getFunctionList().size()) {
-          iplist<Function>::iterator iter = M->getFunctionList().end();
-          Function* func = dyn_cast<Function>(--iter);
-          //std::cout << "REMOVING ON FAIL: " << *func << std::endl;
-          func->dropAllReferences();
-          func->removeFromParent();
-        }
-#endif
         return _sc->F;
       }else{
       if (extemp::EXTLLVM::VERIFY_COMPILES) {
         if (verifyModule(*M)) {
           std::cout << "\nInvalid LLVM IR\n";
-#ifndef EXT_MCJIT
-          if(num_of_funcs != M->getFunctionList().size()) {
-            iplist<Function>::iterator iter = M->getFunctionList().end();
-            Function* func = dyn_cast<Function>(--iter);
-            //std::cout << "REMOVING ON FAIL: " << *func << std::endl;
-            func->dropAllReferences();
-            func->removeFromParent();
-          }
-#endif
           return _sc->F;
         }
       }
-#ifdef EXT_MCJIT
       llvm::Module *modulePtr = newModule.get();
       extemp::EXTLLVM::I()->EE->addModule(std::move(newModule));
       extemp::EXTLLVM::I()->addModule(modulePtr);
@@ -1814,9 +1765,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
       // functions in it - which we'll use later to export the bitcode
       // during AOT-compilation
       return mk_cptr(_sc, modulePtr);
-#else
-      return _sc->T;
-#endif
     }
   }
 
@@ -2002,11 +1950,8 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
   {
     using namespace llvm;
 
-#ifdef EXT_MCJIT
     legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
-#else
-    PassManager* PM = extemp::EXTLLVM::I()->PM;
-#endif
+
     char* struct_type_str = string_value(pair_car(args));
     unsigned long long hash = string_hash((unsigned char*)struct_type_str);
     char name[128];
@@ -2016,11 +1961,9 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     //printf("parse this! %s\n",assm);
     SMDiagnostic pa;
     // Don't!! write this into the default module!
-#ifdef EXT_MCJIT
+
     std::unique_ptr<llvm::Module> newM = parseAssemblyString(assm, pa, getGlobalContext());
-#else
-    const Module* newM = ParseAssemblyString(assm, NULL, pa, getGlobalContext());
-#endif
+
     if(newM == 0)
       {
         return _sc->F;
@@ -2093,11 +2036,8 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
   {
     using namespace llvm;
 
-#ifdef EXT_MCJIT
     Module* m = (Module *)cptr_value(pair_car(args));
-#else
-    Module* m = EXTLLVM::I()->M;
-#endif // EXT_MCJIT
+
     if(m == 0)
       {
         return _sc->F;
@@ -2250,11 +2190,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
       {
         return _sc->F;
       }
-#ifndef EXT_MCJIT
-    extemp::EXTLLVM::I()->EE->lock.acquire();
-    extemp::EXTLLVM::I()->EE->freeMachineCodeForFunction(func);
-    extemp::EXTLLVM::I()->EE->lock.release();
-#endif
     func->deleteBody();
     func->eraseFromParent();
 
@@ -2360,14 +2295,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     try{
       EXTLLVM* xll = EXTLLVM::I();
       ExecutionEngine* EE = xll->EE;
-
-#ifdef EXT_MCJIT
       void* p = NULL;
-#else
-      EE->lock.acquire();
-      void* p = EE->recompileAndRelinkFunction(func);
-      EE->lock.release();
-#endif
     }catch(std::exception& e) {
       std::cout << "EXCEPT: " << e.what() << std::endl;
     }

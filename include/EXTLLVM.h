@@ -252,7 +252,7 @@ static inline uint64_t string_hash(unsigned char* str)
   int64_t llvm_now();
 
   void* thread_fork(void*(*start_routine)(void*),void* args);
-  void thread_destroy(void* thread);  
+  void thread_destroy(void* thread);
   int thread_join(void* thread);
   int thread_kill(void* thread);
   int thread_equal(void* thread1, void* thread2);
@@ -309,9 +309,7 @@ namespace llvm {
   class Function;
   class StructType;
   class ModuleProvider;
-#ifdef EXT_MCJIT
   class SectionMemoryManager;
-#endif
   class ExecutionEngine;
 
   namespace legacy {
@@ -366,9 +364,7 @@ namespace extemp {
     }
     return nullptr;
   }
-#ifdef EXT_MCJIT
   uint64_t getSymbolAddress(const std::string&);
-#endif
   void addModule(llvm::Module* m) { Ms.push_back(m); }
   std::vector<llvm::Module*>& getModules() { return Ms; }
 
@@ -382,9 +378,7 @@ namespace extemp {
 	llvm::ExecutionEngine* EE;
   llvm::legacy::PassManager* PM;
   llvm::legacy::PassManager* PM_NO;
-#ifdef EXT_MCJIT
   std::unique_ptr<llvm::SectionMemoryManager> MM;
-#endif
 
     private:
   std::vector<llvm::Module*> Ms;
