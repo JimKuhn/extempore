@@ -932,6 +932,7 @@ bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
     return false;
   }
   strncpy(c, symbol, pos - symbol);
+  c[pos - symbol] = '\0';
   pointer x = find_slot_in_env(sc, sc->envir, mk_symbol(sc, c), 1);
   if (x == sc->NIL) {
     return false;
