@@ -413,7 +413,9 @@
                    (let ((max (impc:ti:maximize-generic-type base)))
                      (set! max (apply string-append max (make-list ptr-depth "*")))
                      (set! res (impc:ir:get-type-from-pretty-str max))))
-               res))
+               (if (string? res)
+                   (impc:ir:get-type-from-pretty-str res)
+                   res)))
             ((and (char=? (string-ref base 0) #\%)
                   (impc:ti:namedtype-exists? base))
              string-type)
@@ -445,7 +447,7 @@
                          (impc:ti:register-new-namedtype name1 (impc:ir:get-type-from-str type) "")
                          (impc:compiler:print-compiler-error "could not compile new type" (cons name type)))
                      (if *impc:ir:get-type-callback-off*
-                         (impc:ti:compile-type-dataconstructors (string->symbol name1) type #f)
+                         (impc:ti:compile-type-dataconstructors (string->symbol name1) type #f #t #t)
                          (callback (now) 'impc:ti:compile-type-dataconstructors (string->symbol name1) type #f #t #t))
                      string-type)
                    (error ""))))
@@ -3104,7 +3106,7 @@
                  (impc:compiler:print-bad-type-error-with-ast
                   (impc:ir:get-type-from-str (car (cdr (cdr (cadr args)))))
                   "second argument must be a format string" ast)))
-            ((member (car ast) '(llvm_sprintf llvm_fprintf))
+            ((member (car ast) '(llvm_sprintf llvm_sscanf))
              (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
                      (impc:ir:pointer++ *impc:ir:si8*))
                  (impc:compiler:print-bad-type-error-with-ast
@@ -3115,7 +3117,7 @@
                  (impc:compiler:print-bad-type-error-with-ast
                   (impc:ir:get-type-from-str (car (cdr (cdr (cadr args)))))
                   "second argument must be a format string" ast)))
-            (else (impc:compiler:print-bad-type-error-with-ast "" "Bad VARARGS func!")))
+            (else (impc:compiler:print-bad-type-error "" "Bad VARARGS func!")))
       (if (equal? (car ast) 'llvm_printf)
           (string-append (apply string-append (map (lambda (a) (car a)) args))
                          "\n" va " = call i32 (i8*, ...) @printf("

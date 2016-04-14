@@ -76,7 +76,7 @@ if(BUILD_DEPS)
   endif()
 endif()
 
-project(Extempore VERSION 0.6.1)
+project(Extempore VERSION 0.7.0)
 
 if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
   message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
@@ -99,6 +99,50 @@ endif()
 # # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 # set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/extras/cmake CACHE PATH
 #   "path to Extempore's cmake modules")
+
+####################
+# platform/version #
+####################
+
+# this stuff is handy to make sure that the packages/test platforms
+# get sensible names
+
+if(UNIX)
+  find_program(UNAME_PROGRAM uname)
+  execute_process(COMMAND ${UNAME_PROGRAM} -m
+    OUTPUT_VARIABLE UNAME_MACHINE_NAME
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${UNAME_PROGRAM} -r
+    OUTPUT_VARIABLE UNAME_OS_RELEASE
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${UNAME_PROGRAM} -s
+    OUTPUT_VARIABLE UNAME_OS_NAME
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif(UNIX)
+
+if(APPLE)
+  set(EXTEMPORE_SYSTEM_NAME "OSX")
+  execute_process(COMMAND sw_vers -productVersion
+    OUTPUT_VARIABLE EXTEMPORE_SYSTEM_VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  string(REGEX MATCH "^10.[0-9]+" EXTEMPORE_SYSTEM_VERSION ${EXTEMPORE_SYSTEM_VERSION})
+  set(EXTEMPORE_SYSTEM_ARCHITECTURE ${UNAME_MACHINE_NAME})
+elseif(UNIX)
+  set(EXTEMPORE_SYSTEM_NAME ${UNAME_OS_NAME})
+  set(EXTEMPORE_SYSTEM_VERSION ${UNAME_OS_RELEASE})
+  set(EXTEMPORE_SYSTEM_ARCHITECTURE ${UNAME_MACHINE_NAME})
+elseif(WIN32)
+  set(EXTEMPORE_SYSTEM_NAME "Windows")
+  string(REGEX MATCH "^[0-9]+" EXTEMPORE_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION})
+  # deal with Windows version number shenanigans
+  if(${EXTEMPORE_SYSTEM_VERSION} LESS 10)
+    string(CONCAT ACTUAL_VERSION_EXPRESSION "${EXTEMPORE_SYSTEM_VERSION}" " + 1")
+    math(EXPR EXTEMPORE_SYSTEM_VERSION ${ACTUAL_VERSION_EXPRESSION})
+  endif()
+  set(EXTEMPORE_SYSTEM_ARCHITECTURE ${CMAKE_SYSTEM_PROCESSOR})
+else()
+  message(FATAL_ERROR "Sorry, Extempore isn't supported on this platform - OSX, Linux & Windows only.")
+endif()
 
 ########
 # PCRE #
@@ -830,12 +874,68 @@ add_dependencies(aot_extended extended_deps)
 include(CTest)
 
 if(BUILD_TESTING)
-  add_test(
-    NAME core
-    COMMAND extempore --noaudio --port=17097 --run tests/all-core.xtm)
-  add_test(
-    NAME extended
-    COMMAND extempore --noaudio --port=17097 --run tests/all-external.xtm)
+
+  # tests - core
+  add_test(NAME system
+    COMMAND extempore --noaudio --port=17099 --eval "(xtmtest-run-tests \"tests/core/system.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME adt
+    COMMAND extempore --noaudio --port=17097 --eval "(xtmtest-run-tests \"tests/core/adt.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME math
+    COMMAND extempore --noaudio --port=17095 --eval "(xtmtest-run-tests \"tests/core/math.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME std
+    COMMAND extempore --noaudio --port=17093 --eval "(xtmtest-run-tests \"tests/core/std.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME xtlang
+    COMMAND extempore --noaudio --port=17091 --eval "(xtmtest-run-tests \"tests/core/xtlang.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME generics
+    COMMAND extempore --noaudio --port=17089 --eval "(xtmtest-run-tests \"tests/core/generics.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+
+  # tests - external
+  add_test(NAME fft
+    COMMAND extempore --noaudio --port=17087 --eval "(xtmtest-run-tests \"tests/external/fft.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+
+  # examples - core
+  add_test(NAME fmsynth
+    COMMAND extempore --port=17085 --eval "(sys:load-then-quit \"examples/core/fmsynth.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME xthread
+    COMMAND extempore --port=17083 --eval "(sys:load-then-quit \"examples/core/xthread.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME scheduler
+    COMMAND extempore --port=17081 --eval "(sys:load-then-quit \"examples/core/scheduler.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME nbody_lang_shootout
+    COMMAND extempore --port=17079 --eval "(sys:load-then-quit \"examples/core/nbody_lang_shootout.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+
+  # examples - external
+  add_test(NAME electrofunk
+    COMMAND extempore --port=17077 --eval "(sys:load-then-quit \"examples/external/electrofunk.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME triangle
+    COMMAND extempore --port=17069 --eval "(sys:load-then-quit \"examples/external/shader-tutorials/triangle.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME raymarcher
+    COMMAND extempore --port=17075 --eval "(sys:load-then-quit \"examples/external/raymarcher.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME spectrogram
+    COMMAND extempore --port=17073 --eval "(sys:load-then-quit \"examples/external/spectrogram.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME gl-compatibility
+    COMMAND extempore --port=17067 --eval "(sys:load-then-quit \"examples/external/gl-compatibility.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME xtmrender3
+    COMMAND extempore --port=17071 --eval "(sys:load-then-quit \"examples/external/xtmrender3.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME going-native
+    COMMAND extempore --port=17065 --eval "(sys:load-then-quit \"examples/external/going-native.xtm\" 60)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
 endif()
 
 ##########
@@ -861,20 +961,16 @@ add_dependencies(xtmdoc extempore)
 set(CPACK_PACKAGE_NAME "Extempore")
 set(CPACK_PACKAGE_VENDOR "Andrew Sorensen")
 set(CPACK_PACKAGE_CONTACT "Ben Swift")
-
-# CPACK_PACKAGE_DIRECTORY
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
-
-# CPACK_PACKAGE_DESCRIPTION_FILE
-
+set(CPACK_PACKAGE_FILE_NAME Extempore-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}-${EXTEMPORE_SYSTEM_NAME}${EXTEMPORE_SYSTEM_VERSION}${EXTEMPORE_SYSTEM_ARCHITECTURE})
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (http://extempore.moso.com.au)")
 
 if(APPLE)
   set(CPACK_GENERATOR DragNDrop)
 elseif(UNIX AND NOT APPLE)
-  set(CPACK_GENERATOR "TGZ;DEB")
+  set(CPACK_GENERATOR TGZ)
 elseif(WIN32)
   set(CPACK_GENERATOR ZIP)
   # set(CPACK_GENERATOR NSIS64)
