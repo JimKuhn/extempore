@@ -283,6 +283,7 @@ namespace extemp {
 	    { "regex:replace",		          &SchemeFFI::regex_replace },
 	    // llvm stuff
 	    { "llvm:optimize",			        &SchemeFFI::optimizeCompiles },
+        { "llvm:fast-compile",                  &SchemeFFI::fastCompiles },
 	    { "llvm:jit-compile-ir-string", &SchemeFFI::jitCompileIRString},
       { "llvm:ffi-set-name",          &SchemeFFI::ff_set_name },
       { "llvm:ffi-get-name",          &SchemeFFI::ff_get_name },
@@ -1582,6 +1583,12 @@ namespace extemp {
         return _sc->T;
     }
 
+    pointer SchemeFFI::fastCompiles(scheme* _sc, pointer args)
+    {
+        EXTLLVM::FAST_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0;
+        return _sc->T;
+    }
+
     pointer SchemeFFI::verifyCompiles(scheme* _sc, pointer args)
     {
         EXTLLVM::VERIFY_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0;
@@ -1604,7 +1611,6 @@ static std::string SanitizeType(llvm::Type* Type)
 }
 
 static bool sEmitCode = false;
-
   pointer SchemeFFI::jitCompileIRString(scheme* _sc, pointer args)
   {
     // Create some module to put our function into it.
@@ -1666,11 +1672,15 @@ std::cout << pa.getMessage().str() << std::endl;
         }
     }
     std::string asmcode(assm);
-    auto context(LLVMContextCreate());
-    auto newModule(parseAssemblyString(asmcode, pa, *unwrap(context)));
-    bool built(newModule);
-    newModule.reset();
-    LLVMContextDispose(context);
+    std::unique_ptr<llvm::Module> newModule;
+    bool built(false);
+    if (!EXTLLVM::FAST_COMPILES) {
+        auto context(LLVMContextCreate());
+        newModule = parseAssemblyString(asmcode, pa, *unwrap(context));
+        built = bool(newModule);
+        newModule.reset();
+        LLVMContextDispose(context);
+    }
     if (likely(!built)) {
         std::regex globalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::ECMAScript);
         std::vector<std::string> symbols;
@@ -1686,7 +1696,8 @@ std::cout << pa.getMessage().str() << std::endl;
         llvm::raw_string_ostream dstream(declarations);
         for (auto iter = symbols.begin(); iter != end; ++iter) {
             const char* sym(iter->c_str());
-            if (sInlineSyms.find(sym) != sInlineSyms.end() || ignoreSyms.find(sym) != ignoreSyms.end()) {
+            if ((!EXTLLVM::FAST_COMPILES && sInlineSyms.find(sym) != sInlineSyms.end()) ||
+                    ignoreSyms.find(sym) != ignoreSyms.end()) {
                 continue;
             }
             auto gv = extemp::EXTLLVM::I()->getGlobalValue(sym);
@@ -1715,32 +1726,40 @@ std::cout << pa.getMessage().str() << std::endl;
             }
         }
 // std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
-        auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), getGlobalContext()));
-        if (likely(modOrErr)) {
-            newModule = std::move(modOrErr.get());
-            asmcode = sInlineString + dstream.str() + asmcode;
+        if (!EXTLLVM::FAST_COMPILES) {
+            auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), getGlobalContext()));
+            if (likely(modOrErr)) {
+                newModule = std::move(modOrErr.get());
+                asmcode = sInlineString + dstream.str() + asmcode;
 if (sEmitCode) {
     std::cout << "EMITTING\n" << asmcode << "DONE EMITTING\n";
 }
-            if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
+                if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
 std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
-                newModule.reset();
+                    newModule.reset();
+                }
             }
+        } else {
+            newModule = parseAssemblyString(dstream.str() + asmcode, pa, getGlobalContext());
         }
     } else {
         newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
     }
     if (newModule) {
-        if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH);
-        if(EXTLLVM::OPTIMIZE_COMPILES) {
-            PM->run(*newModule);
-        } else {
-            PM_NO->run(*newModule);
+        if (unlikely(!extemp::UNIV::ARCH.empty())) {
+            newModule->setTargetTriple(extemp::UNIV::ARCH);
         }
-      }
+        if (!EXTLLVM::FAST_COMPILES) {
+            if (EXTLLVM::OPTIMIZE_COMPILES) {
+                PM->run(*newModule);
+            } else {
+                PM_NO->run(*newModule);
+            }
+        }
+    }
 
     //std::stringstream ss;
-    if(newModule == 0)
+    if (unlikely(!newModule))
       {
 // std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
 // std::cout << pa.getMessage().str() << std::endl << pa.getLineNo() << std::endl;

@@ -1151,6 +1151,7 @@ namespace extemp {
     EXTLLVM EXTLLVM::SINGLETON;
     int64_t EXTLLVM::LLVM_COUNT = 0l;
     bool EXTLLVM::OPTIMIZE_COMPILES = false;
+    bool EXTLLVM::FAST_COMPILES = false;
     bool EXTLLVM::VERIFY_COMPILES = true;
 
     EXTLLVM::EXTLLVM()

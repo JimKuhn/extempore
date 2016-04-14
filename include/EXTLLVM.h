@@ -371,6 +371,7 @@ namespace extemp {
 	static int64_t LLVM_COUNT;
 	static bool OPTIMIZE_COMPILES;
 	static bool VERIFY_COMPILES;
+  static bool FAST_COMPILES;
 
 
 	llvm::Module* M;
