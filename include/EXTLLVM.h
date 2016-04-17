@@ -304,32 +304,36 @@ static inline uint64_t string_hash(unsigned char* str)
 ///////////////////////////////////////////////////
 
 namespace llvm {
-  class Module;
-  class GlobalVariable;
-  class GlobalValue;
-  class Function;
-  class StructType;
-  class ModuleProvider;
-  class SectionMemoryManager;
-  class ExecutionEngine;
 
-  namespace legacy {
-    class PassManager;
-  }
+class Module;
+class GlobalVariable;
+class GlobalValue;
+class Function;
+class StructType;
+class ModuleProvider;
+class SectionMemoryManager;
+class ExecutionEngine;
+
+namespace legacy {
+
+class PassManager;
+
+}
+
 } // end llvm namespace
 
 namespace extemp {
 
-    class EXTLLVM {
-    public:
-	EXTLLVM();
-	~EXTLLVM();
-	static EXTLLVM* I() { return &SINGLETON; }
+class EXTLLVM {
+public:
+    EXTLLVM();
 
-	void initLLVM();
+    static EXTLLVM* I() { return &SINGLETON; }
 
-  llvm::Module* activeModule();
-  llvm::Function* getFunction(const char* name) {
+    void initLLVM();
+
+    llvm::Module* activeModule();
+    llvm::Function* getFunction(const char* name) {
     for (auto& m : Ms) {
       auto f(m->getFunction(name));
       if (f) {
@@ -369,22 +373,23 @@ namespace extemp {
   void addModule(llvm::Module* m) { Ms.push_back(m); }
   std::vector<llvm::Module*>& getModules() { return Ms; }
 
-	static int64_t LLVM_COUNT;
-	static bool OPTIMIZE_COMPILES;
-	static bool VERIFY_COMPILES;
+        static int64_t LLVM_COUNT;
+        static bool OPTIMIZE_COMPILES;
+        static bool VERIFY_COMPILES;
   static bool FAST_COMPILES;
+  static bool BACKGROUND_COMPILES;
 
 
-	llvm::Module* M;
-	llvm::ModuleProvider* MP;
-	llvm::ExecutionEngine* EE;
+        llvm::Module* M;
+        llvm::ModuleProvider* MP;
+        llvm::ExecutionEngine* EE;
   llvm::legacy::PassManager* PM;
   llvm::legacy::PassManager* PM_NO;
   std::unique_ptr<llvm::SectionMemoryManager> MM;
 
     private:
   std::vector<llvm::Module*> Ms;
-	static EXTLLVM SINGLETON;
+        static EXTLLVM SINGLETON;
     };
 
 } // end extemp namespace

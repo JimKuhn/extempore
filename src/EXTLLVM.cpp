@@ -131,7 +131,7 @@ extemp::EXTMutex alloc_mutex("alloc mutex");
 
 //#ifdef _WIN32
 //double log2(double num) {
-//	return log(num)/log(2.0);
+//      return log(num)/log(2.0);
 //}
 //#endif
 
@@ -294,9 +294,9 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
       fflush(NULL);
         return malloc((size_t)size);  // TODO: what about the stored size????
     #else
-	printf("\nZone:%p size:%lld is full ... exiting!\n",zone,zone->size,size);
+        printf("\nZone:%p size:%lld is full ... exiting!\n",zone,zone->size,size);
         fflush(NULL);
-	exit(1);
+        exit(1);
 #endif
     }
     size = (size + LLVM_ZONE_ALIGNPAD) & ~LLVM_ZONE_ALIGNPAD;
@@ -361,22 +361,19 @@ bool llvm_ptr_in_current_zone(void* ptr)
     return llvm_ptr_in_zone(llvm_peek_zone_stack(), ptr);
 }
 
-extemp::CM* FreeWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,freeWithDelay);
-void free_after_delay(char* dat, double delay)
+extemp::CM* FreeWithDelayCM = new extemp::CMG(extemp::SchemeFFI::freeWithDelay);
+
+void free_after_delay(char* Data, double Delay)
 {
-    //printf("freeWithDelay %p\n",zone);
-    extemp::CM* cb = FreeWithDelayCM;
-    extemp::Task<char*>* task = new extemp::Task<char*>(extemp::UNIV::TIME+delay,44100,cb,dat);
-    extemp::TaskScheduler::I()->add(task);
+    extemp::TaskScheduler::I()->add(new extemp::Task<char*>(extemp::UNIV::TIME + Delay, extemp::UNIV::SECOND(),
+            FreeWithDelayCM, Data));
 }
 
-extemp::CM* DestroyMallocZoneWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,destroyMallocZoneWithDelay);
-void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay)
+extemp::CM* DestroyMallocZoneWithDelayCM = new extemp::CMG(extemp::SchemeFFI::destroyMallocZoneWithDelay);
+void llvm_destroy_zone_after_delay(llvm_zone_t* Zone, uint64_t Delay)
 {
-    // printf("destroyWithDelay %p\n",zone);
-    extemp::CM* cb = DestroyMallocZoneWithDelayCM;
-    extemp::Task<llvm_zone_t*>* task = new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME+delay,44100,cb,zone);
-    extemp::TaskScheduler::I()->add(task);
+    extemp::TaskScheduler::I()->add(new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME + Delay, extemp::UNIV::SECOND(),
+            DestroyMallocZoneWithDelayCM, Zone));
 }
 
 void llvm_schedule_callback(long long time, void* dat)
@@ -396,13 +393,13 @@ void* llvm_get_function_ptr(char* fname)
 }
 
 char* extitoa(int64_t val) {
-	/*
+        /*
   int base = 10;
   static char buf[32] = {0};
   int i = 30;
   for(; val && i ; --i, val /= base)
     buf[i] = "0123456789abcdef"[val % base];
-	*/
+        */
   static char buf[32] = {0};
   sprintf(buf,"%" PRId64,val);
   return buf;//&buf[i+1];
@@ -463,9 +460,9 @@ void llvm_send_udp(char* host, int port, void* message, int message_length)
   if(err < 0)
     {
       if(err == EMSGSIZE) {
-	printf("Error: OSC message too large: UDP 8k message MAX\n");
+        printf("Error: OSC message too large: UDP 8k message MAX\n");
       }else{
-	printf("Error: Problem sending OSC message %d\n",err);
+        printf("Error: Problem sending OSC message %d\n",err);
       }
 
     }
@@ -481,27 +478,27 @@ long long llvm_get_next_prime(long long start)
     long long  i, prime, multiple;
     /*  mark each int as potentially prime */
     for (i=0; i<how_many; i++)
-	array[i] = 1;
+        array[i] = 1;
     /* special cases: 0, 1 not considered prime */
     array[0] = array[1] = 0;
     /* foreach starting prime, mark every multiple as non-prime */
     prime = 0;
     while (1) {
-	/* skip non-primes to find first prime */
-	for (; (prime < how_many) && (!array[prime]); ++prime)
-	    continue;
-	if (prime >= how_many)
-	    break;
-	for (multiple=2*prime; multiple<how_many; multiple+=prime) {
-	    array[multiple] = 0;
-	}
-	++prime;
+        /* skip non-primes to find first prime */
+        for (; (prime < how_many) && (!array[prime]); ++prime)
+            continue;
+        if (prime >= how_many)
+            break;
+        for (multiple=2*prime; multiple<how_many; multiple+=prime) {
+            array[multiple] = 0;
+        }
+        ++prime;
     }
     /* Now that we have marked all multiple of primes as non-prime, */
     /* print the remaining numbers that fell through the sieve, and */
     /* are thus prime */
     for (i=start+1; i<how_many; i++) {
-	if(array[i]) return i;
+        if(array[i]) return i;
     }
     return -1;
 }
@@ -517,13 +514,13 @@ void* thread_fork(void*(*start_routine)(void*), void* args) {
         int result = thread->start();
 
 #ifdef _EXTTHREAD_DEBUG_
-	if (result)
-	{
-		std::cerr << "Error creating thread: " << result << std::endl;
-	}
+        if (result)
+        {
+                std::cerr << "Error creating thread: " << result << std::endl;
+        }
 #endif
 
-	return static_cast<void*>(thread);
+        return static_cast<void*>(thread);
 }
 
 void thread_destroy(void* thread) {
@@ -531,23 +528,23 @@ void thread_destroy(void* thread) {
 }
 
 int thread_join(void* thread) {
-	return static_cast<extemp::EXTThread*>(thread)->join();
+        return static_cast<extemp::EXTThread*>(thread)->join();
 }
 
 int thread_kill(void* thread) {
-	return static_cast<extemp::EXTThread*>(thread)->kill();
+        return static_cast<extemp::EXTThread*>(thread)->kill();
 }
 
 int thread_equal(void* thread1, void* thread2) {
-	return static_cast<extemp::EXTThread*>(thread1)->isEqualTo(static_cast<extemp::EXTThread*>(thread2));
+        return static_cast<extemp::EXTThread*>(thread1)->isEqualTo(static_cast<extemp::EXTThread*>(thread2));
 }
 
 int thread_equal_self(void* thread1) {
-	return static_cast<extemp::EXTThread*>(thread1)->isCurrentThread();
+        return static_cast<extemp::EXTThread*>(thread1)->isCurrentThread();
 }
 
 void* thread_self() {
-	return static_cast<void*>(extemp::EXTThread::activeThread());
+        return static_cast<void*>(extemp::EXTThread::activeThread());
 }
 
 // return value is number of nanosecs sleep missed by
@@ -1110,27 +1107,25 @@ char* llvm_disassemble(const unsigned char* code,int syntax)
 
 namespace extemp {
 
-    EXTLLVM EXTLLVM::SINGLETON;
-    int64_t EXTLLVM::LLVM_COUNT = 0l;
-    bool EXTLLVM::OPTIMIZE_COMPILES = false;
-    bool EXTLLVM::FAST_COMPILES = false;
-    bool EXTLLVM::VERIFY_COMPILES = true;
+EXTLLVM EXTLLVM::SINGLETON;
+int64_t EXTLLVM::LLVM_COUNT = 0l;
+bool EXTLLVM::OPTIMIZE_COMPILES = false;
+bool EXTLLVM::FAST_COMPILES = false;
+bool EXTLLVM::BACKGROUND_COMPILES = false;
+bool EXTLLVM::VERIFY_COMPILES = true;
 
-    EXTLLVM::EXTLLVM()
-    {
-	//printf("making llvm !!!!!!!!!!!!!!!!!!\n");
-        alloc_mutex.init();
-	M = 0;
-	MP = 0;
-	EE = 0;
-  MM = 0;
-	//initLLVM();
-    }
-  EXTLLVM::~EXTLLVM() {}
+EXTLLVM::EXTLLVM()
+{
+    alloc_mutex.init();
+    M = 0;
+    MP = 0;
+    EE = 0;
+    MM = 0;
+}
 
-    uint64_t EXTLLVM::getSymbolAddress(const std::string& name) {
-      return MM->getSymbolAddress(name);
-    }
+uint64_t EXTLLVM::getSymbolAddress(const std::string& name) {
+    return MM->getSymbolAddress(name);
+}
 
   void EXTLLVM::initLLVM()
   {
@@ -1240,10 +1235,10 @@ namespace extemp {
       std::cout << " MCJIT" << std::endl;
       ascii_normal();
 
-	    //EE = llvm::EngineBuilder(M).create();
+            //EE = llvm::EngineBuilder(M).create();
             PM_NO = new llvm::legacy::PassManager();
             PM_NO->add(llvm::createAlwaysInlinerPass());
-	    PM = new llvm::legacy::PassManager();
+            PM = new llvm::legacy::PassManager();
 #if 1
             PM->add(llvm::createAggressiveDCEPass());
             PM->add(llvm::createAlwaysInlinerPass());
@@ -1267,145 +1262,145 @@ namespace extemp {
             PM->add(llvm::createSCCPPass());
             PM->add(llvm::createTailCallEliminationPass());
 #else
-	    //PM->add(new llvm::TargetData(*EE->getTargetData()));
+            //PM->add(new llvm::TargetData(*EE->getTargetData()));
       // PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
 
       PM->add(llvm::createBasicAliasAnalysisPass());   //new
       // promote allocs to register
       PM->add(llvm::createPromoteMemoryToRegisterPass());
-	    // Do simple "peephole" optimizations and bit-twiddling optzns.
-	    PM->add(llvm::createInstructionCombiningPass());
-	    // Reassociate expressions.
-	    PM->add(llvm::createReassociatePass());
-	    // Eliminate Common SubExpressions.
-	    PM->add(llvm::createGVNPass());
-	    // Function inlining
-	    PM->add(llvm::createFunctionInliningPass());
+            // Do simple "peephole" optimizations and bit-twiddling optzns.
+            PM->add(llvm::createInstructionCombiningPass());
+            // Reassociate expressions.
+            PM->add(llvm::createReassociatePass());
+            // Eliminate Common SubExpressions.
+            PM->add(llvm::createGVNPass());
+            // Function inlining
+            PM->add(llvm::createFunctionInliningPass());
             PM->add(llvm::createAlwaysInlinerPass());
-	    // loop invariants
-	    PM->add(llvm::createLICMPass());
-	    // vars
-	    PM->add(llvm::createIndVarSimplifyPass());
-	    // Simplify the control flow graph (deleting unreachable blocks, etc).
-	    PM->add(llvm::createCFGSimplificationPass());
+            // loop invariants
+            PM->add(llvm::createLICMPass());
+            // vars
+            PM->add(llvm::createIndVarSimplifyPass());
+            // Simplify the control flow graph (deleting unreachable blocks, etc).
+            PM->add(llvm::createCFGSimplificationPass());
       //
-	    PM->add(llvm::createPromoteMemoryToRegisterPass());
+            PM->add(llvm::createPromoteMemoryToRegisterPass());
 #endif
       // tell LLVM about some built-in functions
-	    EE->updateGlobalMapping("llvm_disassemble", (uint64_t)&llvm_disassemble);
-	    EE->updateGlobalMapping("llvm_destroy_zone_after_delay", (uint64_t)&llvm_destroy_zone_after_delay);
-	    EE->updateGlobalMapping("free_after_delay", (uint64_t)&free_after_delay);
-	    EE->updateGlobalMapping("llvm_get_next_prime", (uint64_t)&llvm_get_next_prime);
+            EE->updateGlobalMapping("llvm_disassemble", (uint64_t)&llvm_disassemble);
+            EE->updateGlobalMapping("llvm_destroy_zone_after_delay", (uint64_t)&llvm_destroy_zone_after_delay);
+            EE->updateGlobalMapping("free_after_delay", (uint64_t)&free_after_delay);
+            EE->updateGlobalMapping("llvm_get_next_prime", (uint64_t)&llvm_get_next_prime);
             EE->updateGlobalMapping("llvm_printf", uintptr_t(&printf));
             EE->updateGlobalMapping("llvm_fprintf", uintptr_t(&fprintf));
             EE->updateGlobalMapping("llvm_sprintf", uintptr_t(&sprintf));
             EE->updateGlobalMapping("llvm_sscanf", uintptr_t(&sscanf));
             EE->updateGlobalMapping("llvm_fscanf", uintptr_t(&fscanf));
-	    EE->updateGlobalMapping("llvm_zone_create", (uint64_t)&llvm_zone_create);
-	    EE->updateGlobalMapping("llvm_zone_destroy", (uint64_t)&llvm_zone_destroy);
-	    EE->updateGlobalMapping("llvm_zone_print", (uint64_t)&llvm_zone_print);
-	    EE->updateGlobalMapping("llvm_runtime_error", (uint64_t)&llvm_runtime_error);
-	    EE->updateGlobalMapping("llvm_send_udp", (uint64_t)&llvm_send_udp);
-	    EE->updateGlobalMapping("llvm_schedule_callback", (uint64_t)&llvm_schedule_callback);
-	    EE->updateGlobalMapping("llvm_get_function_ptr", (uint64_t)&llvm_get_function_ptr);
+            EE->updateGlobalMapping("llvm_zone_create", (uint64_t)&llvm_zone_create);
+            EE->updateGlobalMapping("llvm_zone_destroy", (uint64_t)&llvm_zone_destroy);
+            EE->updateGlobalMapping("llvm_zone_print", (uint64_t)&llvm_zone_print);
+            EE->updateGlobalMapping("llvm_runtime_error", (uint64_t)&llvm_runtime_error);
+            EE->updateGlobalMapping("llvm_send_udp", (uint64_t)&llvm_send_udp);
+            EE->updateGlobalMapping("llvm_schedule_callback", (uint64_t)&llvm_schedule_callback);
+            EE->updateGlobalMapping("llvm_get_function_ptr", (uint64_t)&llvm_get_function_ptr);
             EE->updateGlobalMapping("llvm_peek_zone_stack_extern", (uint64_t)&llvm_peek_zone_stack);
-	    EE->updateGlobalMapping("llvm_pop_zone_stack", (uint64_t)&llvm_pop_zone_stack);
+            EE->updateGlobalMapping("llvm_pop_zone_stack", (uint64_t)&llvm_pop_zone_stack);
             EE->updateGlobalMapping("llvm_push_zone_stack_extern", (uint64_t)&llvm_push_zone_stack);
-	    EE->updateGlobalMapping("llvm_zone_malloc", (uint64_t)&llvm_zone_malloc);
+            EE->updateGlobalMapping("llvm_zone_malloc", (uint64_t)&llvm_zone_malloc);
             EE->updateGlobalMapping("llvm_zone_callback_setup", uintptr_t(&llvm_zone_callback_setup));
-	    EE->updateGlobalMapping("get_address_table", (uint64_t)&get_address_table);
-	    EE->updateGlobalMapping("check_address_type", (uint64_t)&check_address_type);
-	    EE->updateGlobalMapping("check_address_exists", (uint64_t)&check_address_exists);
-	    EE->updateGlobalMapping("get_address_offset", (uint64_t)&get_address_offset);
-	    EE->updateGlobalMapping("add_address_table", (uint64_t)&add_address_table);
-	    EE->updateGlobalMapping("new_address_table", (uint64_t)&new_address_table);
-	    EE->updateGlobalMapping("llvm_print_pointer", (uint64_t)&llvm_print_pointer);
-	    EE->updateGlobalMapping("llvm_print_i32", (uint64_t)&llvm_print_i32);
-	    EE->updateGlobalMapping("llvm_print_i64", (uint64_t)&llvm_print_i64);
-	    EE->updateGlobalMapping("llvm_print_f32", (uint64_t)&llvm_print_f32);
-	    EE->updateGlobalMapping("llvm_print_f64", (uint64_t)&llvm_print_f64);
-	    EE->updateGlobalMapping("llvm_samplerate", (uint64_t)&llvm_samplerate);
-	    EE->updateGlobalMapping("llvm_frames", (uint64_t)&llvm_frames);
-	    EE->updateGlobalMapping("llvm_channels", (uint64_t)&llvm_channels);
-	    EE->updateGlobalMapping("llvm_in_channels", (uint64_t)&llvm_in_channels);
-	    EE->updateGlobalMapping("llvm_now", (uint64_t)&llvm_now);
-	    EE->updateGlobalMapping("llvm_zone_reset", (uint64_t)&llvm_zone_reset);
-	    EE->updateGlobalMapping("llvm_zone_copy_ptr", (uint64_t)&llvm_zone_copy_ptr);
-	    EE->updateGlobalMapping("llvm_zone_mark", (uint64_t)&llvm_zone_mark);
-	    EE->updateGlobalMapping("llvm_zone_mark_size", (uint64_t)&llvm_zone_mark_size);
-	    EE->updateGlobalMapping("llvm_zone_ptr_set_size", (uint64_t)&llvm_zone_ptr_set_size);
-	    EE->updateGlobalMapping("llvm_zone_ptr_size", (uint64_t)&llvm_zone_ptr_size);
-	    EE->updateGlobalMapping("llvm_ptr_in_zone", (uint64_t)&llvm_ptr_in_zone);
-	    EE->updateGlobalMapping("llvm_ptr_in_current_zone", (uint64_t)&llvm_ptr_in_current_zone);
-	    EE->updateGlobalMapping("extitoa", (uint64_t)&extitoa);
-	    EE->updateGlobalMapping("string_hash", (uint64_t)&string_hash);
-	    EE->updateGlobalMapping("swap64i", (uint64_t)&swap64i);
-	    EE->updateGlobalMapping("swap64f", (uint64_t)&swap64f);
-	    EE->updateGlobalMapping("swap32i", (uint64_t)&swap32i);
-	    EE->updateGlobalMapping("swap32f", (uint64_t)&swap32f);
-	    EE->updateGlobalMapping("unswap64i", (uint64_t)&unswap64i);
-	    EE->updateGlobalMapping("unswap64f", (uint64_t)&unswap64f);
-	    EE->updateGlobalMapping("unswap32i", (uint64_t)&unswap32i);
-	    EE->updateGlobalMapping("unswap32f", (uint64_t)&unswap32f);
-	    EE->updateGlobalMapping("imp_randd", (uint64_t)&imp_randd);
-	    EE->updateGlobalMapping("imp_randf", (uint64_t)&imp_randf);
-	    EE->updateGlobalMapping("imp_rand1_i64", (uint64_t)&imp_rand1_i64);
-	    EE->updateGlobalMapping("imp_rand2_i64", (uint64_t)&imp_rand2_i64);
-	    EE->updateGlobalMapping("imp_rand1_i32", (uint64_t)&imp_rand1_i32);
-	    EE->updateGlobalMapping("imp_rand2_i32", (uint64_t)&imp_rand2_i32);
-	    EE->updateGlobalMapping("imp_rand1_d", (uint64_t)&imp_rand1_d);
-	    EE->updateGlobalMapping("imp_rand2_d", (uint64_t)&imp_rand2_d);
-	    EE->updateGlobalMapping("imp_rand1_f", (uint64_t)&imp_rand1_f);
-	    EE->updateGlobalMapping("imp_rand2_f", (uint64_t)&imp_rand2_f);
-	    EE->updateGlobalMapping("rsplit", (uint64_t)&rsplit);
-	    EE->updateGlobalMapping("rmatch", (uint64_t)&rmatch);
-	    EE->updateGlobalMapping("rreplace", (uint64_t)&rreplace);
-	    EE->updateGlobalMapping("base64_encode", (uint64_t)&base64_encode);
-	    EE->updateGlobalMapping("base64_decode", (uint64_t)&base64_decode);
-	    EE->updateGlobalMapping("cname_encode", (uint64_t)&cname_encode);
-	    EE->updateGlobalMapping("cname_decode", (uint64_t)&cname_decode);
+            EE->updateGlobalMapping("get_address_table", (uint64_t)&get_address_table);
+            EE->updateGlobalMapping("check_address_type", (uint64_t)&check_address_type);
+            EE->updateGlobalMapping("check_address_exists", (uint64_t)&check_address_exists);
+            EE->updateGlobalMapping("get_address_offset", (uint64_t)&get_address_offset);
+            EE->updateGlobalMapping("add_address_table", (uint64_t)&add_address_table);
+            EE->updateGlobalMapping("new_address_table", (uint64_t)&new_address_table);
+            EE->updateGlobalMapping("llvm_print_pointer", (uint64_t)&llvm_print_pointer);
+            EE->updateGlobalMapping("llvm_print_i32", (uint64_t)&llvm_print_i32);
+            EE->updateGlobalMapping("llvm_print_i64", (uint64_t)&llvm_print_i64);
+            EE->updateGlobalMapping("llvm_print_f32", (uint64_t)&llvm_print_f32);
+            EE->updateGlobalMapping("llvm_print_f64", (uint64_t)&llvm_print_f64);
+            EE->updateGlobalMapping("llvm_samplerate", (uint64_t)&llvm_samplerate);
+            EE->updateGlobalMapping("llvm_frames", (uint64_t)&llvm_frames);
+            EE->updateGlobalMapping("llvm_channels", (uint64_t)&llvm_channels);
+            EE->updateGlobalMapping("llvm_in_channels", (uint64_t)&llvm_in_channels);
+            EE->updateGlobalMapping("llvm_now", (uint64_t)&llvm_now);
+            EE->updateGlobalMapping("llvm_zone_reset", (uint64_t)&llvm_zone_reset);
+            EE->updateGlobalMapping("llvm_zone_copy_ptr", (uint64_t)&llvm_zone_copy_ptr);
+            EE->updateGlobalMapping("llvm_zone_mark", (uint64_t)&llvm_zone_mark);
+            EE->updateGlobalMapping("llvm_zone_mark_size", (uint64_t)&llvm_zone_mark_size);
+            EE->updateGlobalMapping("llvm_zone_ptr_set_size", (uint64_t)&llvm_zone_ptr_set_size);
+            EE->updateGlobalMapping("llvm_zone_ptr_size", (uint64_t)&llvm_zone_ptr_size);
+            EE->updateGlobalMapping("llvm_ptr_in_zone", (uint64_t)&llvm_ptr_in_zone);
+            EE->updateGlobalMapping("llvm_ptr_in_current_zone", (uint64_t)&llvm_ptr_in_current_zone);
+            EE->updateGlobalMapping("extitoa", (uint64_t)&extitoa);
+            EE->updateGlobalMapping("string_hash", (uint64_t)&string_hash);
+            EE->updateGlobalMapping("swap64i", (uint64_t)&swap64i);
+            EE->updateGlobalMapping("swap64f", (uint64_t)&swap64f);
+            EE->updateGlobalMapping("swap32i", (uint64_t)&swap32i);
+            EE->updateGlobalMapping("swap32f", (uint64_t)&swap32f);
+            EE->updateGlobalMapping("unswap64i", (uint64_t)&unswap64i);
+            EE->updateGlobalMapping("unswap64f", (uint64_t)&unswap64f);
+            EE->updateGlobalMapping("unswap32i", (uint64_t)&unswap32i);
+            EE->updateGlobalMapping("unswap32f", (uint64_t)&unswap32f);
+            EE->updateGlobalMapping("imp_randd", (uint64_t)&imp_randd);
+            EE->updateGlobalMapping("imp_randf", (uint64_t)&imp_randf);
+            EE->updateGlobalMapping("imp_rand1_i64", (uint64_t)&imp_rand1_i64);
+            EE->updateGlobalMapping("imp_rand2_i64", (uint64_t)&imp_rand2_i64);
+            EE->updateGlobalMapping("imp_rand1_i32", (uint64_t)&imp_rand1_i32);
+            EE->updateGlobalMapping("imp_rand2_i32", (uint64_t)&imp_rand2_i32);
+            EE->updateGlobalMapping("imp_rand1_d", (uint64_t)&imp_rand1_d);
+            EE->updateGlobalMapping("imp_rand2_d", (uint64_t)&imp_rand2_d);
+            EE->updateGlobalMapping("imp_rand1_f", (uint64_t)&imp_rand1_f);
+            EE->updateGlobalMapping("imp_rand2_f", (uint64_t)&imp_rand2_f);
+            EE->updateGlobalMapping("rsplit", (uint64_t)&rsplit);
+            EE->updateGlobalMapping("rmatch", (uint64_t)&rmatch);
+            EE->updateGlobalMapping("rreplace", (uint64_t)&rreplace);
+            EE->updateGlobalMapping("base64_encode", (uint64_t)&base64_encode);
+            EE->updateGlobalMapping("base64_decode", (uint64_t)&base64_decode);
+            EE->updateGlobalMapping("cname_encode", (uint64_t)&cname_encode);
+            EE->updateGlobalMapping("cname_decode", (uint64_t)&cname_decode);
       EE->updateGlobalMapping("clock_clock", (uint64_t)&clock_clock);
       EE->updateGlobalMapping("audio_clock_base", (uint64_t)&audio_clock_base);
       EE->updateGlobalMapping("audio_clock_now", (uint64_t)&audio_clock_now);
-	    EE->updateGlobalMapping("r64value", (uint64_t)&r64value);
-	    EE->updateGlobalMapping("mk_double", (uint64_t)&mk_double);
-	    EE->updateGlobalMapping("r32value", (uint64_t)&r32value);
-	    EE->updateGlobalMapping("mk_float", (uint64_t)&mk_float);
-	    EE->updateGlobalMapping("is_real", (uint64_t)&is_real);
-	    EE->updateGlobalMapping("i64value", (uint64_t)&i64value);
-	    EE->updateGlobalMapping("mk_i64", (uint64_t)&mk_i64);
-	    EE->updateGlobalMapping("i32value", (uint64_t)&i32value);
-	    EE->updateGlobalMapping("mk_i32", (uint64_t)&mk_i32);
-	    EE->updateGlobalMapping("i16value", (uint64_t)&i16value);
-	    EE->updateGlobalMapping("mk_i16", (uint64_t)&mk_i16);
-	    EE->updateGlobalMapping("i8value", (uint64_t)&i8value);
-	    EE->updateGlobalMapping("mk_i8", (uint64_t)&mk_i8);
-	    EE->updateGlobalMapping("i1value", (uint64_t)&i1value);
-	    EE->updateGlobalMapping("mk_i1", (uint64_t)&mk_i1);
-	    EE->updateGlobalMapping("is_integer", (uint64_t)&is_integer);
-	    EE->updateGlobalMapping("string_value", (uint64_t)&string_value);
-	    EE->updateGlobalMapping("mk_string", (uint64_t)&mk_string);
-	    EE->updateGlobalMapping("is_string", (uint64_t)&is_string);
-	    EE->updateGlobalMapping("cptr_value", (uint64_t)&cptr_value);
-	    EE->updateGlobalMapping("mk_cptr", (uint64_t)&mk_cptr);
-	    EE->updateGlobalMapping("is_cptr", (uint64_t)&is_cptr);
-	    EE->updateGlobalMapping("is_cptr_or_str", (uint64_t)&is_cptr_or_str);
-	    EE->updateGlobalMapping("malloc16", (uint64_t)&malloc16);
-	    EE->updateGlobalMapping("free16", (uint64_t)&free16);
-	    EE->updateGlobalMapping("list_ref", (uint64_t)&list_ref);
-	    EE->updateGlobalMapping("thread_fork", (uint64_t)&thread_fork);
-	    EE->updateGlobalMapping("thread_destroy", (uint64_t)&thread_destroy);
-	    EE->updateGlobalMapping("thread_join", (uint64_t)&thread_join);
-	    EE->updateGlobalMapping("thread_kill", (uint64_t)&thread_kill);
-	    EE->updateGlobalMapping("thread_self", (uint64_t)&thread_self);
-	    EE->updateGlobalMapping("thread_equal", (uint64_t)&thread_equal);
-	    EE->updateGlobalMapping("thread_equal_self", (uint64_t)&thread_equal_self);
-	    EE->updateGlobalMapping("thread_sleep", (uint64_t)&thread_sleep);
-	    EE->updateGlobalMapping("mutex_create", (uint64_t)&mutex_create);
-	    EE->updateGlobalMapping("mutex_destroy", (uint64_t)&mutex_destroy);
-	    EE->updateGlobalMapping("mutex_lock", (uint64_t)&mutex_lock);
-	    EE->updateGlobalMapping("mutex_unlock", (uint64_t)&mutex_unlock);
-	    EE->updateGlobalMapping("mutex_trylock", (uint64_t)&mutex_trylock);
+            EE->updateGlobalMapping("r64value", (uint64_t)&r64value);
+            EE->updateGlobalMapping("mk_double", (uint64_t)&mk_double);
+            EE->updateGlobalMapping("r32value", (uint64_t)&r32value);
+            EE->updateGlobalMapping("mk_float", (uint64_t)&mk_float);
+            EE->updateGlobalMapping("is_real", (uint64_t)&is_real);
+            EE->updateGlobalMapping("i64value", (uint64_t)&i64value);
+            EE->updateGlobalMapping("mk_i64", (uint64_t)&mk_i64);
+            EE->updateGlobalMapping("i32value", (uint64_t)&i32value);
+            EE->updateGlobalMapping("mk_i32", (uint64_t)&mk_i32);
+            EE->updateGlobalMapping("i16value", (uint64_t)&i16value);
+            EE->updateGlobalMapping("mk_i16", (uint64_t)&mk_i16);
+            EE->updateGlobalMapping("i8value", (uint64_t)&i8value);
+            EE->updateGlobalMapping("mk_i8", (uint64_t)&mk_i8);
+            EE->updateGlobalMapping("i1value", (uint64_t)&i1value);
+            EE->updateGlobalMapping("mk_i1", (uint64_t)&mk_i1);
+            EE->updateGlobalMapping("is_integer", (uint64_t)&is_integer);
+            EE->updateGlobalMapping("string_value", (uint64_t)&string_value);
+            EE->updateGlobalMapping("mk_string", (uint64_t)&mk_string);
+            EE->updateGlobalMapping("is_string", (uint64_t)&is_string);
+            EE->updateGlobalMapping("cptr_value", (uint64_t)&cptr_value);
+            EE->updateGlobalMapping("mk_cptr", (uint64_t)&mk_cptr);
+            EE->updateGlobalMapping("is_cptr", (uint64_t)&is_cptr);
+            EE->updateGlobalMapping("is_cptr_or_str", (uint64_t)&is_cptr_or_str);
+            EE->updateGlobalMapping("malloc16", (uint64_t)&malloc16);
+            EE->updateGlobalMapping("free16", (uint64_t)&free16);
+            EE->updateGlobalMapping("list_ref", (uint64_t)&list_ref);
+            EE->updateGlobalMapping("thread_fork", (uint64_t)&thread_fork);
+            EE->updateGlobalMapping("thread_destroy", (uint64_t)&thread_destroy);
+            EE->updateGlobalMapping("thread_join", (uint64_t)&thread_join);
+            EE->updateGlobalMapping("thread_kill", (uint64_t)&thread_kill);
+            EE->updateGlobalMapping("thread_self", (uint64_t)&thread_self);
+            EE->updateGlobalMapping("thread_equal", (uint64_t)&thread_equal);
+            EE->updateGlobalMapping("thread_equal_self", (uint64_t)&thread_equal_self);
+            EE->updateGlobalMapping("thread_sleep", (uint64_t)&thread_sleep);
+            EE->updateGlobalMapping("mutex_create", (uint64_t)&mutex_create);
+            EE->updateGlobalMapping("mutex_destroy", (uint64_t)&mutex_destroy);
+            EE->updateGlobalMapping("mutex_lock", (uint64_t)&mutex_lock);
+            EE->updateGlobalMapping("mutex_unlock", (uint64_t)&mutex_unlock);
+            EE->updateGlobalMapping("mutex_trylock", (uint64_t)&mutex_trylock);
       EE->updateGlobalMapping("llvm_tan", (uint64_t)&llvm_tan);
       EE->updateGlobalMapping("llvm_cosh", (uint64_t)&llvm_cosh);
       EE->updateGlobalMapping("llvm_tanh", (uint64_t)&llvm_tanh);

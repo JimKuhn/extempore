@@ -56,14 +56,31 @@ public:
     }
 };
 
+class CMG: public CM
+{
+private:
+    typedef void (*function_type)(TaskI* Task);
+private:
+    function_type m_function;
+public:
+    CMG(function_type Function): m_function(Function) {
+    }
+
+    virtual void execute(TaskI* Task) {
+        m_function(Task);
+    }
+};
+
 template <typename T>
 class CMI: public CM
 {
 private:
-    T*         m_object;
-    void (T::* m_member)(TaskI* Task);
+    typedef void (T::*function_type)(TaskI* Task);
+private:
+    T*            m_object;
+    function_type m_function;
 public:
-    CMI(T* Object, void(T::* Member)(TaskI* Task)): m_object(Object), m_member(Member) {
+    CMI(T* Object, function_type Function): m_object(Object), m_function(Function) {
     }
 
     virtual void execute(TaskI* Task) {
@@ -72,10 +89,10 @@ public:
             std::cerr << "AIME::Object has been removed before task could execute!" << std::endl;
             return;
         }
-        (*m_object.*m_member)(Task);
+        (m_object->*m_function)(Task);
     }
     virtual void print() {
-        std::cout << "OBJ: " << m_object << "  MEMBER: " << m_member << std::endl;
+        std::cout << "OBJ: " << m_object << "  MEMBER: " << m_function << std::endl;
     }
 };
 

@@ -119,7 +119,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
     scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, "*callback*"),
             mk_cptr(m_scheme, mk_cb(this, SchemeProcess, schemeCallback)));
     m_extemporeCallback = mk_cb(this, SchemeProcess, extemporeCallback);
-    SchemeFFI::I()->initSchemeFFI(m_scheme);
+    SchemeFFI::initSchemeFFI(m_scheme);
 }
 
 bool SchemeProcess::start()
