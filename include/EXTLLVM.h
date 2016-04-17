@@ -43,6 +43,7 @@
  //#include <ucontext.h>
 
 #include "BranchPrediction.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/IR/Module.h"
 
 struct zone_hooks_t {

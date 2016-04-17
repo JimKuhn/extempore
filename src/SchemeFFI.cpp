@@ -1807,9 +1807,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
   pointer SchemeFFI::get_function(scheme* _sc, pointer args)
   {
     using namespace llvm;
-    //Module* M = EXTLLVM::I()->M;
     llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     if(func == 0)
       {
         return _sc->F;
@@ -1821,8 +1819,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
   {
     using namespace llvm;
 
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
     llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));
     if(var == 0)
       {
@@ -1834,10 +1830,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 
   pointer SchemeFFI::get_function_calling_conv(scheme* _sc, pointer args)
   {
-    using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
@@ -1851,9 +1843,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
   pointer SchemeFFI::get_function_varargs(scheme* _sc, pointer args)
   {
     using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
@@ -2020,9 +2009,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
   pointer SchemeFFI::get_function_type(scheme* _sc, pointer args)
   {
     using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
@@ -2108,10 +2094,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 
   pointer SchemeFFI::get_function_args(scheme* _sc, pointer args)
   {
-    using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
@@ -2133,10 +2115,10 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     pointer str = mk_string(_sc, tmp_name); //_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
     pointer p = cons(_sc, str, _sc->NIL);
 
-    Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
+    llvm::Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
     while(funcargs != func->getArgumentList().end())
       {
-        Argument* a = &*funcargs;
+        llvm::Argument* a = &*funcargs;
         {
             EnvInjector injector(_sc, p);
         std::string typestr2;
@@ -2161,11 +2143,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 
     pointer SchemeFFI::remove_global_var(scheme* _sc, pointer args)
     {
-	// Create some module to put our function into it.
-	using namespace llvm;
-
-	// Module* M = EXTLLVM::I()->M;
-	// llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
 	llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));
 	if(var == 0)
 	{
@@ -2178,11 +2155,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 
   pointer SchemeFFI::remove_function(scheme* _sc, pointer args)
   {
-    // Create some module to put our function into it.
-    using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
@@ -2200,10 +2172,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 
   pointer SchemeFFI::erase_function(scheme* _sc, pointer args)
   {
-    // Create some module to put our function into it.
-    using namespace llvm;
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
     llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
     if(func == 0)
       {
@@ -2244,24 +2212,15 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 
   pointer SchemeFFI::get_function_pointer(scheme* _sc, pointer args)
   {
-    using namespace llvm;
-
-    llvm::Function* func = EXTLLVM::I()->getFunction(string_value(pair_car(args)));
-    if(func == 0)
-      {
-        return _sc->F;
-      }
-
-    void* p;
-
-    // has the function been loaded somewhere else, e.g. dlsym
-      p = EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
-    if(p==NULL) // look for it as a JIT-compiled function
-      p = EXTLLVM::I()->EE->getPointerToFunction(func);
-    if(p==NULL) {
-      return _sc->F;
+    auto name(string_value(pair_car(args)));
+    // llvm::Function* func = EXTLLVM::I()->getFunction(string_value(pair_car(args)));
+    void* p = EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(name);
+    if (!p) { // look for it as a JIT-compiled function
+        p = reinterpret_cast<void*>(EXTLLVM::I()->EE->getFunctionAddress(name));
+        if (!p) {
+            return _sc->F;
+        }
     }
-
     return mk_cptr(_sc, p);
   }
 
@@ -2272,10 +2231,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     //Module* M = EXTLLVM::I()->M;
     char name[1024];
     sprintf(name,"%s_native",string_value(pair_car(args)));
-    //llvm::Function* func = M->getFunction(std::string(name));
     llvm::Function* func = extemp::EXTLLVM::I()->getFunction(name);
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    //func->setCallingConv(CallingConv::C); //kCStackBased);
     if(func == 0)
       {
         return _sc->F;
@@ -2297,19 +2253,11 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
   pointer SchemeFFI::recompile_and_link_function(scheme* _sc, pointer args)
   {
     using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
     llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
-    //llvm::Function* func = M->getFunction(fname); //std::string(string_value(pair_car(args))));
-    //func->setCallingConv(CallingConv::C); //kCStackBased);
     if(func == 0)
       {
         return _sc->F;
       }
-    //std::cout << "fname: " << fname << std::endl;
-    //std::cout << "M: " << M << std::endl;
-    //std::cout << "FUNC: " << func << std::endl;
-    //std::cout << "EE: " << EXTLLVM::I()->EE << std::endl;
     void* p = 0;
     try{
       EXTLLVM* xll = EXTLLVM::I();
@@ -2322,10 +2270,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     if(p==NULL) {
 	    return _sc->F;
     }
-
-    //const llvm::GlobalValue* f2 = NativeScheme::I()->EE->getGlobalValueAtAddress(p);
-    //std::cout << "FUNC: " << func << "  fptr: " << p << "   f2: " << f2 << std::endl;
-
     return mk_cptr(_sc, p);
   }
 
@@ -2346,15 +2290,11 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 	llvm::Function* func = (Function*) cptr_value(pair_car(args));
 	if(func == 0)
 	{
-	    //std::cout << "no such function\n" << std::endl;
 	    printf("No such function\n");
 	    return _sc->F;
 	}
 	func->getArgumentList();
 	args = pair_cdr(args);
-
-	//llvm::Function* func = NativeScheme::LLVM_JIT->getFunction(std::string("testplusthree"));
-	//llvm::Argument* arg = func->arg_begin();
 	int lgth = list_length(_sc, args);
 	Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
 	if(lgth != func->getArgumentList().size())
@@ -2609,8 +2549,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 
 pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 {
-  //llvm::Module* M = EXTLLVM::I()->M;
-  //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
   llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
 	std::string str;
 	llvm::raw_string_ostream ss(str);

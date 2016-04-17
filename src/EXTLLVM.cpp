@@ -392,21 +392,7 @@ void llvm_schedule_callback(long long time, void* dat)
 
 void* llvm_get_function_ptr(char* fname)
 {
-  using namespace llvm;
-
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(fname);
-  if(func == NULL)
-    {
-      return NULL;
-    }
-  // has the function been loaded somewhere else, e.g. dlsym
-  void* p = extemp::EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
-  if(p==NULL) // look for it as a JIT-compiled function
-    p = extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
-  if(p==NULL) {
-    return NULL;
-  }
-  return p;
+  return reinterpret_cast<void*>(extemp::EXTLLVM::I()->EE->getFunctionAddress(fname));
 }
 
 char* extitoa(int64_t val) {
@@ -941,21 +927,6 @@ bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
   pointer y = find_slot_in_env(sc, sc->envir, mk_symbol(sc, c), 1);
   return y != sc->NIL;
 }
-/*
-    //llvm::Module* M = extemp::EXTLLVM::I()->M;
-    std::string funcname(a);
-    std::string getter("_getter");
-    //llvm::Function* func = M->getFunction(funcname+getter);
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(funcname+getter);
-    if(func) {
-      return true;
-    }else{
-      //printf("Eval error: No compiler match for %s\n",symbol);
-      return false;
-    }
-  }
-  }
-*/
 
 #define strvalue(p)      ((p)->_object._string._svalue)
 pointer llvm_scheme_env_set(scheme* _sc, char* sym)
@@ -988,17 +959,8 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   // Module* M = extemp::EXTLLVM::I()->M;
   std::string funcname(xtlang_name);
   std::string getter("_getter");
-  //llvm::Function* func = M->getFunction(funcname+getter); //std::string(string_value(pair_car(args))));
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction((funcname+getter).c_str());
-  if(func == 0) {
-    printf("Error: no matching function for %s.%s\n",fname,vname);
-    return _sc->F;
-  }
-
-  void*(*p)() = (void*(*)()) extemp::EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
-  if(p==NULL){
-     p = (void*(*)()) extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
-  }else if(p==NULL) {
+  void*(*p)() = (void*(*)()) extemp::EXTLLVM::I()->EE->getFunctionAddress(funcname + getter);
+  if (!p) {
     printf("Error attempting to set environment variable in closure %s.%s\n",fname,vname);
     return _sc->F;
   }
