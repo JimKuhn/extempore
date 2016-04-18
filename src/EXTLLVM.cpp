@@ -361,6 +361,13 @@ bool llvm_ptr_in_current_zone(void* ptr)
     return llvm_ptr_in_zone(llvm_peek_zone_stack(), ptr);
 }
 
+extern "C" llvm_zone_t* llvm_zone_callback_setup()
+{
+    auto zone(llvm_threads_get_callback_zone());
+    llvm_push_zone_stack(zone);
+    return llvm_zone_reset(zone);
+}
+
 extemp::CM* FreeWithDelayCM = new extemp::CMG(extemp::SchemeFFI::freeWithDelay);
 
 void free_after_delay(char* Data, double Delay)
@@ -1114,9 +1121,11 @@ bool EXTLLVM::FAST_COMPILES = false;
 bool EXTLLVM::BACKGROUND_COMPILES = false;
 bool EXTLLVM::VERIFY_COMPILES = true;
 
-EXTLLVM::EXTLLVM()
+EXTLLVM::EXTLLVM(): m_modulesMutex("Modules")
 {
     alloc_mutex.init();
+    m_modulesMutex.init();
+    m_pendingCompiles = 0;
     M = 0;
     MP = 0;
     EE = 0;
@@ -1296,7 +1305,7 @@ uint64_t EXTLLVM::getSymbolAddress(const std::string& name) {
             EE->updateGlobalMapping("llvm_sprintf", uintptr_t(&sprintf));
             EE->updateGlobalMapping("llvm_sscanf", uintptr_t(&sscanf));
             EE->updateGlobalMapping("llvm_fscanf", uintptr_t(&fscanf));
-            EE->updateGlobalMapping("llvm_zone_create", (uint64_t)&llvm_zone_create);
+            EE->updateGlobalMapping("llvm_zone_create_extern", (uint64_t)&llvm_zone_create);
             EE->updateGlobalMapping("llvm_zone_destroy", (uint64_t)&llvm_zone_destroy);
             EE->updateGlobalMapping("llvm_zone_print", (uint64_t)&llvm_zone_print);
             EE->updateGlobalMapping("llvm_runtime_error", (uint64_t)&llvm_runtime_error);
@@ -1324,7 +1333,7 @@ uint64_t EXTLLVM::getSymbolAddress(const std::string& name) {
             EE->updateGlobalMapping("llvm_channels", (uint64_t)&llvm_channels);
             EE->updateGlobalMapping("llvm_in_channels", (uint64_t)&llvm_in_channels);
             EE->updateGlobalMapping("llvm_now", (uint64_t)&llvm_now);
-            EE->updateGlobalMapping("llvm_zone_reset", (uint64_t)&llvm_zone_reset);
+            EE->updateGlobalMapping("llvm_zone_reset_extern", (uint64_t)&llvm_zone_reset);
             EE->updateGlobalMapping("llvm_zone_copy_ptr", (uint64_t)&llvm_zone_copy_ptr);
             EE->updateGlobalMapping("llvm_zone_mark", (uint64_t)&llvm_zone_mark);
             EE->updateGlobalMapping("llvm_zone_mark_size", (uint64_t)&llvm_zone_mark_size);
@@ -1421,13 +1430,22 @@ extern "C" {
 
 llvm_zone_t* llvm_peek_zone_stack_extern()
 {
-  return llvm_peek_zone_stack();
+    return llvm_peek_zone_stack();
 }
 
-void llvm_push_zone_stack_extern (llvm_zone_t* z)
+void llvm_push_zone_stack_extern(llvm_zone_t* Zone)
 {
-  llvm_push_zone_stack(z);
+    llvm_push_zone_stack(Zone);
 }
 
+llvm_zone_t* llvm_zone_reset_extern(llvm_zone_t* Zone)
+{
+    return llvm_zone_reset(Zone);
+}
+
+llvm_zone_t* llvm_zone_create_extern(uint64_t Size)
+{
+    return llvm_zone_create(Size);
+}
 
 }

@@ -171,7 +171,6 @@ pointer get_function_type(scheme* _sc, pointer args);
 pointer get_function_calling_conv(scheme* _sc, pointer args);
 pointer get_global_variable_type(scheme* _sc, pointer args);
 pointer get_function_pointer(scheme* _sc, pointer args);
-pointer recompile_and_link_function(scheme* _sc, pointer args);
 pointer remove_function(scheme* _sc, pointer args);
 pointer remove_global_var(scheme* _sc, pointer args);
 pointer erase_function(scheme* _sc, pointer args);

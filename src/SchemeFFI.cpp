@@ -120,6 +120,40 @@
     ascii_normal()
 #endif
 
+#include <queue>
+#include <unistd.h>
+#include <EXTMutex.h>
+static std::queue<std::string> sCompileQueue;
+static extemp::EXTMutex sCompileQueueMutex("CompileQueue");
+namespace extemp { namespace SchemeFFI {
+static llvm::Module* jitCompile(const std::string& String);
+}}
+
+void* bgCompile(void* Arg) {
+    std::string string;
+    while(true) {
+        usleep(1000);
+        {
+            extemp::EXTMutex::ScopedLock lock(sCompileQueueMutex);
+            if (sCompileQueue.empty()) {
+                continue;
+            }
+            string = std::move(sCompileQueue.front());
+            sCompileQueue.pop();
+        }
+        auto modulePtr(extemp::SchemeFFI::jitCompile(string));
+        if (modulePtr) {
+            std::cout << "COMPILED" << std::endl;
+            extemp::EXTLLVM::I()->addModule(modulePtr);
+        } else {
+            // ????
+        }
+        --extemp::EXTLLVM::I()->m_pendingCompiles;
+    }
+}
+
+static extemp::EXTThread sCompileThread(bgCompile, nullptr, "bgCompile");
+
 char* cstrstrip (char* inputStr)
 {
     char *start, *end;
@@ -340,7 +374,6 @@ void initSchemeFFI(scheme* sc)
         {     "llvm:get-function-calling-conv", &get_function_calling_conv    },
         {     "llvm:get-global-variable-type",  &get_global_variable_type     },
         {     "llvm:get-function-pointer",      &get_function_pointer         },
-        {     "llvm:jit-compile-function",      &recompile_and_link_function  },
         {     "llvm:remove-function",           &remove_function              },
         {     "llvm:remove-globalvar",          &remove_global_var            },
         {     "llvm:erase-function",            &erase_function               },
@@ -937,7 +970,7 @@ void initSchemeFFI(scheme* sc)
 
     void* lib_handle = LoadLibraryA(string_value(pair_car(Args)));
 #else
-    void* lib_handle = dlopen(string_value(pair_car(Args)), RTLD_LAZY|RTLD_GLOBAL);
+    void* lib_handle = dlopen(string_value(pair_car(Args)), RTLD_LAZY|RTLD_GLOBAL);  // TODO: RTLD_NOW
 #endif
     if (!lib_handle)
       {
@@ -947,7 +980,7 @@ void initSchemeFFI(scheme* sc)
 #ifdef _WIN32
             std::cout << "LoadLibrary error:" << GetLastError() << std::endl;
 #else
-            printf("%s\n", dlerror());
+            printf("Bad: %s\n", dlerror());
 #endif
           }
         return Scheme->F;
@@ -1592,11 +1625,10 @@ static std::string SanitizeType(llvm::Type* Type)
 }
 
 static bool sEmitCode = false;
-  pointer jitCompileIRString(scheme* Scheme, pointer Args)
-  {
+static llvm::Module* jitCompile(const std::string& String)
+{
     // Create some module to put our function into it.
     using namespace llvm;
-    Module* M = EXTLLVM::I()->M;
     legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
     legacy::PassManager* PM_NO = extemp::EXTLLVM::I()->PM_NO;
 
@@ -1604,15 +1636,15 @@ static bool sEmitCode = false;
     sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
     char tmpbuf[1024];
 
-    char* assm = string_value(pair_car(Args));
+    std::string asmcode(String);
     SMDiagnostic pa;
-    //ParseError pa;
-    long long num_of_funcs = M->getFunctionList().size();
 
     static std::string sInlineString; // This is a hack for now, but it *WORKS*
     static std::string sInlineBitcode;
     static std::unordered_set<std::string> sInlineSyms;
     if (sInlineString.empty()) {
+        sCompileQueueMutex.init();
+        // sCompileThread.start();
         {
             std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
             std::stringstream inString;
@@ -1652,7 +1684,6 @@ std::cout << pa.getMessage().str() << std::endl;
             first = false;
         }
     }
-    std::string asmcode(assm);
     std::unique_ptr<llvm::Module> newModule;
     bool built(false);
     if (!EXTLLVM::FAST_COMPILES) { // this might not be necessary any more (benchmark later)
@@ -1685,7 +1716,7 @@ std::cout << pa.getMessage().str() << std::endl;
             if (!gv) {
                 continue;
             }
-            auto func(extemp::EXTLLVM::I()->getFunction(sym));
+            auto func(extemp::EXTLLVM::I()->getFunction(sym, false));
             if (func) {
                 dstream << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
                 bool first(true);
@@ -1738,35 +1769,42 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
             }
         }
     }
-
     //std::stringstream ss;
     if (unlikely(!newModule))
-      {
+    {
 // std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
 // std::cout << pa.getMessage().str() << std::endl << pa.getLineNo() << std::endl;
         std::string errstr;
         llvm::raw_string_ostream ss(errstr);
         pa.print("LLVM IR",ss);
         printf("%s\n",ss.str().c_str());
-        return Scheme->F;
-      }else{
-      if (extemp::EXTLLVM::VERIFY_COMPILES) {
-        if (verifyModule(*M)) {
-          std::cout << "\nInvalid LLVM IR\n";
-          return Scheme->F;
-        }
-      }
-      llvm::Module *modulePtr = newModule.get();
-      extemp::EXTLLVM::I()->EE->addModule(std::move(newModule));
-      extemp::EXTLLVM::I()->addModule(modulePtr);
-      extemp::EXTLLVM::I()->EE->finalizeObject();
-
-      // when using MCJIT, return a pointer to the module with the new
-      // functions in it - which we'll use later to export the bitcode
-      // during AOT-compilation
-      return mk_cptr(Scheme, modulePtr);
+        return nullptr;
+    } else if (extemp::EXTLLVM::VERIFY_COMPILES && verifyModule(*newModule)) {
+        std::cout << "\nInvalid LLVM IR\n";
+        return nullptr;
     }
-  }
+    llvm::Module *modulePtr = newModule.get();
+    extemp::EXTLLVM::I()->EE->addModule(std::move(newModule));
+    extemp::EXTLLVM::I()->EE->finalizeObject();
+    return modulePtr;
+}
+
+pointer jitCompileIRString(scheme* Scheme, pointer Args)
+  {
+    if (EXTLLVM::BACKGROUND_COMPILES) {
+        EXTMutex::ScopedLock lock(sCompileQueueMutex);
+        sCompileQueue.push(string_value(pair_car(Args)));
+        ++EXTLLVM::I()->m_pendingCompiles;
+        return Scheme->F;
+    }
+    auto modulePtr(jitCompile(string_value(pair_car(Args))));
+    if (!modulePtr) {
+        return Scheme->F;
+    }
+    extemp::EXTLLVM::I()->addModule(modulePtr);
+    return mk_cptr(Scheme, modulePtr);
+}
+
 
     pointer ff_set_name(scheme* Scheme, pointer Args)
     {
@@ -2122,47 +2160,45 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     return reverse(Scheme, p);
   }
 
-    pointer remove_global_var(scheme* Scheme, pointer Args)
+pointer remove_global_var(scheme* Scheme, pointer Args)
+{
+    auto var(EXTLLVM::I()->EE->FindGlobalVariableNamed(string_value(pair_car(Args))));
+    if (!var)
     {
-        llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(Args)));
-        if(var == 0)
-        {
-            return Scheme->F;
-        }
-        var->dropAllReferences();
-        var->removeFromParent();
+        return Scheme->F;
+    }
+    var->dropAllReferences();
+    var->removeFromParent();
+    return Scheme->T;
+}
+
+pointer remove_function(scheme* Scheme, pointer Args)
+{
+    auto func(EXTLLVM::I()->EE->FindFunctionNamed(string_value(pair_car(Args))));
+    if (!func)
+    {
+        return Scheme->F;
+    }
+    if (func->mayBeOverridden()) {
+        func->dropAllReferences();
+        func->removeFromParent();
         return Scheme->T;
-    }
-
-  pointer remove_function(scheme* Scheme, pointer Args)
-  {
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
-    if(func == 0)
-      {
+    } else {
+        printf("Cannot remove function with dependencies\n");
         return Scheme->F;
-      }
-    if(func->mayBeOverridden()) {
-            func->dropAllReferences();
-            func->removeFromParent();
-            return Scheme->T;
-    }else{
-            printf("Cannot remove function with dependencies\n");
-            return Scheme->F;
     }
-  }
+}
 
-  pointer erase_function(scheme* Scheme, pointer Args)
-  {
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
-    if(func == 0)
-      {
+pointer erase_function(scheme* Scheme, pointer Args)
+{
+    auto func(EXTLLVM::I()->EE->FindFunctionNamed(string_value(pair_car(Args))));
+    if (!func) {
         return Scheme->F;
-      }
+    }
     func->deleteBody();
     func->eraseFromParent();
-
     return Scheme->T;
-  }
+}
 
     pointer callClosure(scheme* Scheme, pointer Args)
     {
@@ -2231,29 +2267,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     return Scheme->T;
   }
 
-  pointer recompile_and_link_function(scheme* Scheme, pointer Args)
-  {
-    using namespace llvm;
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
-    if(func == 0)
-      {
-        return Scheme->F;
-      }
-    void* p = 0;
-    try{
-      EXTLLVM* xll = EXTLLVM::I();
-      ExecutionEngine* EE = xll->EE;
-      void* p = NULL;
-    }catch(std::exception& e) {
-      std::cout << "EXCEPT: " << e.what() << std::endl;
-    }
-
-    if(p==NULL) {
-            return Scheme->F;
-    }
-    return mk_cptr(Scheme, p);
-  }
-
     //
     // This will not be threadsafe whenever a bind-func is done!
     //
@@ -2267,7 +2280,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
   llvm::MutexGuard locked(EE->lock);
 #endif
 
-        Module* M = EXTLLVM::I()->M;
         llvm::Function* func = (Function*) cptr_value(pair_car(Args));
         if(func == 0)
         {
@@ -2512,7 +2524,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
         llvm::raw_string_ostream ss(str);
 
         if(list_length(Scheme, Args) > 0) {
-    llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(Args)));
+            const llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(Args)));
     //llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(Args))));
             if(val == NULL) {
                 std::cerr << "No such value found in LLVM Module" << std::endl;
