@@ -51,17 +51,6 @@ void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);
 
 pointer scmAddForeignFunc(scheme* sc, pointer args);
 
-// dsp bits
-pointer setDSPClosure(scheme* _sc, pointer args);
-pointer setDSPMTClosure(scheme* _sc, pointer args);
-pointer setDSPWrapper(scheme* _sc, pointer args);
-pointer setDSPMTWrapper(scheme* _sc, pointer args);
-pointer setDSPWrapperArray(scheme* _sc, pointer args);
-pointer setDSPMTWrapperArray(scheme* _sc, pointer args);
-pointer initMTAudio(scheme* _sc, pointer args);
-pointer initMTAudioBuf(scheme* _sc, pointer args);
-pointer getAudioLoad(scheme* _sc, pointer args);
-
 // misc stuff
 pointer dataGETi64(scheme* _sc, pointer args);
 pointer dataGETdouble(scheme* _sc, pointer args);
@@ -101,14 +90,6 @@ pointer regex_replace(scheme* _sc, pointer args);
 // memory zone stuff
 void freeWithDelay(TaskI* task);
 void destroyMallocZoneWithDelay(TaskI* task);
-pointer createMallocZone(scheme* _sc, pointer args);
-pointer defaultMallocZone(scheme* _sc, pointer args);
-pointer resetMallocZone(scheme* _sc, pointer args);
-pointer destroyMallocZone(scheme* _sc, pointer args);
-pointer copyToDefaultZone(scheme* _sc, pointer args);
-pointer peekMemoryZone(scheme* _sc, pointer args);
-pointer popMemoryZone(scheme* _sc, pointer args);
-pointer pushMemoryZone(scheme* _sc, pointer args);
 
 // llvm stuff
 pointer optimizeCompiles(scheme* _sc, pointer args);
@@ -145,7 +126,6 @@ pointer llvm_disasm(scheme* _sc, pointer args);
 pointer callClosure(scheme* _sc, pointer args);
 pointer printLLVMModule(scheme* _sc, pointer args);
 pointer printLLVMFunction(scheme* _sc, pointer args);
-pointer symbol_pointer(scheme* _sc, pointer args);
 pointer bind_symbol(scheme* _sc, pointer args);
 pointer update_mapping(scheme* _sc, pointer args);
 pointer get_named_type(scheme* _sc, pointer args);

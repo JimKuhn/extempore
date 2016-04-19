@@ -385,12 +385,12 @@ int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
             }
             int range = ovector[1] - ovector[0];
             char* b = (char*) alloca(range+1);
-            memset(b,0,range+1);
+            b[range] = '\0';
             char* a = data+ovector[0];
             char* substring = strncpy(b, a, range);
       // std::cout << "substr:" << substring << std::endl;
       char* tmp = (char*) malloc(range+1);
-      memset(tmp,0,range+1);
+      tmp[range] = '\0';
       strncpy(tmp,substring,range);
       // std::cout << "adding:" << tmp << " at:" << num << std::endl;
       results[num]=tmp;
@@ -432,10 +432,10 @@ bool rsplit(char* regex, char* str, char* a, char* b)
   int range = ovector[0];
   int range2 = ovector[1];
   //printf("reg ranges %d:%d\n",range,range2);
-  memset(a,0,range+1);
-  memcpy(a,data,range);
-  memset(b,0,(length-(range2+0))+1);
-  memcpy(b,data+range2+0,(length-(range2+0)));
+  a[range] = '\0';;
+  memcpy(a, data, range);
+  b[length - range2] = '\0';
+  memcpy(b, data + range2, length- range2);
   return true;
 }
 
@@ -493,7 +493,7 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
       }
             size = strlen(res);
             tmp = (char*) alloca(size+range+strlen(cc)+1);
-            memset(tmp,0,size+range+strlen(cc)+1);
+            tmp[size+range+strlen(cc)] = '\0';
             memcpy(tmp,res,size);
             memcpy(tmp+size,data+ovector[pos*2],range);
             memcpy(tmp+size+range,cc,strlen(cc));
@@ -506,7 +506,7 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
         range = ovector[1] - ovector[0];
         //char* result = (char*) alloca(lgth);
   if(lgth>4096) return str;
-        memset(result,0,lgth);
+        result[lgth - 1] = '\0'; // TODO: lots of this can be simplified
         memcpy(result,data,ovector[0]);
         memcpy(result+ovector[0],res,strlen(res));
         memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);

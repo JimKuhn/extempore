@@ -176,6 +176,8 @@ static std::unordered_map<std::string,std::string> LLVM_ALIAS_TABLE;
 #include "ffi/misc.inc"
 #include "ffi/number.inc"
 #include "ffi/sys.inc"
+#include "ffi/sys_dsp.inc"
+#include "ffi/sys_zone.inc"
 
 void initSchemeFFI(scheme* sc)
 {
@@ -200,25 +202,8 @@ void initSchemeFFI(scheme* sc)
         MISC_DEFS,
         NUMBER_DEFS,
         SYS_DEFS,
-        // DSP sys stuff
-        {     "sys:set-dsp-closure",            &setDSPClosure                },
-        {     "sys:set-dspmt-closure",          &setDSPMTClosure              },
-        {     "sys:set-dsp-wrapper",            &setDSPWrapper                },
-        {     "sys:set-dspmt-wrapper",          &setDSPMTWrapper              },
-        {     "sys:init-mt-audio",              &initMTAudio                  },
-        {     "sys:init-mt-audio-buf",          &initMTAudioBuf               },
-        {     "sys:audio-load",                 &getAudioLoad                 },
-        {     "sys:set-dsp-wrapper-array",      &setDSPWrapperArray           },
-        {     "sys:set-dspmt-wrapper-array",    &setDSPMTWrapperArray         },
-        // memory zone stuff
-        {     "sys:create-mzone",               &createMallocZone             },
-        {     "sys:default-mzone",              &defaultMallocZone            },
-        {     "sys:destroy-mzone",              &destroyMallocZone            },
-        {     "sys:copy-to-dmzone",             &copyToDefaultZone            },
-        {     "sys:reset-mzone",                &resetMallocZone              },
-        {     "sys:peek-memzone",               &peekMemoryZone               },
-        {     "sys:pop-memzone",                &popMemoryZone                },
-        {     "sys:push-memzone",               &pushMemoryZone               },
+        SYS_DSP_DEFS,
+        SYS_ZONE_DEFS,
         // misc stuff
         {     "cptr:get-i64",                   &dataGETi64                   },
         {     "cptr:get-double",                &dataGETdouble                },
@@ -518,7 +503,7 @@ void initSchemeFFI(scheme* sc)
 
         char* result = (char*) alloca(len+1);
 
-        memset(result,0,len+1);
+        result[0] = '\0';
 
         for(pointer x=pair_car(array);array != Scheme->NIL;array=pair_cdr(array))
         {
@@ -743,7 +728,7 @@ void initSchemeFFI(scheme* sc)
             }else{
                 int range = ovector[p+1] - ovector[p];
                 char* b = (char*) alloca(range+1);
-                memset(b,0,range+1);
+                b[range] = '\0';
                 char* a = data+ovector[p];
                 char* substring = strncpy(b, a, range);
                 EnvInjector injector(Scheme, list);
@@ -790,7 +775,7 @@ void initSchemeFFI(scheme* sc)
             }
             int range = ovector[1] - ovector[0];
             char* b = (char*) alloca(range+1);
-            memset(b,0,range+1);
+            b[range] = '\0';
             char* a = data+ovector[0];
             char* substring = strncpy(b, a, range);
             EnvInjector injector(Scheme, list);
@@ -842,7 +827,7 @@ void initSchemeFFI(scheme* sc)
             }
             int range = ovector[0];
             char* b = (char*) alloca(range+1);
-            memset(b,0,range+1);
+            b[range] = '\0';
             char* substring = strncpy(b, data, range);
             EnvInjector injector(Scheme, list);
             pointer tlist = cons(Scheme,mk_string(Scheme,substring),list);
@@ -897,7 +882,7 @@ void initSchemeFFI(scheme* sc)
             range = (pos>0) ? ovector[(pos*2)+1] - ovector[pos*2] : 0;
             size = strlen(res);
             tmp = (char*) alloca(size+range+strlen(cc)+1);
-            memset(tmp,0,size+range+strlen(cc)+1);
+            tmp[size+range+strlen(cc)] = '\0';
             memcpy(tmp,res,size);
             memcpy(tmp+size,data+ovector[pos*2],range);
             memcpy(tmp+size+range,cc,strlen(cc));
@@ -909,7 +894,7 @@ void initSchemeFFI(scheme* sc)
         int lgth = (strlen(data)-range)+strlen(res)+1;
         range = ovector[1] - ovector[0];
         char* result = (char*) alloca(lgth);
-        memset(result,0,lgth);
+        result[lgth - 1] = '\0';
         memcpy(result,data,ovector[0]);
         memcpy(result+ovector[0],res,strlen(res));
         memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);
@@ -917,11 +902,6 @@ void initSchemeFFI(scheme* sc)
         return mk_string(Scheme,result);
     }
 
-    ///////////////////////////////////////////////////////
-    //
-    // MEMORY ZONE STUFF
-    //
-    //////////////////////////////////////////////////////
     void freeWithDelay(TaskI* task)
     {
         Task<char*>* t = static_cast<Task<char*>*>(task);
@@ -936,60 +916,9 @@ void initSchemeFFI(scheme* sc)
         llvm_zone_destroy(zone);
     }
 
-    pointer createMallocZone(scheme* Scheme, pointer Args)
-    {
-        if(Args == Scheme->NIL)
-            return mk_cptr(Scheme,llvm_zone_create(1024*100));
-        else
-            return mk_cptr(Scheme,llvm_zone_create(ivalue(pair_car(Args))));
-    }
 
-    pointer defaultMallocZone(scheme* Scheme, pointer Args)
-    {
-        return mk_cptr(Scheme,Scheme->m_process->getDefaultZone()); //llvm_zone_default());
-    }
 
-    pointer destroyMallocZone(scheme* Scheme, pointer Args)
-    {
-        llvm_zone_t* ptr = (llvm_zone_t*) cptr_value(pair_car(Args));
-        if(pair_cdr(Args) != Scheme->NIL)
-        {
-          llvm_destroy_zone_after_delay(ptr, ivalue(pair_cadr(Args)));
-        }
-        else
-        {
-          llvm_zone_destroy(ptr);
-        }
-        return Scheme->T;
-    }
 
-    pointer resetMallocZone(scheme* Scheme, pointer Args)
-    {
-        llvm_zone_t* zone = (llvm_zone_t*) cptr_value(pair_car(Args));
-        llvm_zone_reset(zone);
-        return Scheme->T;
-    }
-
-    pointer copyToDefaultZone(scheme* Scheme, pointer Args)
-    {
-        return Scheme->NIL;
-    }
-
-    pointer peekMemoryZone(scheme* Scheme, pointer Args)
-    {
-        return mk_cptr(Scheme,llvm_peek_zone_stack());
-    }
-
-    pointer popMemoryZone(scheme* Scheme, pointer Args)
-    {
-        return mk_cptr(Scheme,llvm_pop_zone_stack());
-    }
-
-    pointer pushMemoryZone(scheme* Scheme, pointer Args)
-    {
-        llvm_push_zone_stack((llvm_zone_t*)cptr_value(pair_car(Args)));
-        return Scheme->T;
-    }
 
     ////////////////////////////////////////////
     //
@@ -1273,9 +1202,8 @@ pointer jitCompileIRString(scheme* Scheme, pointer Args)
     using namespace llvm;
     char* x = string_value(pair_car(Args));
     char rgx[1024];
-    memset((void*)&rgx[0],0,1024);
-    memcpy((void*)&rgx[0],x,strlen(x));
-    strcat((char*)&rgx[0],"_.*");
+    strcpy(rgx, x);
+    strcat(rgx, "_.*");
     // printf("check regex: %s\n",(char*)&rgx[0]);
 
     Module* M = NULL;
@@ -1301,9 +1229,8 @@ pointer jitCompileIRString(scheme* Scheme, pointer Args)
     using namespace llvm;
     char* x = string_value(pair_car(Args));
     char rgx[1024];
-    memset((void*)&rgx[0],0,1024);
-    memcpy((void*)&rgx[0],x,strlen(x));
-    strcat((char*)&rgx[0],"__[0-9]*");
+    strcpy(rgx, x);
+    strcat(rgx, "__[0-9]*");
     // printf("check regex: %s\n",(char*)&rgx[0]);
     char* last_name = NULL;
 
@@ -2040,7 +1967,6 @@ pointer get_named_type(scheme* Scheme, pointer Args)
           //add back any requried '*'s
           if(ptrdepth>0) {
             char tmpstr[256];
-            memset(tmpstr,0,256);
       strcpy(tmpstr,tmp_name);
             for( ;ptrdepth>0;ptrdepth--) {
               tmpstr[strlen(tmpstr)]='*';
@@ -2052,72 +1978,6 @@ pointer get_named_type(scheme* Scheme, pointer Args)
           return Scheme->NIL;
         }
 }
-
-    ////////////////////////////////////////////////////////////
-    //
-    //  DSP BITS
-    //
-    ////////////////////////////////////////////////////////////
-
-    pointer setDSPClosure(scheme* Scheme, pointer Args)
-    {
-        AudioDevice::I()->setDSPClosure(cptr_value(pair_car(Args)));
-        return Scheme->T;
-    }
-
-    pointer setDSPMTClosure(scheme* Scheme, pointer Args)
-    {
-      AudioDevice::I()->setDSPMTClosure(cptr_value(pair_car(Args)),ivalue(pair_cadr(Args)));
-        return Scheme->T;
-    }
-
-    pointer setDSPWrapper(scheme* Scheme, pointer Args)
-    {
-        AudioDevice::I()->setDSPWrapper((dsp_f_ptr)cptr_value(pair_car(Args)));
-        return Scheme->T;
-    }
-
-    pointer setDSPWrapperArray(scheme* Scheme, pointer Args)
-    {
-        AudioDevice::I()->setDSPWrapperArray((dsp_f_ptr_array)cptr_value(pair_car(Args)));
-        return Scheme->T;
-    }
-
-    pointer setDSPMTWrapper(scheme* Scheme, pointer Args)
-    {
-      AudioDevice::I()->setDSPMTWrapper((dsp_f_ptr_sum)cptr_value(pair_car(Args)),
-                                         (dsp_f_ptr)cptr_value(pair_cadr(Args)));
-      return Scheme->T;
-    }
-
-    pointer setDSPMTWrapperArray(scheme* Scheme, pointer Args)
-    {
-      AudioDevice::I()->setDSPMTWrapperArray((dsp_f_ptr_sum_array)cptr_value(pair_car(Args)),
-                                             (dsp_f_ptr_array)cptr_value(pair_cadr(Args)));
-        return Scheme->T;
-    }
-
-    pointer initMTAudio(scheme* Scheme, pointer Args)
-    {
-      pointer val = pair_cadr(Args);
-      bool zerolatency = (val == Scheme->T) ? true : false;
-      AudioDevice::I()->initMTAudio(ivalue(pair_car(Args)),zerolatency);
-      return Scheme->T;
-    }
-
-    pointer initMTAudioBuf(scheme* Scheme, pointer Args)
-    {
-      pointer val = pair_cadr(Args);
-      bool zerolatency = (val == Scheme->T) ? true : false;
-      AudioDevice::I()->initMTAudioBuf(ivalue(pair_car(Args)),zerolatency);
-      return Scheme->T;
-    }
-
-    pointer getAudioLoad(scheme* Scheme, pointer Args)
-    {
-      double load = AudioDevice::getCPULoad();
-      return mk_real(Scheme,load);
-    }
 
   pointer getClockTime(scheme* Scheme, pointer Args)
   {

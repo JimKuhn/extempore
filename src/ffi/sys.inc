@@ -60,7 +60,7 @@ static pointer openDynamicLib(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, lib_handle);
 }
 
-pointer closeDynamicLib(scheme* Scheme, pointer Args)
+static pointer closeDynamicLib(scheme* Scheme, pointer Args)
 {
 #ifdef _WIN32
     FreeLibrary((HMODULE)cptr_value(pair_car(Args))) ;
@@ -70,7 +70,7 @@ pointer closeDynamicLib(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-pointer symbol_pointer(scheme* Scheme, pointer Args)
+static pointer symbol_pointer(scheme* Scheme, pointer Args)
 {
     void* library = cptr_value(pair_car(Args));
     char* symname = string_value(pair_cadr(Args));
@@ -85,14 +85,14 @@ pointer symbol_pointer(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, ptr);
 }
 
-pointer makeCptr(scheme* Scheme, pointer Args)
+static pointer makeCptr(scheme* Scheme, pointer Args)
 {
      auto num_bytes(ivalue(pair_car(Args)));
      void* ptr = calloc(1, num_bytes);
      return mk_cptr(Scheme, ptr);
 }
 
-pointer slurpFile(scheme* Scheme, pointer Args)
+static pointer slurpFile(scheme* Scheme, pointer Args)
 {
     std::string filename(string_value(pair_car(Args)));
     std::string sharedir_filename(UNIV::SHARE_DIR + "/" + filename);
@@ -114,7 +114,7 @@ pointer slurpFile(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-pointer dirlist(scheme* Scheme, pointer Args)
+static pointer dirlist(scheme* Scheme, pointer Args)
 {
 #ifdef _WIN32
     char* path = string_value(pair_car(Args));
@@ -151,7 +151,7 @@ pointer dirlist(scheme* Scheme, pointer Args)
     return reverse(Scheme,list);
 }
 
-pointer pathExpansion(scheme* Scheme, pointer Args)
+static pointer pathExpansion(scheme* Scheme, pointer Args)
 {
 #ifdef _WIN32
     char* exp_path = string_value(pair_car(Args));
@@ -169,13 +169,13 @@ pointer pathExpansion(scheme* Scheme, pointer Args)
     return mk_string(Scheme, exp_path);
 }
 
-pointer command(scheme* Scheme, pointer Args)
+static pointer command(scheme* Scheme, pointer Args)
 {
     // NOTE: doesn't work for Windows yet
     return mk_integer(Scheme, system(string_value(pair_car(Args))));
 }
 
-pointer commandOutput(scheme* Scheme, pointer Args)
+static pointer commandOutput(scheme* Scheme, pointer Args)
 {
     char outbuf[8192];
 #ifdef _WIN32
@@ -200,7 +200,7 @@ pointer commandOutput(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-pointer setEnv(scheme* Scheme, pointer Args)
+static pointer setEnv(scheme* Scheme, pointer Args)
 {
     char* var = string_value(pair_car(Args));
     char* val = string_value(pair_cadr(Args));
@@ -214,13 +214,13 @@ pointer setEnv(scheme* Scheme, pointer Args)
     return mk_integer(Scheme, res);
 }
 
-pointer setDefaultTimeout(scheme* Scheme, pointer Args)
+static pointer setDefaultTimeout(scheme* Scheme, pointer Args)
 {
     Scheme->m_process->setMaxDuration(ivalue(pair_car(Args)));
     return Scheme->T;
 }
 
-pointer getDefaultTimeout(scheme* Scheme, pointer Args)
+static pointer getDefaultTimeout(scheme* Scheme, pointer Args)
 {
     return mk_integer(Scheme, Scheme->m_process->getMaxDuration());
 }

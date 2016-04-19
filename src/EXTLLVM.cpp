@@ -239,7 +239,7 @@ void llvm_zone_destroy(llvm_zone_t* zone)
   #endif
     if(zone->memories != NULL) llvm_zone_destroy(zone->memories);
     // immediate zeroing for debug purposes!
-    memset(zone->memory,0,zone->size);
+    // memset(zone->memory,0,zone->size);
     free(zone->memory);
     free(zone);
     return;
@@ -942,7 +942,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   char tname[256];
 
   char c[1024];
-  memset(c,0,1024);
+  c[0] = '\0';
   const char* d = "_xtlang_name";
 
   if(!(rsplit((char*)"\\.",sym, (char*) fname, (char*) tmp))) {
@@ -950,8 +950,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     return _sc->F;
   }
   if(!rsplit((char*)":",tmp, (char*) vname,(char*) tname)) {
-    memset(tname, 0, 256);
-    memset(vname, 0, 256);
+    tname[0] = '\0';
     memcpy(vname, tmp, 256);
   }
   strcat(c,fname);
