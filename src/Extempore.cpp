@@ -77,7 +77,7 @@ void sig_handler(int Signo)
 {
   if (Signo == SIGINT) {
     printf("\nReceived interrupt signal (SIGINT), exiting Extempore...\n");
-    exit(0);
+    _exit(0);
   }
   else if (Signo == SIGTERM) {
     printf("\nReceived termination signal (SIGTERM), exiting Extempore...\n");
