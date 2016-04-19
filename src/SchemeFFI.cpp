@@ -123,36 +123,9 @@
 #include <queue>
 #include <unistd.h>
 #include <EXTMutex.h>
-static std::queue<std::string> sCompileQueue;
-static extemp::EXTMutex sCompileQueueMutex("CompileQueue");
 namespace extemp { namespace SchemeFFI {
 static llvm::Module* jitCompile(const std::string& String);
 }}
-
-void* bgCompile(void* Arg) {
-    std::string string;
-    while(true) {
-        usleep(1000);
-        {
-            extemp::EXTMutex::ScopedLock lock(sCompileQueueMutex);
-            if (sCompileQueue.empty()) {
-                continue;
-            }
-            string = std::move(sCompileQueue.front());
-            sCompileQueue.pop();
-        }
-        auto modulePtr(extemp::SchemeFFI::jitCompile(string));
-        if (modulePtr) {
-            std::cout << "COMPILED" << std::endl;
-            extemp::EXTLLVM::I()->addModule(modulePtr);
-        } else {
-            // ????
-        }
-        --extemp::EXTLLVM::I()->m_pendingCompiles;
-    }
-}
-
-static extemp::EXTThread sCompileThread(bgCompile, nullptr, "bgCompile");
 
 char* cstrstrip (char* inputStr)
 {
@@ -360,7 +333,6 @@ void initSchemeFFI(scheme* sc)
         // llvm stuff
         {     "llvm:optimize",                  &optimizeCompiles             },
         {     "llvm:fast-compile",              &fastCompiles                 },
-        {     "llvm:background-compile",        &backgroundCompiles           },
         {     "llvm:jit-compile-ir-string",     &jitCompileIRString},
         {     "llvm:ffi-set-name",              &ff_set_name                  },
         {     "llvm:ffi-get-name",              &ff_get_name                  },
@@ -1597,12 +1569,6 @@ pointer fastCompiles(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-pointer backgroundCompiles(scheme* Scheme, pointer Args)
-{
-    EXTLLVM::BACKGROUND_COMPILES = (pair_car(Args) == Scheme->T);
-    return Scheme->T;
-}
-
 pointer verifyCompiles(scheme* Scheme, pointer Args)
 {
     EXTLLVM::VERIFY_COMPILES = (pair_car(Args) == Scheme->T);
@@ -1646,8 +1612,6 @@ static llvm::Module* jitCompile(const std::string& String)
     static std::string sInlineBitcode;
     static std::unordered_set<std::string> sInlineSyms;
     if (sInlineString.empty()) {
-        sCompileQueueMutex.init();
-        // sCompileThread.start();
         {
             std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
             std::stringstream inString;
@@ -1716,7 +1680,7 @@ std::cout << pa.getMessage().str() << std::endl;
             if (!gv) {
                 continue;
             }
-            auto func(extemp::EXTLLVM::I()->getFunction(sym, false));
+            auto func(extemp::EXTLLVM::I()->getFunction(sym));
             if (func) {
                 dstream << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
                 bool first(true);
@@ -1790,13 +1754,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 }
 
 pointer jitCompileIRString(scheme* Scheme, pointer Args)
-  {
-    if (EXTLLVM::BACKGROUND_COMPILES) {
-        EXTMutex::ScopedLock lock(sCompileQueueMutex);
-        sCompileQueue.push(string_value(pair_car(Args)));
-        ++EXTLLVM::I()->m_pendingCompiles;
-        return Scheme->F;
-    }
+{
     auto modulePtr(jitCompile(string_value(pair_car(Args))));
     if (!modulePtr) {
         return Scheme->F;

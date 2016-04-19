@@ -79,28 +79,6 @@ extern __thread llvm_zone_stack* tls_llvm_zone_stack;
 extern __thread uint64_t tls_llvm_zone_stacksize;
 extern __thread llvm_zone_t* tls_llvm_callback_zone;
 
-/* extern double (&cosd)(double); */
-/* extern double (&tand)(double); */
-/* extern double (&sind)(double); */
-/* extern double (&coshd)(double); */
-/* extern double (&tanhd)(double); */
-/* extern double (&sinhd)(double); */
-/* extern double (&acosd)(double); */
-/* extern double (&asind)(double); */
-/* extern double (&atand)(double); */
-/* extern double (&atan2d)(double,double); */
-/* extern double (&ceild)(double); */
-/* extern double (&floord)(double); */
-/* extern double (&expd)(double); */
-/* extern double (&fmodd)(double,double); */
-/* extern double (&powd)(double,double); */
-/* extern double (&logd)(double); */
-/* extern double (&log2d)(double); */
-/* extern double (&log10d)(double); */
-/* extern double (&sqrtd)(double); */
-/* extern double (&fabsd)(double); */
-
-
 extern "C"
 {
 char* llvm_disassemble(const unsigned char*,int syntax);
@@ -329,55 +307,34 @@ public:
     void initLLVM();
 
     llvm::Module* activeModule();
-    llvm::Function* getFunction(const char* name, bool Wait = true) {
-        extemp::EXTMutex::ScopedLock lock(m_modulesMutex);
-        bool again;
-        do {
-            again = (m_pendingCompiles > 0);
-            for (auto& m : Ms) {
-                auto f(m->getFunction(name));
-                if (f) {
-                  return f;
-                }
+    llvm::Function* getFunction(const char* name) {
+        for (auto& m : Ms) {
+            auto f(m->getFunction(name));
+            if (f) {
+                return f;
             }
-        } while (again && Wait);
+        }
         return nullptr;
     }
     llvm::GlobalVariable* getGlobalVariable(const char* name) {
-        extemp::EXTMutex::ScopedLock lock(m_modulesMutex);
-        bool again;
-        do {
-            again = (m_pendingCompiles > 0);
-            for (auto& m : Ms) {
-                auto gv(m->getGlobalVariable(name));
-                if (gv) {
-                    return gv;
-                }
+        for (auto& m : Ms) {
+            auto gv(m->getGlobalVariable(name));
+            if (gv) {
+                return gv;
             }
-        } while (again);
+        }
         return nullptr;
     }
     const llvm::GlobalValue* getGlobalValue(const char* name) {
-        // std::cout << name << ": " << EE->getGlobalValueAddress(name) << " = " <<
-        //         EE->getGlobalValueAtAddress(reinterpret_cast<void*>(EE->getGlobalValueAddress(name))) << std::endl;
-        // std::cout << "  " << EE->FindGlobalVariableNamed(name) << std::endl;
-
-        extemp::EXTMutex::ScopedLock lock(m_modulesMutex);
-        bool again;
-        do {
-            again = (m_pendingCompiles > 0);
-            for (auto& m : Ms) {
-                auto gv(m->getNamedValue(name));
-                if (gv) {
-                    return gv;
-                }
+        for (auto& m : Ms) {
+            auto gv(m->getNamedValue(name));
+            if (gv) {
+                return gv;
             }
-        } while (again);
+        }
         return nullptr;
-        // return EE->getGlobalValueAtAddress(reinterpret_cast<void*>(EE->getGlobalValueAddress(name)));
     }
     llvm::StructType* getNamedType(const char* name) {
-        extemp::EXTMutex::ScopedLock lock(m_modulesMutex);
         for (auto& m : Ms) {
             auto t(m->getTypeByName(name));
             if (t) {
@@ -388,7 +345,6 @@ public:
     }
     uint64_t getSymbolAddress(const std::string&);
     void addModule(llvm::Module* m) {
-        extemp::EXTMutex::ScopedLock lock(m_modulesMutex);
         Ms.push_back(m);
     }
     std::vector<llvm::Module*>& getModules() { return Ms; } // not going to protect these!!!
@@ -409,9 +365,6 @@ public:
 private:
     std::vector<llvm::Module*> Ms;
     static EXTLLVM SINGLETON;
-public: // hack
-    extemp::EXTMutex m_modulesMutex;
-    std::atomic_uint m_pendingCompiles;
 };
 
 } // end extemp namespace

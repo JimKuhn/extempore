@@ -1121,11 +1121,9 @@ bool EXTLLVM::FAST_COMPILES = false;
 bool EXTLLVM::BACKGROUND_COMPILES = false;
 bool EXTLLVM::VERIFY_COMPILES = true;
 
-EXTLLVM::EXTLLVM(): m_modulesMutex("Modules")
+EXTLLVM::EXTLLVM()
 {
     alloc_mutex.init();
-    m_modulesMutex.init();
-    m_pendingCompiles = 0;
     M = 0;
     MP = 0;
     EE = 0;
