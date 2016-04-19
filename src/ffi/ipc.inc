@@ -95,7 +95,7 @@ static pointer ipcDefine(scheme* Scheme, pointer Args)
     if (!appendArg(Scheme, ss, pair_caddr(Args))) {
         return Scheme->F;
     }
-    repl->writeString(std::string("(") + symname(sym) + ss.str() +')');
+    repl->writeString(std::string("(define ") + symname(sym) + ss.str() +')');
     return Scheme->T;
 }
 

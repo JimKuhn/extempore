@@ -51,38 +51,6 @@ void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);
 
 pointer scmAddForeignFunc(scheme* sc, pointer args);
 
-// misc scheme ties
-pointer assocstrcmp(scheme* _sc, pointer args);
-pointer assocstrcmpall(scheme* _sc, pointer args);
-
-// num stuff
-pointer randomReal(scheme* _sc, pointer args);
-pointer randomInt(scheme* _sc, pointer args);
-pointer integerToReal(scheme* _sc, pointer args);
-pointer rationalToReal(scheme* _sc, pointer args);
-pointer realToRational(scheme* _sc, pointer args);
-pointer realToInteger(scheme* _sc, pointer args);
-pointer rationalToNumerator(scheme* _sc, pointer args);
-pointer rationalToDenominator(scheme* _sc, pointer args);
-
-// sys stuff
-pointer openDynamicLib(scheme* _sc, pointer args);
-pointer closeDynamicLib(scheme* _sc, pointer args);
-pointer pointerSize(scheme* _sc, pointer args);
-pointer mcjitEnabled(scheme* _sc, pointer args);
-pointer cmdarg(scheme* _sc, pointer args);
-pointer platform(scheme* _sc, pointer args);
-pointer getShareDir(scheme* _sc, pointer args);
-pointer makeCptr(scheme* _sc, pointer args);
-pointer slurpFile(scheme* _sc, pointer args);
-pointer dirlist(scheme* _sc, pointer args);
-pointer pathExpansion(scheme* _sc, pointer args);
-pointer command(scheme* _sc, pointer args);
-pointer commandOutput(scheme* _sc, pointer args);
-pointer setEnv(scheme* _sc, pointer args);
-pointer setDefaultTimeout(scheme* _sc, pointer args);
-pointer getDefaultTimeout(scheme* _sc, pointer args);
-
 // dsp bits
 pointer setDSPClosure(scheme* _sc, pointer args);
 pointer setDSPMTClosure(scheme* _sc, pointer args);

@@ -173,6 +173,9 @@ static std::unordered_map<std::string,std::string> LLVM_ALIAS_TABLE;
 
 #include "ffi/utility.inc"
 #include "ffi/ipc.inc"
+#include "ffi/misc.inc"
+#include "ffi/number.inc"
+#include "ffi/sys.inc"
 
 void initSchemeFFI(scheme* sc)
 {
@@ -194,36 +197,9 @@ void initSchemeFFI(scheme* sc)
     } funcTable[] = {
         UTILITY_DEFS,
         IPC_DEFS,
-        // misc scheme ties
-        {     "assoc-strcmp",                   &assocstrcmp                  },
-        {     "assoc-strcmp-all",               &assocstrcmpall               },
-        // number stuff
-        {     "random-real",                    &randomReal                   },
-        {     "random-int",                     &randomInt                    },
-        {     "real->integer",                  &realToInteger                },
-        {     "real->rational",                 &realToRational               },
-        {     "rational->real",                 &rationalToReal               },
-        {     "integer->real",                  &integerToReal                },
-        {     "rational->n",                    &rationalToNumerator          },
-        {     "rational->d",                    &rationalToDenominator        },
-        // sys stuff
-        {     "sys:pointer-size",               &pointerSize                  },
-        {     "sys:mcjit-enabled",              &mcjitEnabled                 },
-        {     "sys:platform",                   &platform                     },
-        {     "sys:share-dir",                  &getShareDir                  },
-        {     "sys:cmdarg",                     &cmdarg                       },
-        {     "sys:open-dylib",                 &openDynamicLib               },
-        {     "sys:close-dylib",                &closeDynamicLib              },
-        {     "sys:symbol-cptr",                &symbol_pointer               },
-        {     "sys:make-cptr",                  &makeCptr                     },
-        {     "sys:slurp-file",                 &slurpFile                    },
-        {     "sys:directory-list",             &dirlist                      },
-        {     "sys:expand-path",                &pathExpansion                },
-        {     "sys:command",                    &command                      },
-        {     "sys:command-output",             &commandOutput                },
-        {     "sys:set-env",                    &setEnv                       },
-        {     "sys:set-default-timeout",        &setDefaultTimeout            },
-        {     "sys:get-default-timeout",        &getDefaultTimeout            },
+        MISC_DEFS,
+        NUMBER_DEFS,
+        SYS_DEFS,
         // DSP sys stuff
         {     "sys:set-dsp-closure",            &setDSPClosure                },
         {     "sys:set-dspmt-closure",          &setDSPMTClosure              },
@@ -438,159 +414,10 @@ void initSchemeFFI(scheme* sc)
     }
 
 
-    pointer makeCptr(scheme* Scheme, pointer Args)
-    {
-         long num_bytes = ivalue(pair_car(Args));
-         void* ptr = malloc(num_bytes);
-         memset(ptr,0,num_bytes);
-         return mk_cptr(Scheme, ptr);
-    }
 
-  pointer pathExpansion(scheme* Scheme, pointer Args) {
-  #ifdef _WIN32
-    char* path = string_value(pair_car(Args));
-    char* exp_path = path;
-  #else
-        char exp_path[8192];
-        memset(exp_path,0,8192);
-    char* path = string_value(pair_car(Args));
-    if(path[0] == '~') {
-      char* h = getenv("HOME");
-      strcpy(exp_path,h);
-      strcat(exp_path,&path[1]);
-    }else{
-      realpath(path,exp_path);
-    }
 
-  #endif
-    return mk_string(Scheme,exp_path);
-  }
 
-  pointer command(scheme* Scheme, pointer Args) {
-    // NOTE: doesn't work for Windows yet
-    int res = system(string_value(pair_car(Args)));
-    return mk_integer(Scheme,res);
-  }
 
-  pointer commandOutput(scheme* Scheme, pointer Args) {
-
-    char outbuf[8192];
-    memset(outbuf,0,8192);
-#ifdef _WIN32
-    FILE *stream = _popen(string_value(pair_car(Args)), "r");
-#else
-    FILE *stream = popen(string_value(pair_car(Args)), "r");
-#endif
-    if (stream && fgets(outbuf, 8192, stream))
-      {
-#ifdef _WIN32
-        _pclose(stream);
-#else
-        pclose(stream);
-#endif
-        // get rid of the final newline
-        size_t len = strnlen(outbuf, 8192);
-        if(len < 8192)
-          outbuf[len-1] = '\0';
-        return mk_string(Scheme,outbuf);
-      }
-    else
-      return Scheme->F;
-  }
-
-  pointer setEnv(scheme* Scheme, pointer Args) {
-    char* var = string_value(pair_car(Args));
-    char* val = string_value(pair_cadr(Args));
-
-    int res;
-#ifdef _WIN32
-    res = _putenv_s(var, val);
-#else
-    res = setenv(var, val, 1); // overwrite = TRUE
-#endif
-    return mk_integer(Scheme,res);
-  }
-
-  pointer setDefaultTimeout(scheme* Scheme, pointer Args)
-  {
-    long long timeout = ivalue(pair_car(Args));
-    Scheme->m_process->setMaxDuration(timeout);
-    return Scheme->T;
-  }
-
-  pointer getDefaultTimeout(scheme* Scheme, pointer Args)
-  {
-    return mk_integer(Scheme, Scheme->m_process->getMaxDuration());
-  }
-
-#ifdef _WIN32
-        pointer dirlist(scheme* Scheme, pointer Args)
-        {
-          char* path = string_value(pair_car(Args));
-          std::tr2::sys::path bpath(path);
-          if(!std::tr2::sys::exists(bpath)) {
-                  return Scheme->NIL;
-          }
-          if(!std::tr2::sys::is_directory(bpath)) {
-                  return Scheme->NIL;
-          }
-
-          std::tr2::sys::directory_iterator end_it;
-
-          pointer list = Scheme->NIL;
-        for (std::tr2::sys::directory_iterator it(bpath); it != end_it; ++it) {
-            EnvInjector injector(Scheme, list);
-                //tlist = cons(Scheme,mk_string(Scheme,it->path().leaf().string().c_str()),list);
-            pointer tlist = cons(Scheme,mk_string(Scheme,it->path().string().c_str()),list);
-            list = tlist;
-          }
-          return reverse(Scheme,list);
-        }
-#else
-  pointer dirlist(scheme* Scheme, pointer Args)
-  {
-        DIR* dp;
-        struct dirent* ep;
-        dp = opendir(string_value(pair_car(Args)));
-    pointer list = Scheme->NIL;
-        if (dp) {
-            while ((ep = readdir(dp))) {
-                EnvInjector injector(Scheme, list);
-                pointer tlist = cons(Scheme, mk_string(Scheme,ep->d_name),list);
-          list = tlist;
-        }
-        (void) closedir (dp);
-      }
-    else {
-      perror ("Couldn't open the directory");
-    }
-        return reverse(Scheme, list);
-  }
-#endif
-
-  pointer slurpFile(scheme* Scheme, pointer Args)
-  {
-    std::string filename(string_value(pair_car(Args)));
-    std::string sharedir_filename(UNIV::SHARE_DIR + "/" + filename);
-
-    // check raw path first, then prepend SHARE_DIR
-    std::FILE *fp = std::fopen(filename.c_str(), "rb");
-    if (!fp) {
-      fp = std::fopen(sharedir_filename.c_str(), "rb");
-    }
-
-    if(fp){
-      std::string contents;
-      std::fseek(fp, 0, SEEK_END);
-      contents.resize(std::ftell(fp));
-      std::rewind(fp);
-      std::fread(&contents[0], 1, contents.size(), fp);
-      std::fclose(fp);
-
-      return mk_string(Scheme,contents.c_str());
-    }
-    return Scheme->F;
-  }
 
     pointer impcirGetType(scheme* Scheme, pointer Args)
     {
@@ -620,148 +447,7 @@ void initSchemeFFI(scheme* sc)
     }
 
 
-    pointer assocstrcmp(scheme* Scheme, pointer Args)
-    {
-      pointer key = pair_car(Args);
-      pointer alist = pair_cadr(Args);
-      return assoc_strcmp(Scheme,key,alist);
-    }
 
-    pointer assocstrcmpall(scheme* Scheme, pointer Args)
-    {
-      pointer key = pair_car(Args);
-      pointer alist = pair_cadr(Args);
-      return assoc_strcmp_all(Scheme,key,alist);
-    }
-
-    // number stuff
-    pointer randomReal(scheme* Scheme, pointer Args)
-    {
-        return mk_real(Scheme,UNIV::random());
-    }
-
-    pointer randomInt(scheme* Scheme, pointer Args)
-    {
-        return mk_integer(Scheme,UNIV::random(ivalue(pair_car(Args))));
-    }
-
-    pointer integerToReal(scheme* Scheme, pointer Args)
-    {
-        double val = (double) ivalue(pair_car(Args));
-        return mk_real(Scheme,val);
-    }
-
-    pointer rationalToReal(scheme* Scheme, pointer Args)
-    {
-        return mk_real(Scheme, rvalue(pair_car(Args)));
-    }
-
-    pointer realToRational(scheme* Scheme, pointer Args)
-    {
-        double val = rvalue(pair_car(Args));
-        long long vali = (long long) val;
-        double remain = val - (double)vali;
-        return mk_rational(Scheme, ((long long)(remain*10000000.0))+(vali*10000000ll), 10000000ll);
-    }
-
-    pointer rationalToNumerator(scheme* Scheme, pointer Args)
-    {
-        pointer rat = pair_car(Args);
-        if(!is_rational(rat))
-          return mk_integer(Scheme, ivalue(rat));
-        return mk_integer(Scheme,rat->_object._number.value.ratvalue.n);
-    }
-
-    pointer rationalToDenominator(scheme* Scheme, pointer Args)
-    {
-        pointer rat = pair_car(Args);
-        if(!is_rational(rat)) return mk_integer(Scheme,1);
-        return mk_integer(Scheme,rat->_object._number.value.ratvalue.d);
-    }
-
-    pointer realToInteger(scheme* Scheme, pointer Args)
-    {
-        long long int val = (long long int) rvalue(pair_car(Args));
-        return mk_integer(Scheme,val);
-    }
-
-  pointer openDynamicLib(scheme* Scheme, pointer Args)
-  {
-    //void* lib_handle = dlopen(string_value(pair_car(Args)), RTLD_GLOBAL); //LAZY);
-#ifdef _WIN32
-        // set up the DLL load path
-          SetDllDirectory(""); // Plug "binary planting" security hole.
-          if (!SetDllDirectory((extemp::UNIV::SHARE_DIR + "/libs/aot-cache").c_str()))
-                  std::cout << "Warning: couldn't add libs/aot-cache/ to DLL search path" << std::endl;
-
-    void* lib_handle = LoadLibraryA(string_value(pair_car(Args)));
-#else
-    void* lib_handle = dlopen(string_value(pair_car(Args)), RTLD_LAZY|RTLD_GLOBAL);  // TODO: RTLD_NOW
-#endif
-    if (!lib_handle)
-      {
-        // if an optional second argument is non-nil, print the error
-        if(pair_cdr(Args) != Scheme->NIL && pair_cadr(Args) != Scheme->F)
-          {
-#ifdef _WIN32
-            std::cout << "LoadLibrary error:" << GetLastError() << std::endl;
-#else
-            printf("Bad: %s\n", dlerror());
-#endif
-          }
-        return Scheme->F;
-      }
-    return mk_cptr(Scheme,lib_handle);
-  }
-
-    pointer closeDynamicLib(scheme* Scheme, pointer Args)
-    {
-#ifdef _WIN32
-      FreeLibrary((HMODULE)cptr_value(pair_car(Args))) ;
-#else
-        dlclose(cptr_value(pair_car(Args)));
-#endif
-        return Scheme->T;
-    }
-
-
-    pointer pointerSize(scheme* Scheme, pointer Args)
-    {
-#ifdef TARGET_64BIT
-        return mk_integer(Scheme, 64);
-#else
-        return mk_integer(Scheme, 32);
-#endif
-    }
-
-    pointer mcjitEnabled(scheme* Scheme, pointer Args)
-    {
-      return Scheme->T;
-    }
-    pointer cmdarg(scheme* Scheme, pointer Args)
-    {
-      char* key = string_value(pair_car(Args));
-      std::string val = UNIV::CMDPARAMS[std::string(key)];
-      return mk_string(Scheme,val.c_str());
-    }
-
-    pointer platform(scheme* Scheme, pointer Args)
-    {
-#ifdef __APPLE__
-      return mk_string(Scheme, "OSX");
-#elif __linux__
-      return mk_string(Scheme, "Linux");
-#elif _WIN32
-          return mk_string(Scheme, "Windows");
-#else
-          return mk_string(Scheme, "");
-#endif
-    }
-
-  pointer getShareDir(scheme* Scheme, pointer Args)
-  {
-                return mk_string(Scheme,UNIV::SHARE_DIR.c_str());
-  }
 
     // positions base64[62] = '+' and base64[63] == '/'
     pointer Base64Encode(scheme* Scheme, pointer Args)
@@ -2262,21 +1948,6 @@ pointer printLLVMFunction(scheme* Scheme, pointer Args)
         return Scheme->T;
 }
 
-    pointer symbol_pointer(scheme* Scheme, pointer Args)
-    {
-        void* library = cptr_value(pair_car(Args));
-        char* symname = string_value(pair_cadr(Args));
-
-#ifdef _WIN32
-        void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
-#else
-        void* ptr = dlsym(library, symname);
-#endif
-        if(!ptr) {
-            return Scheme->F;
-        }
-        return mk_cptr(Scheme,ptr);
-    }
 
   pointer bind_symbol(scheme* Scheme, pointer Args)
   {
