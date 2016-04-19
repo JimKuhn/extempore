@@ -121,14 +121,21 @@ if(UNIX)
 endif(UNIX)
 
 if(APPLE)
-  set(EXTEMPORE_SYSTEM_NAME "OSX")
+  set(EXTEMPORE_SYSTEM_NAME "osx")
   execute_process(COMMAND sw_vers -productVersion
     OUTPUT_VARIABLE EXTEMPORE_SYSTEM_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   string(REGEX MATCH "^10.[0-9]+" EXTEMPORE_SYSTEM_VERSION ${EXTEMPORE_SYSTEM_VERSION})
   set(EXTEMPORE_SYSTEM_ARCHITECTURE ${UNAME_MACHINE_NAME})
 elseif(UNIX)
-  set(EXTEMPORE_SYSTEM_NAME ${UNAME_OS_NAME})
+  # try lsb_release first - better at giving the distro name
+  execute_process(COMMAND lsb_release -is
+    OUTPUT_VARIABLE EXTEMPORE_SYSTEM_NAME
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT EXTEMPORE_SYSTEM_NAME)
+    # otherwise use uname output
+    set(EXTEMPORE_SYSTEM_NAME ${UNAME_OS_NAME})
+  endif()
   set(EXTEMPORE_SYSTEM_VERSION ${UNAME_OS_RELEASE})
   set(EXTEMPORE_SYSTEM_ARCHITECTURE ${UNAME_MACHINE_NAME})
 elseif(WIN32)
@@ -612,62 +619,64 @@ else(WIN32)
 
   # this approach requires specifying the inter-lib dependencies by hand, but allows us to do AOT compilation in parallell
 
-  function(aotcompile_lib lib group port) # deps are optional, and go at the end
-    get_filename_component(basename ${lib} NAME_WE)
+  set(EXTEMPORE_AOT_COMPILE_PORT 17099)
+
+  macro(aotcompile_lib libfile group) # deps are optional, and go at the end
+    get_filename_component(basename ${libfile} NAME_WE)
     set(targetname aot_${basename})
     if(PACKAGE)
       add_custom_target(${targetname}
-        COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${port}
-        --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
-        BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
+        COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${EXTEMPORE_AOT_COMPILE_PORT}
+        --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
         WORKING_DIRECTORY ${EXT_SHARE_DIR}
         VERBATIM)
     else(PACKAGE)
       add_custom_target(${targetname}
-        COMMAND extempore --nobase --noaudio --port=${port}
-        --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
-        BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
+        COMMAND extempore --nobase --noaudio --port=${EXTEMPORE_AOT_COMPILE_PORT}
+        --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
         WORKING_DIRECTORY ${EXT_SHARE_DIR}
         VERBATIM)
     endif(PACKAGE)
-  add_dependencies(${targetname} extempore)
+    add_dependencies(${targetname} extempore)
     add_dependencies(${group} ${targetname})
     foreach(dep ${ARGN})
       add_dependencies(${targetname} aot_${dep})
     endforeach()
-  endfunction(aotcompile_lib)
+    # decrement port number by 2
+    math(EXPR EXTEMPORE_AOT_COMPILE_PORT "${EXTEMPORE_AOT_COMPILE_PORT} - 2")
+  endmacro(aotcompile_lib)
 
   # core
   add_custom_target(aot)
-  aotcompile_lib(libs/base/base.xtm aot 17099) # no lib dependency for base.xtm
-  aotcompile_lib(libs/core/math.xtm aot 17097 base)
-  aotcompile_lib(libs/core/audiobuffer.xtm aot 17087 base)
-  aotcompile_lib(libs/core/audio_dsp.xtm aot 17095 base math audiobuffer)
-  aotcompile_lib(libs/core/instruments.xtm aot 17093 base math audio_dsp)
+  aotcompile_lib(libs/base/base.xtm aot) # no lib dependency for base.xtm
+  aotcompile_lib(libs/core/math.xtm aot base)
+  aotcompile_lib(libs/core/audiobuffer.xtm aot base)
+  aotcompile_lib(libs/core/audio_dsp.xtm aot base math audiobuffer)
+  aotcompile_lib(libs/core/instruments.xtm aot base math audio_dsp)
 
   # extended
   add_custom_target(aot_extended ALL)
-  aotcompile_lib(libs/external/fft.xtm aot_extended 17091 base math)
-  aotcompile_lib(libs/external/sndfile.xtm aot_extended 17089 base)
-  aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended 17085 base fft sndfile)
-  aotcompile_lib(libs/external/instruments_ext.xtm aot_extended 17083 base sndfile instruments)
-  aotcompile_lib(libs/external/portmidi.xtm aot_extended 17081 base)
-  aotcompile_lib(libs/external/stb_image.xtm aot_extended 17077 base)
-  aotcompile_lib(libs/external/glfw3.xtm aot_extended 17075 base)
+  aotcompile_lib(libs/external/fft.xtm aot_extended base math)
+  aotcompile_lib(libs/external/sndfile.xtm aot_extended base)
+  aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended base fft sndfile)
+  aotcompile_lib(libs/external/instruments_ext.xtm aot_extended base sndfile instruments)
+  aotcompile_lib(libs/external/portmidi.xtm aot_extended base)
+  aotcompile_lib(libs/external/stb_image.xtm aot_extended base)
+  aotcompile_lib(libs/external/glfw3.xtm aot_extended base)
   if(WIN32 OR DEFINED ENV{EXTEMPORE_FORCE_GL_GETPROCADDRESS})
     set(GL_BIND_METHOD getprocaddress)
   else()
     set(GL_BIND_METHOD directbind)
   endif()
-  aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm aot_extended 17073 base)
-  aotcompile_lib(libs/external/gl/gl-objects.xtm aot_extended 17071 base glcore-${GL_BIND_METHOD} stb_image)
-  aotcompile_lib(libs/external/nanovg.xtm aot_extended 17069 base glcore-${GL_BIND_METHOD})
-  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended 17067 base)
-  aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended 17065 base glcompat-${GL_BIND_METHOD})
+  aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm aot_extended base)
+  aotcompile_lib(libs/external/gl/gl-objects.xtm aot_extended base glcore-${GL_BIND_METHOD} stb_image)
+  aotcompile_lib(libs/external/nanovg.xtm aot_extended base glcore-${GL_BIND_METHOD})
+  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended base)
+  aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended base glcompat-${GL_BIND_METHOD})
   if(NOT WIN32)
     # these ones don't currently work on Windows
-    # aotcompile_lib(libs/external/glib.xtm aot_extended 17079 base)
-    aotcompile_lib(libs/external/assimp.xtm aot_extended 17063 base stb_image graphics-pipeline)
+    # aotcompile_lib(libs/external/glib.xtm aot_extended base)
+    aotcompile_lib(libs/external/assimp.xtm aot_extended base stb_image graphics-pipeline)
   endif()
 
 endif(WIN32)
@@ -875,67 +884,67 @@ include(CTest)
 
 if(BUILD_TESTING)
 
+  set(EXTEMPORE_TEST_PORT 17099)
+
+  macro(extempore_add_test testfile)
+    add_test(NAME ${testfile}
+      COMMAND extempore --noaudio --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)"
+      WORKING_DIRECTORY ${EXT_SHARE_DIR})
+    # decrement port number by 2
+    math(EXPR EXTEMPORE_TEST_PORT "${EXTEMPORE_TEST_PORT} - 2")
+  endmacro()
+
+  macro(extempore_add_example_as_test examplefile timeout)
+    add_test(NAME ${examplefile}
+      COMMAND extempore --port=${EXTEMPORE_TEST_PORT} --eval "(sys:load-then-quit \"${examplefile}\" ${timeout})"
+      WORKING_DIRECTORY ${EXT_SHARE_DIR})
+    # decrement port number by 2
+    math(EXPR EXTEMPORE_TEST_PORT "${EXTEMPORE_TEST_PORT} - 2")
+  endmacro()
+
   # tests - core
-  add_test(NAME system
-    COMMAND extempore --noaudio --port=17099 --eval "(xtmtest-run-tests \"tests/core/system.xtm\" #t #t)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME adt
-    COMMAND extempore --noaudio --port=17097 --eval "(xtmtest-run-tests \"tests/core/adt.xtm\" #t #t)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME math
-    COMMAND extempore --noaudio --port=17095 --eval "(xtmtest-run-tests \"tests/core/math.xtm\" #t #t)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME std
-    COMMAND extempore --noaudio --port=17093 --eval "(xtmtest-run-tests \"tests/core/std.xtm\" #t #t)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME xtlang
-    COMMAND extempore --noaudio --port=17091 --eval "(xtmtest-run-tests \"tests/core/xtlang.xtm\" #t #t)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME generics
-    COMMAND extempore --noaudio --port=17089 --eval "(xtmtest-run-tests \"tests/core/generics.xtm\" #t #t)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-
+  extempore_add_test(tests/core/system.xtm)
+  extempore_add_test(tests/core/adt.xtm)
+  extempore_add_test(tests/core/math.xtm)
+  extempore_add_test(tests/core/std.xtm)
+  extempore_add_test(tests/core/xtlang.xtm)
+  extempore_add_test(tests/core/generics.xtm)
   # tests - external
-  add_test(NAME fft
-    COMMAND extempore --noaudio --port=17087 --eval "(xtmtest-run-tests \"tests/external/fft.xtm\" #t #t)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-
+  extempore_add_test(tests/external/fft.xtm)
   # examples - core
-  add_test(NAME fmsynth
-    COMMAND extempore --port=17085 --eval "(sys:load-then-quit \"examples/core/fmsynth.xtm\" 10)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME xthread
-    COMMAND extempore --port=17083 --eval "(sys:load-then-quit \"examples/core/xthread.xtm\" 10)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME scheduler
-    COMMAND extempore --port=17081 --eval "(sys:load-then-quit \"examples/core/scheduler.xtm\" 10)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME nbody_lang_shootout
-    COMMAND extempore --port=17079 --eval "(sys:load-then-quit \"examples/core/nbody_lang_shootout.xtm\" 10)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-
+  extempore_add_example_as_test(examples/core/audio_101.xtm 10)
+  extempore_add_example_as_test(examples/core/extempore_lang.xtm 10)
+  extempore_add_example_as_test(examples/core/fasta_lang_shootout.xtm 10)
+  extempore_add_example_as_test(examples/core/fmsynth.xtm 10)
+  extempore_add_example_as_test(examples/core/midi_synth.xtm 10)
+  extempore_add_example_as_test(examples/core/mtaudio.xtm 10)
+  extempore_add_example_as_test(examples/core/nbody_lang_shootout.xtm 10)
+  extempore_add_example_as_test(examples/core/osc_101.xtm 10)
+  extempore_add_example_as_test(examples/core/polysynth.xtm 10)
+  extempore_add_example_as_test(examples/core/scheduler.xtm 10)
+  extempore_add_example_as_test(examples/core/topclock_metro.xtm 10)
+  extempore_add_example_as_test(examples/core/typeclasses.xtm 10)
+  extempore_add_example_as_test(examples/core/xthread.xtm 10)
   # examples - external
-  add_test(NAME electrofunk
-    COMMAND extempore --port=17077 --eval "(sys:load-then-quit \"examples/external/electrofunk.xtm\" 10)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME triangle
-    COMMAND extempore --port=17069 --eval "(sys:load-then-quit \"examples/external/shader-tutorials/triangle.xtm\" 10)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME raymarcher
-    COMMAND extempore --port=17075 --eval "(sys:load-then-quit \"examples/external/raymarcher.xtm\" 10)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME spectrogram
-    COMMAND extempore --port=17073 --eval "(sys:load-then-quit \"examples/external/spectrogram.xtm\" 10)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME gl-compatibility
-    COMMAND extempore --port=17067 --eval "(sys:load-then-quit \"examples/external/gl-compatibility.xtm\" 10)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME xtmrender3
-    COMMAND extempore --port=17071 --eval "(sys:load-then-quit \"examples/external/xtmrender3.xtm\" 10)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
-  add_test(NAME going-native
-    COMMAND extempore --port=17065 --eval "(sys:load-then-quit \"examples/external/going-native.xtm\" 60)"
-    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  extempore_add_example_as_test(examples/external/audio_player.xtm 10)
+  extempore_add_example_as_test(examples/external/convolution_reverb.xtm 10)
+  extempore_add_example_as_test(examples/external/electrofunk.xtm 10)
+  extempore_add_example_as_test(examples/external/gl-compatibility.xtm 10)
+  extempore_add_example_as_test(examples/external/going-native.xtm 60)
+  extempore_add_example_as_test(examples/external/granulator.xtm 10)
+  extempore_add_example_as_test(examples/external/gui.xtm 10)
+  extempore_add_example_as_test(examples/external/openvg.xtm 10)
+  extempore_add_example_as_test(examples/external/portmidi-output.xtm 10)
+  extempore_add_example_as_test(examples/external/portmidi.xtm 10)
+  extempore_add_example_as_test(examples/external/raymarcher.xtm 10)
+  extempore_add_example_as_test(examples/external/sampler.xtm 10)
+  extempore_add_example_as_test(examples/external/shader-tutorials 10)
+  extempore_add_example_as_test(examples/external/sing_a_song.xtm 10)
+  extempore_add_example_as_test(examples/external/spectrogram.xtm 10)
+  extempore_add_example_as_test(examples/external/xtmrender1.xtm 10)
+  extempore_add_example_as_test(examples/external/xtmrender2.xtm 10)
+  extempore_add_example_as_test(examples/external/xtmrender3.xtm 10)
+  extempore_add_example_as_test(examples/external/xtmrender4.xtm 10)
 endif()
 
 ##########
@@ -964,7 +973,16 @@ set(CPACK_PACKAGE_CONTACT "Ben Swift")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
-set(CPACK_PACKAGE_FILE_NAME Extempore-${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}-${EXTEMPORE_SYSTEM_NAME}${EXTEMPORE_SYSTEM_VERSION}${EXTEMPORE_SYSTEM_ARCHITECTURE})
+
+# give the zipball a nice name on each platform
+if(APPLE)
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-osx10.9+)
+elseif(UNIX)
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_SYSTEM_NAME})
+elseif(WIN32)
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-win${EXTEMPORE_SYSTEM_VERSION})
+endif()
+
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (http://extempore.moso.com.au)")
 
 if(APPLE)
