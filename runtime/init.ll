@@ -615,11 +615,9 @@ declare i8* @memset(i8* %dest, i32 %val, i64 %len)
 declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i32, i1)
 
 declare %mzone* @llvm_zone_callback_setup() nounwind
-declare %mzone* @llvm_zone_create(i64) nounwind
 declare %mzone* @llvm_pop_zone_stack() nounwind
 declare void @llvm_zone_destroy(%mzone*) nounwind
 declare void @llvm_zone_print(%mzone*) nounwind
-declare %mzone* @llvm_zone_reset(%mzone*) nounwind
 declare void @llvm_zone_mark(%mzone*) nounwind
 declare i64 @llvm_zone_mark_size(%mzone*) nounwind
 declare i8* @llvm_zone_malloc(%mzone*, i64) nounwind

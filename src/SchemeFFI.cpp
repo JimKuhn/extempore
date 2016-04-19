@@ -1,5 +1,3 @@
-// #include <unistd.h>
-
 /*
  * Copyright (c) 2011, Andrew Sorensen
  *
@@ -72,7 +70,7 @@
 #include "SchemeProcess.h"
 #include "SchemeREPL.h"
 #include <unordered_set>
-//#include "sys/mman.h"
+#include <unordered_map>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -111,16 +109,50 @@
 #endif
 
 #ifdef _WIN32
-#define PRINT_ERROR(format, ...)		\
+#define PRINT_ERROR(format, ...)                \
     ascii_error();                   \
-    printf(format , __VA_ARGS__);			\
+    printf(format , __VA_ARGS__);                       \
     ascii_normal()
 #else
-#define PRINT_ERROR(format, args...)		\
+#define PRINT_ERROR(format, args...)            \
     ascii_error();                   \
-    printf(format , ## args);			\
+    printf(format , ## args);                   \
     ascii_normal()
 #endif
+
+#include <queue>
+#include <unistd.h>
+#include <EXTMutex.h>
+static std::queue<std::string> sCompileQueue;
+static extemp::EXTMutex sCompileQueueMutex("CompileQueue");
+namespace extemp { namespace SchemeFFI {
+static llvm::Module* jitCompile(const std::string& String);
+}}
+
+void* bgCompile(void* Arg) {
+    std::string string;
+    while(true) {
+        usleep(1000);
+        {
+            extemp::EXTMutex::ScopedLock lock(sCompileQueueMutex);
+            if (sCompileQueue.empty()) {
+                continue;
+            }
+            string = std::move(sCompileQueue.front());
+            sCompileQueue.pop();
+        }
+        auto modulePtr(extemp::SchemeFFI::jitCompile(string));
+        if (modulePtr) {
+            std::cout << "COMPILED" << std::endl;
+            extemp::EXTLLVM::I()->addModule(modulePtr);
+        } else {
+            // ????
+        }
+        --extemp::EXTLLVM::I()->m_pendingCompiles;
+    }
+}
+
+static extemp::EXTThread sCompileThread(bgCompile, nullptr, "bgCompile");
 
 char* cstrstrip (char* inputStr)
 {
@@ -157,235 +189,258 @@ static inline std::string xtm_ftostr(const llvm::APFloat& V) {
   return "<unknown format in ftostr>"; // error
 }
 
-#define nelem(table) sizeof(table) / sizeof(table[0])
-
 namespace extemp {
 
-    SchemeFFI SchemeFFI::SINGLETON;
-    std::unordered_map<std::string,std::pair<std::string,std::string>> SchemeFFI::IMPCIR_DICT;
-    char* SchemeFFI::tmp_str_a = (char*) malloc(1024);
-    char* SchemeFFI::tmp_str_b = (char*) malloc(4096);
-  std::unordered_map<std::string,std::string> SchemeFFI::LLVM_ALIAS_TABLE;
+namespace SchemeFFI {
 
-    void SchemeFFI::initSchemeFFI(scheme* sc)
-    {
-	int i;
+static std::unordered_map<std::string,std::pair<std::string,std::string>> IMPCIR_DICT;
+static char* tmp_str_a = reinterpret_cast<char*>(malloc(1024));
+static char* tmp_str_b = (char*) malloc(4096);
+static std::unordered_map<std::string,std::string> LLVM_ALIAS_TABLE;
 
-	static struct {
-	    const char *name;
-	    uint32_t    value;
-	} integerTable[] = {
-	    { "*au:block-size*",	UNIV::FRAMES },
-	    { "*au:samplerate*",	UNIV::SAMPLERATE },
-	    { "*au:channels*",	        UNIV::CHANNELS },
-	    { "*au:in-channels*",	UNIV::IN_CHANNELS },
-	};
+static pointer asciiColor(scheme* Scheme, pointer Args)
+{
+    ascii_text_color(ivalue(pair_car(Args)),ivalue(pair_cadr(Args)),ivalue(pair_caddr(Args)));
+    return Scheme->T;
+}
 
-	static struct {
-	    const char * name;
-	    foreign_func func;
-	} funcTable[] = {
-	    { "ascii-print-color",	       	&SchemeFFI::asciiColor },
-	    { "emit",                       &SchemeFFI::emit },
-      { "quit",                       &SchemeFFI::exit_extempore },
-	    //IPC stuff
-	    { "ipc:new",		              	&SchemeFFI::newSchemeProcess },
-	    { "ipc:connect",	            	&SchemeFFI::connectToProcess },
-	    { "ipc:call-async",	          	&SchemeFFI::ipcCall },
-	    { "ipc:define",		             	&SchemeFFI::ipcDefine },
-	    { "ipc:eval-string",	        	&SchemeFFI::ipcEval },
-	    { "ipc:load",			              &SchemeFFI::ipcLoad },
-	    { "ipc:set-priority",           &SchemeFFI::ipcSetPriority },
-	    { "ipc:get-priority",           &SchemeFFI::ipcGetPriority },
-	    { "ipc:get-process-name",      	&SchemeFFI::getNameOfCurrentProcess },
-	    // misc scheme ties
-	    { "assoc-strcmp",               &SchemeFFI::assocstrcmp },
-	    { "assoc-strcmp-all",           &SchemeFFI::assocstrcmpall },
-	    // number stuff
-	    { "random-real",		            &SchemeFFI::randomReal },
-	    { "random-int",			            &SchemeFFI::randomInt },
-	    { "real->integer",		          &SchemeFFI::realToInteger },
-	    { "real->rational",		          &SchemeFFI::realToRational },
-	    { "rational->real",		          &SchemeFFI::rationalToReal },
-	    { "integer->real",		          &SchemeFFI::integerToReal },
-      { "rational->n",                &SchemeFFI::rationalToNumerator },
-      { "rational->d",                &SchemeFFI::rationalToDenominator },
-	    // sys stuff
-	    { "sys:pointer-size",		        &SchemeFFI::pointerSize },
-      { "sys:mcjit-enabled",          &SchemeFFI::mcjitEnabled },
-	    { "sys:platform",	  	          &SchemeFFI::platform },
-	    { "sys:share-dir",	       	    &SchemeFFI::getShareDir },
-	    { "sys:cmdarg",    		          &SchemeFFI::cmdarg },
-	    { "sys:open-dylib",		          &SchemeFFI::openDynamicLib },
-	    { "sys:close-dylib",	          &SchemeFFI::closeDynamicLib },
-	    { "sys:symbol-cptr",	          &SchemeFFI::symbol_pointer },
-	    { "sys:make-cptr",		          &SchemeFFI::makeCptr },
-	    { "sys:slurp-file",             &SchemeFFI::slurpFile },
-	    { "sys:directory-list",         &SchemeFFI::dirlist },
-      { "sys:expand-path",            &SchemeFFI::pathExpansion },
-      { "sys:command",                &SchemeFFI::command },
-      { "sys:command-output",         &SchemeFFI::commandOutput },
-      { "sys:set-env",                &SchemeFFI::setEnv },
-      { "sys:set-default-timeout",    &SchemeFFI::setDefaultTimeout },
-      { "sys:get-default-timeout",    &SchemeFFI::getDefaultTimeout },
-	    // DSP sys stuff
-	    { "sys:set-dsp-closure",	      &SchemeFFI::setDSPClosure },
-	    { "sys:set-dspmt-closure",	    &SchemeFFI::setDSPMTClosure },
-	    { "sys:set-dsp-wrapper",	      &SchemeFFI::setDSPWrapper },
-	    { "sys:set-dspmt-wrapper",	    &SchemeFFI::setDSPMTWrapper },
-      { "sys:init-mt-audio",          &SchemeFFI::initMTAudio },
-      { "sys:init-mt-audio-buf",      &SchemeFFI::initMTAudioBuf },
-      { "sys:audio-load",             &SchemeFFI::getAudioLoad },
-	    { "sys:set-dsp-wrapper-array",	&SchemeFFI::setDSPWrapperArray },
-	    { "sys:set-dspmt-wrapper-array",&SchemeFFI::setDSPMTWrapperArray },
-	    // memory zone stuff
-      { "sys:create-mzone",	   	      &SchemeFFI::createMallocZone },
-	    { "sys:default-mzone",		      &SchemeFFI::defaultMallocZone },
-	    { "sys:destroy-mzone",		      &SchemeFFI::destroyMallocZone },
-	    { "sys:copy-to-dmzone",		      &SchemeFFI::copyToDefaultZone },
-	    { "sys:reset-mzone",		        &SchemeFFI::resetMallocZone },
-	    { "sys:peek-memzone",           &SchemeFFI::peekMemoryZone },
-	    { "sys:pop-memzone",            &SchemeFFI::popMemoryZone },
-	    { "sys:push-memzone",           &SchemeFFI::pushMemoryZone },
-	    // misc stuff
-	    { "cptr:get-i64",               &SchemeFFI::dataGETi64 },
-	    { "cptr:get-double",            &SchemeFFI::dataGETdouble },
-	    { "cptr:get-float",             &SchemeFFI::dataGETfloat },
-	    { "cptr:set-i64",               &SchemeFFI::dataSETi64 },
-	    { "cptr:set-double",            &SchemeFFI::dataSETdouble },
-	    { "cptr:set-float",             &SchemeFFI::dataSETfloat },
-	    { "cptr->string",               &SchemeFFI::cptrToString },
-	    { "cptr:get-string",            &SchemeFFI::cptrToString },
-	    { "string->cptr",               &SchemeFFI::stringToCptr },
-	    { "string-strip",		            &SchemeFFI::stringStrip },
-	    { "string-hash",		            &SchemeFFI::stringHash },
-	    { "base64-encode",	            &SchemeFFI::Base64Encode },
-	    { "base64-decode",	            &SchemeFFI::Base64Decode },
-	    { "cname-encode",		            &SchemeFFI::CNameEncode },
-	    { "cname-decode",		            &SchemeFFI::CNameDecode },
-	    { "string-join",		            &SchemeFFI::stringJoin },
-	    { "call-cpp-at-time",	         	&SchemeFFI::callCPPAtTime },
-	    { "now",			                  &SchemeFFI::getTime },
-	    { "sexpr->string",		          &SchemeFFI::sexprToString },
-	    { "println",	  		            &SchemeFFI::print },
-	    { "print",		     	            &SchemeFFI::print_no_new_line },
-	    { "print-full",			            &SchemeFFI::printFull },
-	    { "print-full-nq",		          &SchemeFFI::printFullNoQuotes },
-	    { "pprint-error",		            &SchemeFFI::printError }, // pprint-error is pprint for a reason!
-	    { "print-notification",	       	&SchemeFFI::printNotification },
-	    { "get-closure-env",         		&SchemeFFI::getClosureEnv },
-      { "mk-ff",                      &SchemeFFI::scmAddForeignFunc },
-	    // regex stuff
-	    { "regex:match?",		            &SchemeFFI::regex_match },
-	    { "regex:matched",		          &SchemeFFI::regex_matched },
-	    { "regex:match-all",		        &SchemeFFI::regex_match_all },
-	    { "regex:split",		            &SchemeFFI::regex_split },
-	    { "regex:replace",		          &SchemeFFI::regex_replace },
-	    // llvm stuff
-	    { "llvm:optimize",			        &SchemeFFI::optimizeCompiles },
-        { "llvm:fast-compile",                  &SchemeFFI::fastCompiles },
-	    { "llvm:jit-compile-ir-string", &SchemeFFI::jitCompileIRString},
-      { "llvm:ffi-set-name",          &SchemeFFI::ff_set_name },
-      { "llvm:ffi-get-name",          &SchemeFFI::ff_get_name },
-	    { "llvm:get-function",		     	&SchemeFFI::get_function },
-	    { "llvm:get-globalvar",		     	&SchemeFFI::get_globalvar },
-      { "llvm:get-struct-size",       &SchemeFFI::get_struct_size },
-      { "llvm:get-named-struct-size", &SchemeFFI::get_named_struct_size },
-	    { "llvm:get-function-args",		  &SchemeFFI::get_function_args },
-	    { "llvm:get-function-varargs",	&SchemeFFI::get_function_varargs },
-	    { "llvm:get-function-type",		  &SchemeFFI::get_function_type },
-	    { "llvm:get-function-calling-conv",	&SchemeFFI::get_function_calling_conv },
-	    { "llvm:get-global-variable-type",	&SchemeFFI::get_global_variable_type },
-	    { "llvm:get-function-pointer",	&SchemeFFI::get_function_pointer },
-	    { "llvm:jit-compile-function",	&SchemeFFI::recompile_and_link_function },
-	    { "llvm:remove-function",		    &SchemeFFI::remove_function },
-	    { "llvm:remove-globalvar",		  &SchemeFFI::remove_global_var },
-	    { "llvm:erase-function",		    &SchemeFFI::erase_function },
-	    { "llvm:call-void-func",        &SchemeFFI::llvm_call_void_native },
-	    { "llvm:run",				            &SchemeFFI::call_compiled },
-	    { "llvm:convert-float",			    &SchemeFFI::llvm_convert_float_constant },
- 	    { "llvm:convert-double",			  &SchemeFFI::llvm_convert_double_constant },
-	    { "llvm:count",				          &SchemeFFI::llvm_count },
-	    { "llvm:count-set",				      &SchemeFFI::llvm_count_set },
-	    { "llvm:count++",		        	  &SchemeFFI::llvm_count_inc },
-	    { "llvm:call-closure",			    &SchemeFFI::callClosure },
-	    { "llvm:print",				          &SchemeFFI::printLLVMModule },
-	    { "llvm:print-function",		    &SchemeFFI::printLLVMFunction },
-      { "llvm:print-all-closures",         &SchemeFFI::llvm_print_all_closures },
-      { "llvm:print-closure",    &SchemeFFI::llvm_print_closure },
-      { "llvm:get-closure-work-name", &SchemeFFI::llvm_closure_last_name },
-      { "llvm:disassemble",           &SchemeFFI::llvm_disasm },
-	    { "llvm:bind-symbol",			      &SchemeFFI::bind_symbol },
-	    { "llvm:update-mapping",			  &SchemeFFI::update_mapping },
-	    { "llvm:add-llvm-alias",        &SchemeFFI::add_llvm_alias },
-	    { "llvm:get-llvm-alias",        &SchemeFFI::get_llvm_alias },
-	    { "llvm:get-named-type",        &SchemeFFI::get_named_type },
-	    { "llvm:get-global-module",     &SchemeFFI::get_global_module},
-      { "llvm:export-module",         &SchemeFFI::export_llvmmodule_bitcode },
-	    { "impc:ir:getname",			      &SchemeFFI::impcirGetName },
-	    { "impc:ir:gettype",			      &SchemeFFI::impcirGetType },
-	    { "impc:ir:addtodict",			    &SchemeFFI::impcirAdd },
-	    //#ifdef EXT_BOOST
-	    //#else
-	    //CLOCK STUFF
-	    { "clock:set-offset",           &SchemeFFI::setClockOffset},
-	    { "clock:get-offset",           &SchemeFFI::getClockOffset},
-      { "clock:adjust-offset",        &SchemeFFI::adjustClockOffset},
-	    { "clock:clock",                &SchemeFFI::getClockTime},
-      { "clock:ad:clock",             &SchemeFFI::lastSampleBlockClock},
-	    //#endif
-
-
-
-	};
-
-	for (i = 0; i < nelem(integerTable); i++) {
-	    scheme_define(
-		sc, sc->global_env,
-		mk_symbol(sc, integerTable[i].name),
-		mk_integer(sc, integerTable[i].value)
-		);
-	}
-
-	for (i = 0; i < nelem(funcTable); i++) {
-	    scheme_define(
-		sc, sc->global_env,
-		mk_symbol(sc, funcTable[i].name),
-		mk_foreign_func(sc, funcTable[i].func)
-		);
-	}
-
+static pointer emit(scheme* Scheme, pointer Args)
+{
+    std::stringstream ss;
+    int lgth = list_length(Scheme, Args);
+    pointer io = list_ref(Scheme, lgth - 1, Args);
+    if (!is_string(io)) {
+        PRINT_ERROR("Emit accepts only string arguments!\n");
+        return Scheme->F;
     }
+    ss << string_value(io);
+    pointer arg = 0;
+    for (int i=0; i < lgth - 1; ++i) {
+        arg = pair_car(Args);
+        if (!is_string(arg)) {
+            PRINT_ERROR("Emit accepts only string arguments!\n");
+            return Scheme->F;
+        }
+        ss << string_value(arg);
+        Args = pair_cdr(Args);
+    }
+    auto tmp(ss.str());
+    int l = tmp.length();
+    auto s(strdup(tmp.c_str()));
+    free(io->_object._string._svalue);
+    io->_object._string._svalue = s;
+    io->_object._string._length = l;
+    return io;
+}
+
+pointer exit_extempore(scheme* Scheme, pointer Args)
+{
+    int rc(ivalue(pair_car(Args)));
+#ifdef _WIN32
+    std::exit(rc);
+#else
+    std::_Exit(rc);
+#endif
+}
+
+void initSchemeFFI(scheme* sc)
+{
+    static struct {
+        const char* name;
+        uint32_t    value;
+    } integerTable[] = {
+        { "*au:block-size*", UNIV::FRAMES },
+        { "*au:samplerate*", UNIV::SAMPLERATE },
+        { "*au:channels*", UNIV::CHANNELS },
+        { "*au:in-channels*", UNIV::IN_CHANNELS },
+    };
+    for (auto& elem: integerTable) {
+        scheme_define(sc, sc->global_env, mk_symbol(sc, elem.name), mk_integer(sc, elem.value));
+    }
+    static struct {
+        const char*  name;
+        foreign_func func;
+    } funcTable[] = {
+        {     "ascii-print-color",              &asciiColor                   },
+        {     "emit",                           &emit                         },
+        {     "quit",                           &exit_extempore               },
+        //IPC stuff
+        {     "ipc:new",                        &newSchemeProcess             },
+        {     "ipc:connect",                    &connectToProcess             },
+        {     "ipc:call-async",                 &ipcCall                      },
+        {     "ipc:define",                     &ipcDefine                    },
+        {     "ipc:eval-string",                &ipcEval                      },
+        {     "ipc:load",                       &ipcLoad                      },
+        {     "ipc:set-priority",               &ipcSetPriority               },
+        {     "ipc:get-priority",               &ipcGetPriority               },
+        {     "ipc:get-process-name",           &getNameOfCurrentProcess      },
+        // misc scheme ties
+        {     "assoc-strcmp",                   &assocstrcmp                  },
+        {     "assoc-strcmp-all",               &assocstrcmpall               },
+        // number stuff
+        {     "random-real",                    &randomReal                   },
+        {     "random-int",                     &randomInt                    },
+        {     "real->integer",                  &realToInteger                },
+        {     "real->rational",                 &realToRational               },
+        {     "rational->real",                 &rationalToReal               },
+        {     "integer->real",                  &integerToReal                },
+        {     "rational->n",                    &rationalToNumerator          },
+        {     "rational->d",                    &rationalToDenominator        },
+        // sys stuff
+        {     "sys:pointer-size",               &pointerSize                  },
+        {     "sys:mcjit-enabled",              &mcjitEnabled                 },
+        {     "sys:platform",                   &platform                     },
+        {     "sys:share-dir",                  &getShareDir                  },
+        {     "sys:cmdarg",                     &cmdarg                       },
+        {     "sys:open-dylib",                 &openDynamicLib               },
+        {     "sys:close-dylib",                &closeDynamicLib              },
+        {     "sys:symbol-cptr",                &symbol_pointer               },
+        {     "sys:make-cptr",                  &makeCptr                     },
+        {     "sys:slurp-file",                 &slurpFile                    },
+        {     "sys:directory-list",             &dirlist                      },
+        {     "sys:expand-path",                &pathExpansion                },
+        {     "sys:command",                    &command                      },
+        {     "sys:command-output",             &commandOutput                },
+        {     "sys:set-env",                    &setEnv                       },
+        {     "sys:set-default-timeout",        &setDefaultTimeout            },
+        {     "sys:get-default-timeout",        &getDefaultTimeout            },
+        // DSP sys stuff
+        {     "sys:set-dsp-closure",            &setDSPClosure                },
+        {     "sys:set-dspmt-closure",          &setDSPMTClosure              },
+        {     "sys:set-dsp-wrapper",            &setDSPWrapper                },
+        {     "sys:set-dspmt-wrapper",          &setDSPMTWrapper              },
+        {     "sys:init-mt-audio",              &initMTAudio                  },
+        {     "sys:init-mt-audio-buf",          &initMTAudioBuf               },
+        {     "sys:audio-load",                 &getAudioLoad                 },
+        {     "sys:set-dsp-wrapper-array",      &setDSPWrapperArray           },
+        {     "sys:set-dspmt-wrapper-array",    &setDSPMTWrapperArray         },
+        // memory zone stuff
+        {     "sys:create-mzone",               &createMallocZone             },
+        {     "sys:default-mzone",              &defaultMallocZone            },
+        {     "sys:destroy-mzone",              &destroyMallocZone            },
+        {     "sys:copy-to-dmzone",             &copyToDefaultZone            },
+        {     "sys:reset-mzone",                &resetMallocZone              },
+        {     "sys:peek-memzone",               &peekMemoryZone               },
+        {     "sys:pop-memzone",                &popMemoryZone                },
+        {     "sys:push-memzone",               &pushMemoryZone               },
+        // misc stuff
+        {     "cptr:get-i64",                   &dataGETi64                   },
+        {     "cptr:get-double",                &dataGETdouble                },
+        {     "cptr:get-float",                 &dataGETfloat                 },
+        {     "cptr:set-i64",                   &dataSETi64                   },
+        {     "cptr:set-double",                &dataSETdouble                },
+        {     "cptr:set-float",                 &dataSETfloat                 },
+        {     "cptr->string",                   &cptrToString                 },
+        {     "cptr:get-string",                &cptrToString                 },
+        {     "string->cptr",                   &stringToCptr                 },
+        {     "string-strip",                   &stringStrip                  },
+        {     "string-hash",                    &stringHash                   },
+        {     "base64-encode",                  &Base64Encode                 },
+        {     "base64-decode",                  &Base64Decode                 },
+        {     "cname-encode",                   &CNameEncode                  },
+        {     "cname-decode",                   &CNameDecode                  },
+        {     "string-join",                    &stringJoin                   },
+        {     "call-cpp-at-time",               &callCPPAtTime                },
+        {     "now",                            &getTime                      },
+        {     "sexpr->string",                  &sexprToString                },
+        {     "println",                        &print                        },
+        {     "print",                          &print_no_new_line            },
+        {     "print-full",                     &printFull                    },
+        {     "print-full-nq",                  &printFullNoQuotes            },
+        {     "pprint-error",                   &printError                   },    // pprint-error is pprint for a reason!
+        {     "print-notification",             &printNotification            },
+        {     "get-closure-env",                &getClosureEnv                },
+        {     "mk-ff",                          &scmAddForeignFunc            },
+        // regex stuff
+        {     "regex:match?",                   &regex_match                  },
+        {     "regex:matched",                  &regex_matched                },
+        {     "regex:match-all",                &regex_match_all              },
+        {     "regex:split",                    &regex_split                  },
+        {     "regex:replace",                  &regex_replace                },
+        // llvm stuff
+        {     "llvm:optimize",                  &optimizeCompiles             },
+        {     "llvm:fast-compile",              &fastCompiles                 },
+        {     "llvm:background-compile",        &backgroundCompiles           },
+        {     "llvm:jit-compile-ir-string",     &jitCompileIRString},
+        {     "llvm:ffi-set-name",              &ff_set_name                  },
+        {     "llvm:ffi-get-name",              &ff_get_name                  },
+        {     "llvm:get-function",              &get_function                 },
+        {     "llvm:get-globalvar",             &get_globalvar                },
+        {     "llvm:get-struct-size",           &get_struct_size              },
+        {     "llvm:get-named-struct-size",     &get_named_struct_size        },
+        {     "llvm:get-function-args",         &get_function_args            },
+        {     "llvm:get-function-varargs",      &get_function_varargs         },
+        {     "llvm:get-function-type",         &get_function_type            },
+        {     "llvm:get-function-calling-conv", &get_function_calling_conv    },
+        {     "llvm:get-global-variable-type",  &get_global_variable_type     },
+        {     "llvm:get-function-pointer",      &get_function_pointer         },
+        {     "llvm:remove-function",           &remove_function              },
+        {     "llvm:remove-globalvar",          &remove_global_var            },
+        {     "llvm:erase-function",            &erase_function               },
+        {     "llvm:call-void-func",            &llvm_call_void_native        },
+        {     "llvm:run",                       &call_compiled                },
+        {     "llvm:convert-float",             &llvm_convert_float_constant  },
+        {     "llvm:convert-double",            &llvm_convert_double_constant },
+        {     "llvm:count",                     &llvm_count                   },
+        {     "llvm:count-set",                 &llvm_count_set               },
+        {     "llvm:count++",                   &llvm_count_inc               },
+        {     "llvm:call-closure",              &callClosure                  },
+        {     "llvm:print",                     &printLLVMModule              },
+        {     "llvm:print-function",            &printLLVMFunction            },
+        {     "llvm:print-all-closures",        &llvm_print_all_closures      },
+        {     "llvm:print-closure",             &llvm_print_closure           },
+        {     "llvm:get-closure-work-name",     &llvm_closure_last_name       },
+        {     "llvm:disassemble",               &llvm_disasm                  },
+        {     "llvm:bind-symbol",               &bind_symbol                  },
+        {     "llvm:update-mapping",            &update_mapping               },
+        {     "llvm:add-llvm-alias",            &add_llvm_alias               },
+        {     "llvm:get-llvm-alias",            &get_llvm_alias               },
+        {     "llvm:get-named-type",            &get_named_type               },
+        {     "llvm:get-global-module",         &get_global_module            },
+        {     "llvm:export-module",             &export_llvmmodule_bitcode    },
+        {     "impc:ir:getname",                &impcirGetName                },
+        {     "impc:ir:gettype",                &impcirGetType                },
+        {     "impc:ir:addtodict",              &impcirAdd                    },
+        {     "clock:set-offset",               &setClockOffset               },
+        {     "clock:get-offset",               &getClockOffset               },
+        {     "clock:adjust-offset",            &adjustClockOffset            },
+        {     "clock:clock",                    &getClockTime                 },
+        {     "clock:ad:clock",                 &lastSampleBlockClock         },
+    };
+    for (auto& elem : funcTable) {
+        scheme_define(sc, sc->global_env, mk_symbol(sc, elem.name), mk_foreign_func(sc, elem.func));
+    }
+}
 
     //////////////////// helper functions ////////////////////////
-    void SchemeFFI::addGlobal(scheme* sc, char* symbol_name, pointer arg)
+    void addGlobal(scheme* sc, char* symbol_name, pointer arg)
     {
-	scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), arg);
+        scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), arg);
     }
 
-    void SchemeFFI::addForeignFunc(scheme* sc, char* symbol_name, foreign_func func)
+    void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func)
     {
-	scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
+        scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
     }
 
-    // pointer SchemeFFI::scmAddForeignFunc(scheme* sc, pointer args) {
-    //   //char* sym_name = string_value(pair_car(args));
-    //   foreign_func func = (foreign_func) cptr_value(pair_car(args));
+    // pointer scmAddForeignFunc(scheme* sc, pointer Args) {
+    //   //char* sym_name = string_value(pair_car(Args));
+    //   foreign_func func = (foreign_func) cptr_value(pair_car(Args));
     //   //scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
     //   return mk_foreign_func(sc,func); //sc->T;
     // }
 
-  pointer SchemeFFI::scmAddForeignFunc(scheme* sc, pointer args) {
-    char* symbol_name = string_value(pair_car(args));
-    foreign_func func = (foreign_func) cptr_value(pair_cadr(args));
+  pointer scmAddForeignFunc(scheme* sc, pointer Args) {
+    char* symbol_name = string_value(pair_car(Args));
+    foreign_func func = (foreign_func) cptr_value(pair_cadr(Args));
     pointer ffunc = mk_foreign_func(sc,func);
     scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), ffunc);
     return ffunc;
   }
 
-    void SchemeFFI::addGlobalCptr(scheme* sc, char* symbol_name, void* ptr)
+    void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr)
     {
-	scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_cptr(sc, ptr));
+        scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_cptr(sc, ptr));
     }
 
     ///////////////////////////////////////////////////////
@@ -396,137 +451,90 @@ namespace extemp {
 
 
 
-    pointer SchemeFFI::exit_extempore(scheme* _sc, pointer args)
+
+    pointer dataGETi64(scheme* Scheme, pointer Args)
     {
-      int rc = (int)ivalue(pair_car(args));
-#ifdef _WIN32
-	  std::exit(rc);
-#else
-      std::_Exit(rc);
-#endif
+        char* cptr = (char*) cptr_value(pair_car(Args));
+        int64_t offset = ivalue(pair_cadr(Args));
+        int64_t* ptr = (int64_t*) (cptr+offset);
+        return mk_integer(Scheme,ptr[0]);
     }
 
-    pointer SchemeFFI::dataGETi64(scheme* _sc, pointer args)
+    pointer dataGETdouble(scheme* Scheme, pointer Args)
     {
-        char* cptr = (char*) cptr_value(pair_car(args));
-	int64_t offset = ivalue(pair_cadr(args));
-	int64_t* ptr = (int64_t*) (cptr+offset);
-	return mk_integer(_sc,ptr[0]);
+        char* cptr = (char*) cptr_value(pair_car(Args));
+        int64_t offset = ivalue(pair_cadr(Args));
+        double* ptr = (double*) (cptr+offset);
+        return mk_real(Scheme,ptr[0]);
     }
 
-    pointer SchemeFFI::dataGETdouble(scheme* _sc, pointer args)
+    pointer dataGETfloat(scheme* Scheme, pointer Args)
     {
-        char* cptr = (char*) cptr_value(pair_car(args));
-	int64_t offset = ivalue(pair_cadr(args));
-	double* ptr = (double*) (cptr+offset);
-	return mk_real(_sc,ptr[0]);
+        char* cptr = (char*) cptr_value(pair_car(Args));
+        int64_t offset = ivalue(pair_cadr(Args));
+        float* ptr = (float*) (cptr+offset);
+        return mk_real(Scheme,ptr[0]);
     }
 
-    pointer SchemeFFI::dataGETfloat(scheme* _sc, pointer args)
+    pointer dataSETi64(scheme* Scheme, pointer Args)
     {
-        char* cptr = (char*) cptr_value(pair_car(args));
-	int64_t offset = ivalue(pair_cadr(args));
-	float* ptr = (float*) (cptr+offset);
-	return mk_real(_sc,ptr[0]);
+        char* cptr = (char*) cptr_value(pair_car(Args));
+        int64_t offset = ivalue(pair_cadr(Args));
+        int64_t* ptr = (int64_t*) (cptr+offset);
+        ptr[0] = (int64_t) ivalue(pair_caddr(Args));
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::dataSETi64(scheme* _sc, pointer args)
+    pointer dataSETdouble(scheme* Scheme, pointer Args)
     {
-        char* cptr = (char*) cptr_value(pair_car(args));
-	int64_t offset = ivalue(pair_cadr(args));
-	int64_t* ptr = (int64_t*) (cptr+offset);
-	ptr[0] = (int64_t) ivalue(pair_caddr(args));
-	return _sc->T;
+        char* cptr = (char*) cptr_value(pair_car(Args));
+        int64_t offset = ivalue(pair_cadr(Args));
+        double* ptr = (double*) (cptr+offset);
+        ptr[0] = (double) rvalue(pair_caddr(Args));
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::dataSETdouble(scheme* _sc, pointer args)
+    pointer dataSETfloat(scheme* Scheme, pointer Args)
     {
-        char* cptr = (char*) cptr_value(pair_car(args));
-	int64_t offset = ivalue(pair_cadr(args));
-	double* ptr = (double*) (cptr+offset);
-	ptr[0] = (double) rvalue(pair_caddr(args));
-	return _sc->T;
+        char* cptr = (char*) cptr_value(pair_car(Args));
+        int64_t offset = ivalue(pair_cadr(Args));
+        float* ptr = (float*) (cptr+offset);
+        ptr[0] = (float) rvalue(pair_caddr(Args));
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::dataSETfloat(scheme* _sc, pointer args)
+    pointer cptrToString(scheme* Scheme, pointer Args)
     {
-        char* cptr = (char*) cptr_value(pair_car(args));
-	int64_t offset = ivalue(pair_cadr(args));
-	float* ptr = (float*) (cptr+offset);
-	ptr[0] = (float) rvalue(pair_caddr(args));
-	return _sc->T;
+        char* cptr = (char*) cptr_value(pair_car(Args));
+        char* cstr = (char*) cptr;
+        return mk_string(Scheme, cstr);
     }
 
-    pointer SchemeFFI::cptrToString(scheme* _sc, pointer args)
+    pointer stringToCptr(scheme* Scheme, pointer Args)
     {
-        char* cptr = (char*) cptr_value(pair_car(args));
-	char* cstr = (char*) cptr;
-	return mk_string(_sc, cstr);
-    }
-
-    pointer SchemeFFI::stringToCptr(scheme* _sc, pointer args)
-    {
-        char* cstr = (char*) cptr_value(pair_car(args));
-	char* cptr = (char*) malloc(strlen(cstr) + 1);
+        char* cstr = (char*) cptr_value(pair_car(Args));
+        char* cptr = (char*) malloc(strlen(cstr) + 1);
         strcpy(cptr, cstr);
-	return mk_cptr(_sc, cptr);
+        return mk_cptr(Scheme, cptr);
     }
 
-    pointer SchemeFFI::asciiColor(scheme* _sc, pointer args)
-    {
-	ascii_text_color(ivalue(pair_car(args)),ivalue(pair_cadr(args)),ivalue(pair_caddr(args)));
-	return _sc->T;
-    }
 
-    pointer SchemeFFI::emit(scheme* _sc, pointer args)
+    pointer makeCptr(scheme* Scheme, pointer Args)
     {
-	std::stringstream ss;
-	int lgth = list_length(_sc,args);
-	pointer io = list_ref(_sc,lgth-1,args);
-	if(!is_string(io)) {
-	    PRINT_ERROR("Emit accepts only string arguments!\n");
-	    return _sc->F;
-	}
-	ss << string_value(io);
-	pointer arg = 0;
-	for(int i=0;i<lgth-1;i++) {
-	    arg = pair_car(args);
-	    if(!is_string(arg)) {
-		PRINT_ERROR("Emit accepts only string arguments!\n");
-		return _sc->F;
-	    }
-	    ss << string_value(arg);
-	    args = pair_cdr(args);
-	}
-
-	std::string tmp = ss.str();
-	// replace io string in place
-	int l = tmp.length();
-	char* s = (char*) malloc(l+1);
-	strcpy(s,tmp.c_str());
-	free(io->_object._string._svalue);
-	io->_object._string._svalue = s;
-	io->_object._string._length = l;
-	// return io string
-	return io;
-    }
-
-    pointer SchemeFFI::makeCptr(scheme* _sc, pointer args)
-    {
-         long num_bytes = ivalue(pair_car(args));
+         long num_bytes = ivalue(pair_car(Args));
          void* ptr = malloc(num_bytes);
          memset(ptr,0,num_bytes);
-         return mk_cptr(_sc, ptr);
+         return mk_cptr(Scheme, ptr);
     }
 
-  pointer SchemeFFI::pathExpansion(scheme* _sc, pointer args) {
+  pointer pathExpansion(scheme* Scheme, pointer Args) {
   #ifdef _WIN32
-    char* path = string_value(pair_car(args));
+    char* path = string_value(pair_car(Args));
     char* exp_path = path;
   #else
-	char exp_path[8192];
-	memset(exp_path,0,8192);
-    char* path = string_value(pair_car(args));
+        char exp_path[8192];
+        memset(exp_path,0,8192);
+    char* path = string_value(pair_car(Args));
     if(path[0] == '~') {
       char* h = getenv("HOME");
       strcpy(exp_path,h);
@@ -536,23 +544,23 @@ namespace extemp {
     }
 
   #endif
-    return mk_string(_sc,exp_path);
+    return mk_string(Scheme,exp_path);
   }
 
-  pointer SchemeFFI::command(scheme* _sc, pointer args) {
+  pointer command(scheme* Scheme, pointer Args) {
     // NOTE: doesn't work for Windows yet
-    int res = system(string_value(pair_car(args)));
-    return mk_integer(_sc,res);
+    int res = system(string_value(pair_car(Args)));
+    return mk_integer(Scheme,res);
   }
 
-  pointer SchemeFFI::commandOutput(scheme* _sc, pointer args) {
+  pointer commandOutput(scheme* Scheme, pointer Args) {
 
     char outbuf[8192];
     memset(outbuf,0,8192);
 #ifdef _WIN32
-    FILE *stream = _popen(string_value(pair_car(args)), "r");
+    FILE *stream = _popen(string_value(pair_car(Args)), "r");
 #else
-    FILE *stream = popen(string_value(pair_car(args)), "r");
+    FILE *stream = popen(string_value(pair_car(Args)), "r");
 #endif
     if (stream && fgets(outbuf, 8192, stream))
       {
@@ -565,15 +573,15 @@ namespace extemp {
         size_t len = strnlen(outbuf, 8192);
         if(len < 8192)
           outbuf[len-1] = '\0';
-        return mk_string(_sc,outbuf);
+        return mk_string(Scheme,outbuf);
       }
     else
-      return _sc->F;
+      return Scheme->F;
   }
 
-  pointer SchemeFFI::setEnv(scheme* _sc, pointer args) {
-    char* var = string_value(pair_car(args));
-    char* val = string_value(pair_cadr(args));
+  pointer setEnv(scheme* Scheme, pointer Args) {
+    char* var = string_value(pair_car(Args));
+    char* val = string_value(pair_cadr(Args));
 
     int res;
 #ifdef _WIN32
@@ -581,69 +589,69 @@ namespace extemp {
 #else
     res = setenv(var, val, 1); // overwrite = TRUE
 #endif
-    return mk_integer(_sc,res);
+    return mk_integer(Scheme,res);
   }
 
-  pointer SchemeFFI::setDefaultTimeout(scheme* _sc, pointer args)
+  pointer setDefaultTimeout(scheme* Scheme, pointer Args)
   {
-    long long timeout = ivalue(pair_car(args));
-    _sc->m_process->setMaxDuration(timeout);
-    return _sc->T;
+    long long timeout = ivalue(pair_car(Args));
+    Scheme->m_process->setMaxDuration(timeout);
+    return Scheme->T;
   }
 
-  pointer SchemeFFI::getDefaultTimeout(scheme* _sc, pointer args)
+  pointer getDefaultTimeout(scheme* Scheme, pointer Args)
   {
-    return mk_integer(_sc, _sc->m_process->getMaxDuration());
+    return mk_integer(Scheme, Scheme->m_process->getMaxDuration());
   }
 
 #ifdef _WIN32
-	pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
-	{
-	  char* path = string_value(pair_car(args));
-	  std::tr2::sys::path bpath(path);
-	  if(!std::tr2::sys::exists(bpath)) {
-		  return _sc->NIL;
-	  }
-	  if(!std::tr2::sys::is_directory(bpath)) {
-		  return _sc->NIL;
-	  }
+        pointer dirlist(scheme* Scheme, pointer Args)
+        {
+          char* path = string_value(pair_car(Args));
+          std::tr2::sys::path bpath(path);
+          if(!std::tr2::sys::exists(bpath)) {
+                  return Scheme->NIL;
+          }
+          if(!std::tr2::sys::is_directory(bpath)) {
+                  return Scheme->NIL;
+          }
 
-	  std::tr2::sys::directory_iterator end_it;
+          std::tr2::sys::directory_iterator end_it;
 
-	  pointer list = _sc->NIL;
+          pointer list = Scheme->NIL;
         for (std::tr2::sys::directory_iterator it(bpath); it != end_it; ++it) {
-            EnvInjector injector(_sc, list);
-		//tlist = cons(_sc,mk_string(_sc,it->path().leaf().string().c_str()),list);
-            pointer tlist = cons(_sc,mk_string(_sc,it->path().string().c_str()),list);
-	    list = tlist;
-	  }
-	  return reverse(_sc,list);
-	}
+            EnvInjector injector(Scheme, list);
+                //tlist = cons(Scheme,mk_string(Scheme,it->path().leaf().string().c_str()),list);
+            pointer tlist = cons(Scheme,mk_string(Scheme,it->path().string().c_str()),list);
+            list = tlist;
+          }
+          return reverse(Scheme,list);
+        }
 #else
-  pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
+  pointer dirlist(scheme* Scheme, pointer Args)
   {
         DIR* dp;
         struct dirent* ep;
-        dp = opendir(string_value(pair_car(args)));
-    pointer list = _sc->NIL;
+        dp = opendir(string_value(pair_car(Args)));
+    pointer list = Scheme->NIL;
         if (dp) {
             while ((ep = readdir(dp))) {
-                EnvInjector injector(_sc, list);
-                pointer tlist = cons(_sc, mk_string(_sc,ep->d_name),list);
-	  list = tlist;
-	}
-	(void) closedir (dp);
+                EnvInjector injector(Scheme, list);
+                pointer tlist = cons(Scheme, mk_string(Scheme,ep->d_name),list);
+          list = tlist;
+        }
+        (void) closedir (dp);
       }
     else {
       perror ("Couldn't open the directory");
     }
-        return reverse(_sc, list);
+        return reverse(Scheme, list);
   }
 #endif
 
-  pointer SchemeFFI::slurpFile(scheme* _sc, pointer args)
+  pointer slurpFile(scheme* Scheme, pointer Args)
   {
-    std::string filename(string_value(pair_car(args)));
+    std::string filename(string_value(pair_car(Args)));
     std::string sharedir_filename(UNIV::SHARE_DIR + "/" + filename);
 
     // check raw path first, then prepend SHARE_DIR
@@ -660,589 +668,589 @@ namespace extemp {
       std::fread(&contents[0], 1, contents.size(), fp);
       std::fclose(fp);
 
-      return mk_string(_sc,contents.c_str());
+      return mk_string(Scheme,contents.c_str());
     }
-    return _sc->F;
+    return Scheme->F;
   }
 
-    pointer SchemeFFI::impcirGetType(scheme* _sc, pointer args)
+    pointer impcirGetType(scheme* Scheme, pointer Args)
     {
-		std::string key(string_value(pair_car(args)));
-		return mk_string(_sc, IMPCIR_DICT[key].second.c_str());
+                std::string key(string_value(pair_car(Args)));
+                return mk_string(Scheme, IMPCIR_DICT[key].second.c_str());
     }
 
-    pointer SchemeFFI::impcirGetName(scheme* _sc, pointer args)
+    pointer impcirGetName(scheme* Scheme, pointer Args)
     {
-		std::string key(string_value(pair_car(args)));
-		return mk_string(_sc, IMPCIR_DICT[key].first.c_str());
+                std::string key(string_value(pair_car(Args)));
+                return mk_string(Scheme, IMPCIR_DICT[key].first.c_str());
     }
 
-    pointer SchemeFFI::impcirAdd(scheme* _sc, pointer args)
+    pointer impcirAdd(scheme* Scheme, pointer Args)
     {
-		std::string current("current");
-		std::string previous("previous");
-		std::string key(string_value(pair_car(args)));
-		std::string name(string_value(pair_cadr(args)));
-		std::string type(string_value(pair_caddr(args)));
-		//std::cout << "ADDING IN C++ "  << key << " " << name << " " << type << std::endl;
-		std::pair<std::string,std::string> p(name,type);
-		IMPCIR_DICT[previous] = IMPCIR_DICT[current];
-		IMPCIR_DICT[current] = p;
-		IMPCIR_DICT[key] = p;
-		return _sc->T;
+                std::string current("current");
+                std::string previous("previous");
+                std::string key(string_value(pair_car(Args)));
+                std::string name(string_value(pair_cadr(Args)));
+                std::string type(string_value(pair_caddr(Args)));
+                //std::cout << "ADDING IN C++ "  << key << " " << name << " " << type << std::endl;
+                std::pair<std::string,std::string> p(name,type);
+                IMPCIR_DICT[previous] = IMPCIR_DICT[current];
+                IMPCIR_DICT[current] = p;
+                IMPCIR_DICT[key] = p;
+                return Scheme->T;
     }
 
     // ipc stuff
-    pointer SchemeFFI::newSchemeProcess(scheme* _sc, pointer args)
+    pointer newSchemeProcess(scheme* Scheme, pointer Args)
     {
-	std::string host_name("localhost");
-	std::string proc_name(string_value(pair_car(args)));
-	int port = ivalue(pair_cadr(args));
-	SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, 0);
-	sp->start();
-	SchemeREPL* repl = new SchemeREPL(proc_name);
+        std::string host_name("localhost");
+        std::string proc_name(string_value(pair_car(Args)));
+        int port = ivalue(pair_cadr(Args));
+        SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, 0);
+        sp->start();
+        SchemeREPL* repl = new SchemeREPL(proc_name);
 
-	if(repl->connectToProcessAtHostname(host_name, port)) {
-	    return _sc->T;
-	} else {
-	    sp->stop();
-	    delete sp;
-	    delete repl;
-	    return _sc->F;
-	}
+        if(repl->connectToProcessAtHostname(host_name, port)) {
+            return Scheme->T;
+        } else {
+            sp->stop();
+            delete sp;
+            delete repl;
+            return Scheme->F;
+        }
     }
 
-    pointer SchemeFFI::connectToProcess(scheme* _sc, pointer args)
+    pointer connectToProcess(scheme* Scheme, pointer Args)
     {
-	std::string host_name(string_value(pair_car(args)));
-	std::string proc_name(string_value(pair_cadr(args)));
-	int port = ivalue(pair_caddr(args));
-	SchemeREPL* repl = new SchemeREPL(proc_name);
-	if(repl->connectToProcessAtHostname(host_name, port)) {
-	    return _sc->T;
-	} else {
-	    delete repl;
-	    return _sc->F;
-	}
+        std::string host_name(string_value(pair_car(Args)));
+        std::string proc_name(string_value(pair_cadr(Args)));
+        int port = ivalue(pair_caddr(Args));
+        SchemeREPL* repl = new SchemeREPL(proc_name);
+        if(repl->connectToProcessAtHostname(host_name, port)) {
+            return Scheme->T;
+        } else {
+            delete repl;
+            return Scheme->F;
+        }
     }
 
-  pointer SchemeFFI::ipcCall(scheme* _sc, pointer args)
+  pointer ipcCall(scheme* Scheme, pointer Args)
   {
-    std::string process(string_value(pair_car(args)));
+    std::string process(string_value(pair_car(Args)));
     SchemeREPL* repl = SchemeREPL::I(process);
     if(!repl) {
       std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
-      return _sc->F;
+      return Scheme->F;
     }
     std::stringstream ss;
-    pointer sym = pair_cadr(args);
-    args = pair_cddr(args);
-    for(; is_pair(args); args = pair_cdr(args)) {
-	    ss << " ";
-	    if(is_pair(pair_car(args)) || is_vector(pair_car(args)) || is_symbol(pair_car(args))) {
+    pointer sym = pair_cadr(Args);
+    Args = pair_cddr(Args);
+    for(; is_pair(Args); Args = pair_cdr(Args)) {
+            ss << " ";
+            if(is_pair(pair_car(Args)) || is_vector(pair_car(Args)) || is_symbol(pair_car(Args))) {
         ss << "'";
-        UNIV::printSchemeCell(_sc, ss, pair_car(args),true);
-	    }
-	    else if(_sc->NIL == pair_car(args)) {
+        UNIV::printSchemeCell(Scheme, ss, pair_car(Args),true);
+            }
+            else if(Scheme->NIL == pair_car(Args)) {
         ss << "'()";
-	    }
-	    else if(pair_car(args) == _sc->F) {
+            }
+            else if(pair_car(Args) == Scheme->F) {
         ss << "#f";
-	    }
-	    else if(pair_car(args) == _sc->T) {
+            }
+            else if(pair_car(Args) == Scheme->T) {
         ss << "#t";
-	    }
-      else if(pair_car(args) == _sc->EOF_OBJ) {
+            }
+      else if(pair_car(Args) == Scheme->EOF_OBJ) {
         // igore end of file
       }
-	    else if(is_closure(pair_car(args))) {
+            else if(is_closure(pair_car(Args))) {
         std::stringstream tmp;
-        UNIV::printSchemeCell(_sc, tmp, closure_code(pair_car(args)), true);
+        UNIV::printSchemeCell(Scheme, tmp, closure_code(pair_car(Args)), true);
         std::string sss = "(lambda "+tmp.str().substr(1);
         ss << sss;
-	    }
-	    else if(is_string(pair_car(args)) || is_number(pair_car(args)) || is_symbol(pair_car(args))){
-        UNIV::printSchemeCell(_sc, ss, pair_car(args), true);
-	    }
-	    else {
+            }
+            else if(is_string(pair_car(Args)) || is_number(pair_car(Args)) || is_symbol(pair_car(Args))){
+        UNIV::printSchemeCell(Scheme, ss, pair_car(Args), true);
+            }
+            else {
         PRINT_ERROR("Extempore's IPC mechanism cannot serialise this type - this maybe related to the return type as well as the arguments.\n");
-        return _sc->F;
-	    }
+        return Scheme->F;
+            }
     }
     std::string str = "("+std::string(symname(sym))+ss.str()+")";
     repl->writeString(str);
-    return _sc->T;
+    return Scheme->T;
   }
 
-  pointer SchemeFFI::ipcDefine(scheme* _sc, pointer args)
+  pointer ipcDefine(scheme* Scheme, pointer Args)
   {
-    std::string process(string_value(pair_car(args)));
+    std::string process(string_value(pair_car(Args)));
     SchemeREPL* repl = SchemeREPL::I(process);
     if(!repl) {
       std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
-      return _sc->F;
+      return Scheme->F;
     }
     std::stringstream ss;
-    pointer sym = pair_cadr(args);
-    pointer value = pair_caddr(args);
+    pointer sym = pair_cadr(Args);
+    pointer value = pair_caddr(Args);
     ss << " ";
     if(is_pair(value) || is_vector(value) || is_symbol(value)) {
-	    ss << "'";
-	    UNIV::printSchemeCell(_sc, ss, value,true);
+            ss << "'";
+            UNIV::printSchemeCell(Scheme, ss, value,true);
     }
-    else if(_sc->NIL == value) {
-	    ss << "'()";
+    else if(Scheme->NIL == value) {
+            ss << "'()";
     }
-    else if(value == _sc->F) {
-	    ss << "#f";
+    else if(value == Scheme->F) {
+            ss << "#f";
     }
-    else if(value == _sc->T) {
-	    ss << "#t";
+    else if(value == Scheme->T) {
+            ss << "#t";
     }
-    else if(value == _sc->EOF_OBJ) {
+    else if(value == Scheme->EOF_OBJ) {
       // ignore eof
     }
     else if(is_closure(value)) {
-	    std::stringstream tmp;
-	    UNIV::printSchemeCell(_sc, tmp, closure_code(value), true);
-	    std::string sss = "(lambda "+tmp.str().substr(1);
-	    ss << sss;
+            std::stringstream tmp;
+            UNIV::printSchemeCell(Scheme, tmp, closure_code(value), true);
+            std::string sss = "(lambda "+tmp.str().substr(1);
+            ss << sss;
     }
     else if(is_string(value) || is_number(value)) {
-	    UNIV::printSchemeCell(_sc, ss,value, true);
+            UNIV::printSchemeCell(Scheme, ss,value, true);
     }
     else {
       PRINT_ERROR("Extempore's IPC mechanism cannot serialise this type - this maybe related to the return type as well as the arguments.\n");
-	    return _sc->F;
+            return Scheme->F;
     }
     std::string str = "(define "+std::string(symname(sym))+ss.str()+")";
     repl->writeString(str);
-    return _sc->T;
+    return Scheme->T;
   }
 
-  pointer SchemeFFI::ipcEval(scheme* _sc, pointer args)
+  pointer ipcEval(scheme* Scheme, pointer Args)
   {
-    std::string process(string_value(pair_car(args)));
+    std::string process(string_value(pair_car(Args)));
     SchemeREPL* repl = SchemeREPL::I(process);
     if(!repl) {
       std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
-      return _sc->F;
+      return Scheme->F;
     }
-    std::string expr(string_value(pair_cadr(args)));
+    std::string expr(string_value(pair_cadr(Args)));
     SchemeREPL::I(process)->writeString(expr);
-    return _sc->T;
+    return Scheme->T;
     }
 
-  pointer SchemeFFI::ipcLoad(scheme* _sc, pointer args)
+  pointer ipcLoad(scheme* Scheme, pointer Args)
   {
-    std::string process(string_value(pair_car(args)));
+    std::string process(string_value(pair_car(Args)));
     SchemeREPL* repl = SchemeREPL::I(process);
     if(!repl) {
       std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
-      return _sc->F;
+      return Scheme->F;
     }
-    std::string path(string_value(pair_cadr(args)));
+    std::string path(string_value(pair_cadr(Args)));
     std::string str = "(sys:load \""+std::string(path)+"\")";
     SchemeREPL::I(process)->writeString(str);
-    return _sc->T;
+    return Scheme->T;
   }
 
-  pointer SchemeFFI::ipcSetPriority(scheme* _sc, pointer args)
+  pointer ipcSetPriority(scheme* Scheme, pointer Args)
   {
-    std::string process(string_value(pair_car(args)));
+    std::string process(string_value(pair_car(Args)));
     SchemeREPL* repl = SchemeREPL::I(process);
     if(!repl) {
       std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
-      return _sc->F;
+      return Scheme->F;
     }
-    int priority = ivalue(pair_cadr(args));
+    int priority = ivalue(pair_cadr(Args));
     SchemeProcess::I(process)->setPriority(priority);
-    return _sc->T;
+    return Scheme->T;
   }
 
-  pointer SchemeFFI::ipcGetPriority(scheme* _sc, pointer args)
+  pointer ipcGetPriority(scheme* Scheme, pointer Args)
   {
-    std::string process(string_value(pair_car(args)));
+    std::string process(string_value(pair_car(Args)));
     SchemeREPL* repl = SchemeREPL::I(process);
     if(!repl) {
       std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
-      return _sc->F;
+      return Scheme->F;
     }
     int priority = SchemeProcess::I(process)->getPriority();
-    return mk_integer(_sc, priority);
+    return mk_integer(Scheme, priority);
   }
 
-    pointer SchemeFFI::getNameOfCurrentProcess(scheme* _sc, pointer args)
+    pointer getNameOfCurrentProcess(scheme* Scheme, pointer Args)
     {
-            const char* name = _sc->m_process->getName().c_str();
-		return mk_string(_sc,name);
-	//if(args == _sc->NIL) return mk_string(_sc, name);
-	//else { printf("Error getting name of current process\n"); return _sc->F; }
-	/*
-	  NSDictionary* dict = (NSDictionary*) objc_value(pair_car(args));
-	  NSString* alias_name = [dict objectForKey:[NSString stringWithCString:name]];
-	  if(alias_name == NULL) return mk_string(_sc, name);
-	  return mk_string(_sc, [alias_name UTF8String]);
-	*/
+            const char* name = Scheme->m_process->getName().c_str();
+                return mk_string(Scheme,name);
+        //if(args == Scheme->NIL) return mk_string(Scheme, name);
+        //else { printf("Error getting name of current process\n"); return Scheme->F; }
+        /*
+          NSDictionary* dict = (NSDictionary*) objc_value(pair_car(Args));
+          NSString* alias_name = [dict objectForKey:[NSString stringWithCString:name]];
+          if(alias_name == NULL) return mk_string(Scheme, name);
+          return mk_string(Scheme, [alias_name UTF8String]);
+        */
     }
 
-    pointer SchemeFFI::assocstrcmp(scheme* _sc, pointer args)
+    pointer assocstrcmp(scheme* Scheme, pointer Args)
     {
-      pointer key = pair_car(args);
-      pointer alist = pair_cadr(args);
-      return assoc_strcmp(_sc,key,alist);
+      pointer key = pair_car(Args);
+      pointer alist = pair_cadr(Args);
+      return assoc_strcmp(Scheme,key,alist);
     }
 
-    pointer SchemeFFI::assocstrcmpall(scheme* _sc, pointer args)
+    pointer assocstrcmpall(scheme* Scheme, pointer Args)
     {
-      pointer key = pair_car(args);
-      pointer alist = pair_cadr(args);
-      return assoc_strcmp_all(_sc,key,alist);
+      pointer key = pair_car(Args);
+      pointer alist = pair_cadr(Args);
+      return assoc_strcmp_all(Scheme,key,alist);
     }
 
     // number stuff
-    pointer SchemeFFI::randomReal(scheme* _sc, pointer args)
+    pointer randomReal(scheme* Scheme, pointer Args)
     {
-	return mk_real(_sc,UNIV::random());
+        return mk_real(Scheme,UNIV::random());
     }
 
-    pointer SchemeFFI::randomInt(scheme* _sc, pointer args)
+    pointer randomInt(scheme* Scheme, pointer Args)
     {
-	return mk_integer(_sc,UNIV::random(ivalue(pair_car(args))));
+        return mk_integer(Scheme,UNIV::random(ivalue(pair_car(Args))));
     }
 
-    pointer SchemeFFI::integerToReal(scheme* _sc, pointer args)
+    pointer integerToReal(scheme* Scheme, pointer Args)
     {
-	double val = (double) ivalue(pair_car(args));
-	return mk_real(_sc,val);
+        double val = (double) ivalue(pair_car(Args));
+        return mk_real(Scheme,val);
     }
 
-    pointer SchemeFFI::rationalToReal(scheme* _sc, pointer args)
+    pointer rationalToReal(scheme* Scheme, pointer Args)
     {
-	return mk_real(_sc, rvalue(pair_car(args)));
+        return mk_real(Scheme, rvalue(pair_car(Args)));
     }
 
-    pointer SchemeFFI::realToRational(scheme* _sc, pointer args)
+    pointer realToRational(scheme* Scheme, pointer Args)
     {
-	double val = rvalue(pair_car(args));
-	long long vali = (long long) val;
-	double remain = val - (double)vali;
-	return mk_rational(_sc, ((long long)(remain*10000000.0))+(vali*10000000ll), 10000000ll);
+        double val = rvalue(pair_car(Args));
+        long long vali = (long long) val;
+        double remain = val - (double)vali;
+        return mk_rational(Scheme, ((long long)(remain*10000000.0))+(vali*10000000ll), 10000000ll);
     }
 
-    pointer SchemeFFI::rationalToNumerator(scheme* _sc, pointer args)
+    pointer rationalToNumerator(scheme* Scheme, pointer Args)
     {
-        pointer rat = pair_car(args);
+        pointer rat = pair_car(Args);
         if(!is_rational(rat))
-          return mk_integer(_sc, ivalue(rat));
-        return mk_integer(_sc,rat->_object._number.value.ratvalue.n);
+          return mk_integer(Scheme, ivalue(rat));
+        return mk_integer(Scheme,rat->_object._number.value.ratvalue.n);
     }
 
-    pointer SchemeFFI::rationalToDenominator(scheme* _sc, pointer args)
+    pointer rationalToDenominator(scheme* Scheme, pointer Args)
     {
-        pointer rat = pair_car(args);
-        if(!is_rational(rat)) return mk_integer(_sc,1);
-        return mk_integer(_sc,rat->_object._number.value.ratvalue.d);
+        pointer rat = pair_car(Args);
+        if(!is_rational(rat)) return mk_integer(Scheme,1);
+        return mk_integer(Scheme,rat->_object._number.value.ratvalue.d);
     }
 
-    pointer SchemeFFI::realToInteger(scheme* _sc, pointer args)
+    pointer realToInteger(scheme* Scheme, pointer Args)
     {
-	long long int val = (long long int) rvalue(pair_car(args));
-	return mk_integer(_sc,val);
+        long long int val = (long long int) rvalue(pair_car(Args));
+        return mk_integer(Scheme,val);
     }
 
-  pointer SchemeFFI::openDynamicLib(scheme* _sc, pointer args)
+  pointer openDynamicLib(scheme* Scheme, pointer Args)
   {
-    //void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
+    //void* lib_handle = dlopen(string_value(pair_car(Args)), RTLD_GLOBAL); //LAZY);
 #ifdef _WIN32
-	// set up the DLL load path
-	  SetDllDirectory(""); // Plug "binary planting" security hole.
-	  if (!SetDllDirectory((extemp::UNIV::SHARE_DIR + "/libs/aot-cache").c_str()))
-		  std::cout << "Warning: couldn't add libs/aot-cache/ to DLL search path" << std::endl;
+        // set up the DLL load path
+          SetDllDirectory(""); // Plug "binary planting" security hole.
+          if (!SetDllDirectory((extemp::UNIV::SHARE_DIR + "/libs/aot-cache").c_str()))
+                  std::cout << "Warning: couldn't add libs/aot-cache/ to DLL search path" << std::endl;
 
-    void* lib_handle = LoadLibraryA(string_value(pair_car(args)));
+    void* lib_handle = LoadLibraryA(string_value(pair_car(Args)));
 #else
-    void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_LAZY|RTLD_GLOBAL);
+    void* lib_handle = dlopen(string_value(pair_car(Args)), RTLD_LAZY|RTLD_GLOBAL);  // TODO: RTLD_NOW
 #endif
     if (!lib_handle)
       {
         // if an optional second argument is non-nil, print the error
-        if(pair_cdr(args) != _sc->NIL && pair_cadr(args) != _sc->F)
+        if(pair_cdr(Args) != Scheme->NIL && pair_cadr(Args) != Scheme->F)
           {
 #ifdef _WIN32
             std::cout << "LoadLibrary error:" << GetLastError() << std::endl;
 #else
-            printf("%s\n", dlerror());
+            printf("Bad: %s\n", dlerror());
 #endif
           }
-        return _sc->F;
+        return Scheme->F;
       }
-    return mk_cptr(_sc,lib_handle);
+    return mk_cptr(Scheme,lib_handle);
   }
 
-    pointer SchemeFFI::closeDynamicLib(scheme* _sc, pointer args)
+    pointer closeDynamicLib(scheme* Scheme, pointer Args)
     {
 #ifdef _WIN32
-      FreeLibrary((HMODULE)cptr_value(pair_car(args))) ;
+      FreeLibrary((HMODULE)cptr_value(pair_car(Args))) ;
 #else
-	dlclose(cptr_value(pair_car(args)));
+        dlclose(cptr_value(pair_car(Args)));
 #endif
-	return _sc->T;
+        return Scheme->T;
     }
 
 
-    pointer SchemeFFI::pointerSize(scheme* _sc, pointer args)
+    pointer pointerSize(scheme* Scheme, pointer Args)
     {
 #ifdef TARGET_64BIT
-	return mk_integer(_sc, 64);
+        return mk_integer(Scheme, 64);
 #else
-	return mk_integer(_sc, 32);
+        return mk_integer(Scheme, 32);
 #endif
     }
 
-    pointer SchemeFFI::mcjitEnabled(scheme* _sc, pointer args)
+    pointer mcjitEnabled(scheme* Scheme, pointer Args)
     {
-      return _sc->T;
+      return Scheme->T;
     }
-    pointer SchemeFFI::cmdarg(scheme* _sc, pointer args)
+    pointer cmdarg(scheme* Scheme, pointer Args)
     {
-      char* key = string_value(pair_car(args));
+      char* key = string_value(pair_car(Args));
       std::string val = UNIV::CMDPARAMS[std::string(key)];
-      return mk_string(_sc,val.c_str());
+      return mk_string(Scheme,val.c_str());
     }
 
-    pointer SchemeFFI::platform(scheme* _sc, pointer args)
+    pointer platform(scheme* Scheme, pointer Args)
     {
 #ifdef __APPLE__
-      return mk_string(_sc, "OSX");
+      return mk_string(Scheme, "OSX");
 #elif __linux__
-      return mk_string(_sc, "Linux");
+      return mk_string(Scheme, "Linux");
 #elif _WIN32
-	  return mk_string(_sc, "Windows");
+          return mk_string(Scheme, "Windows");
 #else
-	  return mk_string(_sc, "");
+          return mk_string(Scheme, "");
 #endif
     }
 
-  pointer SchemeFFI::getShareDir(scheme* _sc, pointer args)
+  pointer getShareDir(scheme* Scheme, pointer Args)
   {
-		return mk_string(_sc,UNIV::SHARE_DIR.c_str());
+                return mk_string(Scheme,UNIV::SHARE_DIR.c_str());
   }
 
     // positions base64[62] = '+' and base64[63] == '/'
-    pointer SchemeFFI::Base64Encode(scheme* _sc, pointer args)
+    pointer Base64Encode(scheme* Scheme, pointer Args)
     {
-      const unsigned char* dat = (const unsigned char*) cptr_value(pair_car(args));
-      size_t datlength = ivalue(pair_cadr(args));
+      const unsigned char* dat = (const unsigned char*) cptr_value(pair_car(Args));
+      size_t datlength = ivalue(pair_cadr(Args));
       size_t lth = 0;
       char* res = base64_encode(dat,datlength,&lth);
-      return mk_string(_sc,res);
+      return mk_string(Scheme,res);
     }
     // positions base64[62] = '+' and base64[63] == '/'
-    pointer SchemeFFI::Base64Decode(scheme* _sc, pointer args)
+    pointer Base64Decode(scheme* Scheme, pointer Args)
     {
-      char* str = string_value(pair_car(args));
+      char* str = string_value(pair_car(Args));
       size_t lth = 0;
       unsigned char* res = base64_decode(str,strlen(str),&lth);
-      return mk_string(_sc,(char*)res);
+      return mk_string(Scheme,(char*)res);
     }
 
     // positions base64[62] = '_' and base64[63] == '-'
-    pointer SchemeFFI::CNameEncode(scheme* _sc, pointer args)
+    pointer CNameEncode(scheme* Scheme, pointer Args)
     {
-      char* str = string_value(pair_car(args));
+      char* str = string_value(pair_car(Args));
       size_t lth = 0;
       char* res = cname_encode(str,strlen(str),&lth);
-      return mk_string(_sc,res);
+      return mk_string(Scheme,res);
     }
 
     // positions base64[62] = '_' and base64[63] == '-'
-    pointer SchemeFFI::CNameDecode(scheme* _sc, pointer args)
+    pointer CNameDecode(scheme* Scheme, pointer Args)
     {
-      char* str = string_value(pair_car(args));
+      char* str = string_value(pair_car(Args));
       size_t lth = 0;
       char* res = (char*) cname_decode(str,strlen(str),&lth);
-      return mk_string(_sc,res);
+      return mk_string(Scheme,res);
     }
 
-    pointer SchemeFFI::stringHash(scheme* _sc, pointer args)
+    pointer stringHash(scheme* Scheme, pointer Args)
     {
-      char* str = string_value(pair_car(args));
+      char* str = string_value(pair_car(Args));
       // unsigned long hash = 0;
       // int c;
 
   //     while ((c = *str++))
-	// hash = c + (hash << 6) + (hash << 16) - hash;
+        // hash = c + (hash << 6) + (hash << 16) - hash;
 
-      return mk_integer(_sc,string_hash((unsigned char*) str));
+      return mk_integer(Scheme,string_hash((unsigned char*) str));
     }
 
-    pointer SchemeFFI::stringStrip(scheme* _sc, pointer args)
+    pointer stringStrip(scheme* Scheme, pointer Args)
     {
-	return mk_string(_sc,cstrstrip(string_value(pair_car(args))));
+        return mk_string(Scheme,cstrstrip(string_value(pair_car(Args))));
     }
 
-    pointer SchemeFFI::stringJoin(scheme* _sc, pointer args)
+    pointer stringJoin(scheme* Scheme, pointer Args)
     {
-	pointer array = pair_car(args);
-	if(array == _sc->NIL) return mk_string(_sc,"");
-	char* joinstr = string_value(pair_cadr(args));
-	int len = 0;
-	for(pointer x=pair_car(array);array != _sc->NIL;array=pair_cdr(array))
-	{
-	    x = pair_car(array);
-	    len += strlen(string_value(x));
-	}
-	array = pair_car(args); // reset array
-	len += (list_length(_sc,array)-1)*(strlen(joinstr));
+        pointer array = pair_car(Args);
+        if(array == Scheme->NIL) return mk_string(Scheme,"");
+        char* joinstr = string_value(pair_cadr(Args));
+        int len = 0;
+        for(pointer x=pair_car(array);array != Scheme->NIL;array=pair_cdr(array))
+        {
+            x = pair_car(array);
+            len += strlen(string_value(x));
+        }
+        array = pair_car(Args); // reset array
+        len += (list_length(Scheme,array)-1)*(strlen(joinstr));
 
-	char* result = (char*) alloca(len+1);
+        char* result = (char*) alloca(len+1);
 
-	memset(result,0,len+1);
+        memset(result,0,len+1);
 
-	for(pointer x=pair_car(array);array != _sc->NIL;array=pair_cdr(array))
-	{
-	    x=pair_car(array);
-	    char* str = string_value(x);
-	    strcat(result,str);
-	    if(pair_cdr(array) != _sc->NIL) strcat(result,joinstr);
-	}
-	return mk_string(_sc,result);
+        for(pointer x=pair_car(array);array != Scheme->NIL;array=pair_cdr(array))
+        {
+            x=pair_car(array);
+            char* str = string_value(x);
+            strcat(result,str);
+            if(pair_cdr(array) != Scheme->NIL) strcat(result,joinstr);
+        }
+        return mk_string(Scheme,result);
     }
 
-    pointer SchemeFFI::getClosureEnv(scheme* _sc, pointer args)
+    pointer getClosureEnv(scheme* Scheme, pointer Args)
     {
-	return closure_env(pair_car(args));
+        return closure_env(pair_car(Args));
     }
 
-    pointer SchemeFFI::getTime(scheme* _sc, pointer args)
+    pointer getTime(scheme* Scheme, pointer Args)
     {
-	return mk_integer(_sc, extemp::UNIV::TIME);
+        return mk_integer(Scheme, extemp::UNIV::TIME);
     }
 
-    pointer SchemeFFI::sexprToString(scheme* _sc, pointer args)
+    pointer sexprToString(scheme* Scheme, pointer Args)
     {
-	std::stringstream ss;
-	UNIV::printSchemeCell(_sc, ss, args, true);
-	std::string s = ss.str();
-	s.erase(0,1);
-	s.erase(s.size()-1,1);
-	return mk_string(_sc, s.c_str());
+        std::stringstream ss;
+        UNIV::printSchemeCell(Scheme, ss, Args, true);
+        std::string s = ss.str();
+        s.erase(0,1);
+        s.erase(s.size()-1,1);
+        return mk_string(Scheme, s.c_str());
     }
 
-    pointer SchemeFFI::print(scheme* _sc, pointer args)
+    pointer print(scheme* Scheme, pointer Args)
     {
-	if(args == _sc->NIL) {
-	    printf("\r\n");
-	    fflush(stdout);
-	    return _sc->T;
-	}
-	std::stringstream ss;
-	UNIV::printSchemeCell(_sc, ss, args);
-	std::string s = ss.str();
-	s.erase(0,1);
-	s.erase(s.size()-1,1);
-	printf("%s\r\n",s.c_str());
-	fflush(stdout);
-	return _sc->T;
+        if(Args == Scheme->NIL) {
+            printf("\r\n");
+            fflush(stdout);
+            return Scheme->T;
+        }
+        std::stringstream ss;
+        UNIV::printSchemeCell(Scheme, ss, Args);
+        std::string s = ss.str();
+        s.erase(0,1);
+        s.erase(s.size()-1,1);
+        printf("%s\r\n",s.c_str());
+        fflush(stdout);
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::print_no_new_line(scheme* _sc, pointer args)
+    pointer print_no_new_line(scheme* Scheme, pointer Args)
     {
-	if(args == _sc->NIL) {
-	    printf("\r\n");
-	    fflush(stdout);
-	    return _sc->T;
-	}
-	std::stringstream ss;
-	UNIV::printSchemeCell(_sc, ss, args, false, false);
-	std::string s = ss.str();
-	s.erase(0,1);
-	s.erase(s.size()-1,1);
-	printf("%s",s.c_str());
-	fflush(stdout);
-	return _sc->T;
+        if(Args == Scheme->NIL) {
+            printf("\r\n");
+            fflush(stdout);
+            return Scheme->T;
+        }
+        std::stringstream ss;
+        UNIV::printSchemeCell(Scheme, ss, Args, false, false);
+        std::string s = ss.str();
+        s.erase(0,1);
+        s.erase(s.size()-1,1);
+        printf("%s",s.c_str());
+        fflush(stdout);
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::printFull(scheme* _sc, pointer args)
+    pointer printFull(scheme* Scheme, pointer Args)
     {
-	std::stringstream ss;
-	UNIV::printSchemeCell(_sc, ss, args, true);
-	std::string s = ss.str();
-	s.erase(0,1);
-	s.erase(s.size()-1,1);
-	printf("%s\n",s.c_str());
-	return _sc->T;
+        std::stringstream ss;
+        UNIV::printSchemeCell(Scheme, ss, Args, true);
+        std::string s = ss.str();
+        s.erase(0,1);
+        s.erase(s.size()-1,1);
+        printf("%s\n",s.c_str());
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::printFullNoQuotes(scheme* _sc, pointer args)
+    pointer printFullNoQuotes(scheme* Scheme, pointer Args)
     {
-	std::stringstream ss;
-	UNIV::printSchemeCell(_sc, ss, args, true, false);
-	std::string s = ss.str();
-	s.erase(0,1);
-	s.erase(s.size()-1,1);
-	printf("%s\n",s.c_str());
-	return _sc->T; //mk_string(_sc, s.c_str());
+        std::stringstream ss;
+        UNIV::printSchemeCell(Scheme, ss, Args, true, false);
+        std::string s = ss.str();
+        s.erase(0,1);
+        s.erase(s.size()-1,1);
+        printf("%s\n",s.c_str());
+        return Scheme->T; //mk_string(Scheme, s.c_str());
     }
 
-    pointer SchemeFFI::printError(scheme* _sc, pointer args)
+    pointer printError(scheme* Scheme, pointer Args)
     {
-	std::stringstream ss;
-	UNIV::printSchemeCell(_sc, ss, args, true);
-	std::string s = ss.str();
-	s.erase(0,1);
-	s.erase(s.size()-1,1);
+        std::stringstream ss;
+        UNIV::printSchemeCell(Scheme, ss, Args, true);
+        std::string s = ss.str();
+        s.erase(0,1);
+        s.erase(s.size()-1,1);
         ascii_error();
-	printf("%s\n",s.c_str());
+        printf("%s\n",s.c_str());
         ascii_normal();
         fflush(stdout);
-	return _sc->T; //mk_string(_sc, s.c_str());
+        return Scheme->T; //mk_string(Scheme, s.c_str());
     }
 
-    pointer SchemeFFI::printNotification(scheme* _sc, pointer args)
+    pointer printNotification(scheme* Scheme, pointer Args)
     {
-	std::stringstream ss;
-	UNIV::printSchemeCell(_sc, ss, args);
-	std::string s = ss.str();
-	s.erase(0,1);
-	s.erase(s.size()-1,1);
+        std::stringstream ss;
+        UNIV::printSchemeCell(Scheme, ss, Args);
+        std::string s = ss.str();
+        s.erase(0,1);
+        s.erase(s.size()-1,1);
         ascii_warning();
-	printf("%s\n",s.c_str());
+        printf("%s\n",s.c_str());
         ascii_normal();
         fflush(stdout);
-	return _sc->T; //mk_string(_sc, s.c_str());
+        return Scheme->T; //mk_string(Scheme, s.c_str());
     }
 
-    pointer SchemeFFI::callCPPAtTime(scheme* _sc, pointer args)
+    pointer callCPPAtTime(scheme* Scheme, pointer Args)
     {
-	if(is_cptr(pair_caddr(args)) == false) {
-	    printf("Bad task needs valid CM ptr");
-	    return _sc->F;
-	}
+        if(is_cptr(pair_caddr(Args)) == false) {
+            printf("Bad task needs valid CM ptr");
+            return Scheme->F;
+        }
 
-	int task_type = ivalue(pair_cadr(args));
+        int task_type = ivalue(pair_cadr(Args));
 
-	bool is_callback = (task_type == 2) ? true : false;
+        bool is_callback = (task_type == 2) ? true : false;
 
-	// is_render_thread_type are for tasks that must be called in the render thread
-	// primarily for midi calls to an AU that must occur on the audio thread
-	bool is_render_thread_type = (task_type == 1) ? true : false;
+        // is_render_thread_type are for tasks that must be called in the render thread
+        // primarily for midi calls to an AU that must occur on the audio thread
+        bool is_render_thread_type = (task_type == 1) ? true : false;
 
-	if(is_render_thread_type) {
-	    if(is_pair(pair_car(args))) { //check for tag based call
-		std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;
-	    }else{
-		std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;
-	    }
-	}else{
-	    if(is_pair(pair_car(args))) {
-		extemp::TaskScheduler::I()->addTask(ivalue(pair_caar(args)), ivalue(pair_cdar(args)), (extemp::CM*)(cptr_value(pair_caddr(args))), new SchemeObj(_sc, pair_cadddr(args), pair_caddddr(args)), 0, is_callback);
-	    }else{
-		extemp::TaskScheduler::I()->addTask(ivalue(pair_car(args)), ivalue(pair_car(args))+_sc->call_default_time, (extemp::CM*)(cptr_value(pair_caddr(args))), new SchemeObj(_sc, pair_cadddr(args), pair_caddddr(args)), 0, is_callback);
-	    }
-	}
-	return _sc->T;
+        if(is_render_thread_type) {
+            if(is_pair(pair_car(Args))) { //check for tag based call
+                std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;
+            }else{
+                std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;
+            }
+        }else{
+            if(is_pair(pair_car(Args))) {
+                extemp::TaskScheduler::I()->addTask(ivalue(pair_caar(Args)), ivalue(pair_cdar(Args)), (extemp::CM*)(cptr_value(pair_caddr(Args))), new SchemeObj(Scheme, pair_cadddr(Args), pair_caddddr(Args)), 0, is_callback);
+            }else{
+                extemp::TaskScheduler::I()->addTask(ivalue(pair_car(Args)), ivalue(pair_car(Args))+Scheme->call_default_time, (extemp::CM*)(cptr_value(pair_caddr(Args))), new SchemeObj(Scheme, pair_cadddr(Args), pair_caddddr(Args)), 0, is_callback);
+            }
+        }
+        return Scheme->T;
     }
 
 
@@ -1252,249 +1260,249 @@ namespace extemp {
     //
     //////////////////////////////////////////////////////
 
-    pointer SchemeFFI::regex_match(scheme* _sc, pointer args)
+    pointer regex_match(scheme* Scheme, pointer Args)
     {
-	char* data = string_value(pair_car(args));
-	char* pattern = string_value(pair_cadr(args));
+        char* data = string_value(pair_car(Args));
+        char* pattern = string_value(pair_cadr(Args));
 
-	pcre *re;
-	const char *error;
-	int erroffset;
+        pcre *re;
+        const char *error;
+        int erroffset;
 
-	re = pcre_compile(	pattern, /* the pattern */
-			0, /* default options */
-			&error, /* for error message */
-			&erroffset, /* for error offset */
-			NULL); /* use default character tables */
+        re = pcre_compile(      pattern, /* the pattern */
+                        0, /* default options */
+                        &error, /* for error message */
+                        &erroffset, /* for error offset */
+                        NULL); /* use default character tables */
 
-	int rc;
-	int ovector[30];
-	rc = pcre_exec(	re, /* result of pcre_compile() */
-			NULL, /* we didn’t study the pattern */
-			data, /* the subject string */
-			strlen(data), /* the length of the subject string */
-			0, /* start at offset 0 in the subject */
-			0, /* default options */
-			ovector, /* vector of integers for substring information */
-			30); /* number of elements (NOT size in bytes) */
+        int rc;
+        int ovector[30];
+        rc = pcre_exec( re, /* result of pcre_compile() */
+                        NULL, /* we didn’t study the pattern */
+                        data, /* the subject string */
+                        strlen(data), /* the length of the subject string */
+                        0, /* start at offset 0 in the subject */
+                        0, /* default options */
+                        ovector, /* vector of integers for substring information */
+                        30); /* number of elements (NOT size in bytes) */
 
-	return (rc>=0) ? _sc->T : _sc->F;
+        return (rc>=0) ? Scheme->T : Scheme->F;
     }
 
-    pointer SchemeFFI::regex_matched(scheme* _sc, pointer args)
+    pointer regex_matched(scheme* Scheme, pointer Args)
     {
-	char* data = string_value(pair_car(args));
-	char* pattern = string_value(pair_cadr(args));
+        char* data = string_value(pair_car(Args));
+        char* pattern = string_value(pair_cadr(Args));
 
-	pcre *re;
-	const char *error;
-	int erroffset;
-	re = pcre_compile(	pattern, /* the pattern */
-				0, /* default options */
-				&error, /* for error message */
-				&erroffset, /* for error offset */
-				NULL); /* use default character tables */
+        pcre *re;
+        const char *error;
+        int erroffset;
+        re = pcre_compile(      pattern, /* the pattern */
+                                0, /* default options */
+                                &error, /* for error message */
+                                &erroffset, /* for error offset */
+                                NULL); /* use default character tables */
 
-	int rc;
-	int ovector[60];
-	rc = pcre_exec(	re, /* result of pcre_compile() */
-			NULL, /* we didn’t study the pattern */
-			data, /* the subject string */
-			strlen(data), /* the length of the subject string */
-			0, /* start at offset 0 in the subject */
-			0, /* default options */
-			ovector, /* vector of integers for substring information */
-			60); /* number of elements (NOT size in bytes) */
+        int rc;
+        int ovector[60];
+        rc = pcre_exec( re, /* result of pcre_compile() */
+                        NULL, /* we didn’t study the pattern */
+                        data, /* the subject string */
+                        strlen(data), /* the length of the subject string */
+                        0, /* start at offset 0 in the subject */
+                        0, /* default options */
+                        ovector, /* vector of integers for substring information */
+                        60); /* number of elements (NOT size in bytes) */
 
-	// make pointer to hold return results
-	pointer list = _sc->NIL;
+        // make pointer to hold return results
+        pointer list = Scheme->NIL;
 
-	// if failed to match return empty list
-	if(rc<0) return list;
+        // if failed to match return empty list
+        if(rc<0) return list;
 
-	for(int i=0, p=0;i<rc;i++)
-	{
-	    //std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
-	    p=i*2;
-	    if(ovector[p]==-1) {
-                EnvInjector injector(_sc, list);
-		pointer tlist = cons(_sc,mk_string(_sc,""),list);
-		list = tlist;
-	    }else{
-		int range = ovector[p+1] - ovector[p];
-		char* b = (char*) alloca(range+1);
-		memset(b,0,range+1);
-		char* a = data+ovector[p];
-		char* substring = strncpy(b, a, range);
-                EnvInjector injector(_sc, list);
-		pointer tlist = cons(_sc,mk_string(_sc,substring),list);
-		list = tlist;
-	    }
-	}
+        for(int i=0, p=0;i<rc;i++)
+        {
+            //std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
+            p=i*2;
+            if(ovector[p]==-1) {
+                EnvInjector injector(Scheme, list);
+                pointer tlist = cons(Scheme,mk_string(Scheme,""),list);
+                list = tlist;
+            }else{
+                int range = ovector[p+1] - ovector[p];
+                char* b = (char*) alloca(range+1);
+                memset(b,0,range+1);
+                char* a = data+ovector[p];
+                char* substring = strncpy(b, a, range);
+                EnvInjector injector(Scheme, list);
+                pointer tlist = cons(Scheme,mk_string(Scheme,substring),list);
+                list = tlist;
+            }
+        }
 
-	return reverse(_sc,list);
+        return reverse(Scheme,list);
     }
 
-    pointer SchemeFFI::regex_match_all(scheme* _sc, pointer args)
+    pointer regex_match_all(scheme* Scheme, pointer Args)
     {
-	char* data = string_value(pair_car(args));
-	char* pattern = string_value(pair_cadr(args));
+        char* data = string_value(pair_car(Args));
+        char* pattern = string_value(pair_cadr(Args));
 
-	pcre *re;
-	const char *error;
-	int erroffset;
-	re = pcre_compile(	pattern, /* the pattern */
-				0, /* default options */
-				&error, /* for error message */
-				&erroffset, /* for error offset */
-				NULL); /* use default character tables */
+        pcre *re;
+        const char *error;
+        int erroffset;
+        re = pcre_compile(      pattern, /* the pattern */
+                                0, /* default options */
+                                &error, /* for error message */
+                                &erroffset, /* for error offset */
+                                NULL); /* use default character tables */
 
-	// pointer to hold return results
-	pointer list = _sc->NIL;
-	int rc;
-	int ovector[60];
+        // pointer to hold return results
+        pointer list = Scheme->NIL;
+        int rc;
+        int ovector[60];
 
-	while(true) {
-	    rc = pcre_exec(	re, /* result of pcre_compile() */
-				NULL, /* we didn’t study the pattern */
-				data, /* the subject string */
-				strlen(data), /* the length of the subject string */
-				0, /* start at offset 0 in the subject */
-				0, /* default options */
-				ovector, /* vector of integers for substring information */
-				60); /* number of elements (NOT size in bytes) */
+        while(true) {
+            rc = pcre_exec(     re, /* result of pcre_compile() */
+                                NULL, /* we didn’t study the pattern */
+                                data, /* the subject string */
+                                strlen(data), /* the length of the subject string */
+                                0, /* start at offset 0 in the subject */
+                                0, /* default options */
+                                ovector, /* vector of integers for substring information */
+                                60); /* number of elements (NOT size in bytes) */
 
-	    //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << std::endl;
-	    if(rc<1) {
-		return reverse(_sc,list);
-	    }
-	    int range = ovector[1] - ovector[0];
-	    char* b = (char*) alloca(range+1);
-	    memset(b,0,range+1);
-	    char* a = data+ovector[0];
-	    char* substring = strncpy(b, a, range);
-            EnvInjector injector(_sc, list);
-	    pointer tlist = cons(_sc,mk_string(_sc,substring),list);
-	    list = tlist;
-	    data = data+range+ovector[0];
-	}
+            //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << std::endl;
+            if(rc<1) {
+                return reverse(Scheme,list);
+            }
+            int range = ovector[1] - ovector[0];
+            char* b = (char*) alloca(range+1);
+            memset(b,0,range+1);
+            char* a = data+ovector[0];
+            char* substring = strncpy(b, a, range);
+            EnvInjector injector(Scheme, list);
+            pointer tlist = cons(Scheme,mk_string(Scheme,substring),list);
+            list = tlist;
+            data = data+range+ovector[0];
+        }
 
-	// shouldn't ever reach here!
-	return _sc->NIL;
+        // shouldn't ever reach here!
+        return Scheme->NIL;
     }
 
-    pointer SchemeFFI::regex_split(scheme* _sc, pointer args)
+    pointer regex_split(scheme* Scheme, pointer Args)
     {
-	char* data = string_value(pair_car(args));
-	char* pattern = string_value(pair_cadr(args));
+        char* data = string_value(pair_car(Args));
+        char* pattern = string_value(pair_cadr(Args));
 
-	pcre *re;
-	const char *error;
-	int erroffset;
-	re = pcre_compile(	pattern, /* the pattern */
-				0, /* default options */
-				&error, /* for error message */
-				&erroffset, /* for error offset */
-				NULL); /* use default character tables */
+        pcre *re;
+        const char *error;
+        int erroffset;
+        re = pcre_compile(      pattern, /* the pattern */
+                                0, /* default options */
+                                &error, /* for error message */
+                                &erroffset, /* for error offset */
+                                NULL); /* use default character tables */
 
-	// pointer to hold return results
-	pointer list = _sc->NIL;
-	int rc;
-	int ovector[60];
+        // pointer to hold return results
+        pointer list = Scheme->NIL;
+        int rc;
+        int ovector[60];
 
-	while(true) {
-	    rc = pcre_exec(	re, /* result of pcre_compile() */
-				NULL, /* we didn’t study the pattern */
-				data, /* the subject string */
-				strlen(data), /* the length of the subject string */
-				0, /* start at offset 0 in the subject */
-				0, /* default options */
-				ovector, /* vector of integers for substring information */
-				60); /* number of elements (NOT size in bytes) */
+        while(true) {
+            rc = pcre_exec(     re, /* result of pcre_compile() */
+                                NULL, /* we didn’t study the pattern */
+                                data, /* the subject string */
+                                strlen(data), /* the length of the subject string */
+                                0, /* start at offset 0 in the subject */
+                                0, /* default options */
+                                ovector, /* vector of integers for substring information */
+                                60); /* number of elements (NOT size in bytes) */
 
-	    //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << std::endl;
-	    if(rc<1) {
-		if(strlen(data)>0) // append remaining chars if any left
-		{
-		    list = cons(_sc,mk_string(_sc,data),list);
-		}
-		return reverse(_sc,list);
-	    }
-	    int range = ovector[0];
-	    char* b = (char*) alloca(range+1);
-	    memset(b,0,range+1);
-	    char* substring = strncpy(b, data, range);
-            EnvInjector injector(_sc, list);
-	    pointer tlist = cons(_sc,mk_string(_sc,substring),list);
-	    list = tlist;
-	    data = data+ovector[1];
-	}
+            //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << std::endl;
+            if(rc<1) {
+                if(strlen(data)>0) // append remaining chars if any left
+                {
+                    list = cons(Scheme,mk_string(Scheme,data),list);
+                }
+                return reverse(Scheme,list);
+            }
+            int range = ovector[0];
+            char* b = (char*) alloca(range+1);
+            memset(b,0,range+1);
+            char* substring = strncpy(b, data, range);
+            EnvInjector injector(Scheme, list);
+            pointer tlist = cons(Scheme,mk_string(Scheme,substring),list);
+            list = tlist;
+            data = data+ovector[1];
+        }
 
-	// shouldn't ever reach here!
-	return _sc->NIL;
+        // shouldn't ever reach here!
+        return Scheme->NIL;
     }
 
-    pointer SchemeFFI::regex_replace(scheme* _sc, pointer args)
+    pointer regex_replace(scheme* Scheme, pointer Args)
     {
-	char* data = string_value(pair_car(args));
-	char* pattern = string_value(pair_cadr(args));
-	char* replace = string_value(pair_caddr(args));
+        char* data = string_value(pair_car(Args));
+        char* pattern = string_value(pair_cadr(Args));
+        char* replace = string_value(pair_caddr(Args));
 
-	pcre *re;
-	const char *error;
-	int erroffset;
-	re = pcre_compile(	pattern, /* the pattern */
-				0, /* default options */
-				&error, /* for error message */
-				&erroffset, /* for error offset */
-				NULL); /* use default character tables */
+        pcre *re;
+        const char *error;
+        int erroffset;
+        re = pcre_compile(      pattern, /* the pattern */
+                                0, /* default options */
+                                &error, /* for error message */
+                                &erroffset, /* for error offset */
+                                NULL); /* use default character tables */
 
-	int rc;
-	int ovector[60];
+        int rc;
+        int ovector[60];
 
-	rc = pcre_exec(	re, /* result of pcre_compile() */
-			NULL, /* we didn’t study the pattern */
-			data, /* the subject string */
-			strlen(data), /* the length of the subject string */
-			0, /* start at offset 0 in the subject */
-			0, /* default options */
-			ovector, /* vector of integers for substring information */
-			60); /* number of elements (NOT size in bytes) */
+        rc = pcre_exec( re, /* result of pcre_compile() */
+                        NULL, /* we didn’t study the pattern */
+                        data, /* the subject string */
+                        strlen(data), /* the length of the subject string */
+                        0, /* start at offset 0 in the subject */
+                        0, /* default options */
+                        ovector, /* vector of integers for substring information */
+                        60); /* number of elements (NOT size in bytes) */
 
-	// no match found return original string
-	if(rc<1) return mk_string(_sc,data);
+        // no match found return original string
+        if(rc<1) return mk_string(Scheme,data);
 
-	// ok we have a match
-	// first replace any groups in replace string (i.e. $1 $2 ...)
-	char* res = (char*) "";
-	char* sep = (char*) "$";
-	char* tmp = 0;
-	int pos,range,size = 0;
- 	char* p = strtok(replace,sep);
-	do{
-	    char* cc;
-	    pos = strtol(p,&cc,10);
-	    range = (pos>0) ? ovector[(pos*2)+1] - ovector[pos*2] : 0;
-	    size = strlen(res);
-	    tmp = (char*) alloca(size+range+strlen(cc)+1);
-	    memset(tmp,0,size+range+strlen(cc)+1);
-	    memcpy(tmp,res,size);
-	    memcpy(tmp+size,data+ovector[pos*2],range);
-	    memcpy(tmp+size+range,cc,strlen(cc));
-	    res = tmp;
-	    p = strtok(NULL, sep);
-	}while(p);
+        // ok we have a match
+        // first replace any groups in replace string (i.e. $1 $2 ...)
+        char* res = (char*) "";
+        char* sep = (char*) "$";
+        char* tmp = 0;
+        int pos,range,size = 0;
+        char* p = strtok(replace,sep);
+        do{
+            char* cc;
+            pos = strtol(p,&cc,10);
+            range = (pos>0) ? ovector[(pos*2)+1] - ovector[pos*2] : 0;
+            size = strlen(res);
+            tmp = (char*) alloca(size+range+strlen(cc)+1);
+            memset(tmp,0,size+range+strlen(cc)+1);
+            memcpy(tmp,res,size);
+            memcpy(tmp+size,data+ovector[pos*2],range);
+            memcpy(tmp+size+range,cc,strlen(cc));
+            res = tmp;
+            p = strtok(NULL, sep);
+        }while(p);
 
-	// now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
-	int lgth = (strlen(data)-range)+strlen(res)+1;
-	range = ovector[1] - ovector[0];
-	char* result = (char*) alloca(lgth);
-	memset(result,0,lgth);
-	memcpy(result,data,ovector[0]);
-	memcpy(result+ovector[0],res,strlen(res));
-	memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);
+        // now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
+        int lgth = (strlen(data)-range)+strlen(res)+1;
+        range = ovector[1] - ovector[0];
+        char* result = (char*) alloca(lgth);
+        memset(result,0,lgth);
+        memcpy(result,data,ovector[0]);
+        memcpy(result+ovector[0],res,strlen(res));
+        memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);
 
-	return mk_string(_sc,result);
+        return mk_string(Scheme,result);
     }
 
     ///////////////////////////////////////////////////////
@@ -1502,73 +1510,73 @@ namespace extemp {
     // MEMORY ZONE STUFF
     //
     //////////////////////////////////////////////////////
-    void SchemeFFI::freeWithDelay(TaskI* task)
+    void freeWithDelay(TaskI* task)
     {
-	Task<char*>* t = static_cast<Task<char*>*>(task);
+        Task<char*>* t = static_cast<Task<char*>*>(task);
         char* dat = t->getArg();
-	free(dat);
+        free(dat);
     }
 
-    void SchemeFFI::destroyMallocZoneWithDelay(TaskI* task)
+    void destroyMallocZoneWithDelay(TaskI* task)
     {
-	Task<llvm_zone_t*>* t = static_cast<Task<llvm_zone_t*>*>(task);
-	llvm_zone_t* zone = t->getArg();
-	llvm_zone_destroy(zone);
+        Task<llvm_zone_t*>* t = static_cast<Task<llvm_zone_t*>*>(task);
+        llvm_zone_t* zone = t->getArg();
+        llvm_zone_destroy(zone);
     }
 
-    pointer SchemeFFI::createMallocZone(scheme* _sc, pointer args)
+    pointer createMallocZone(scheme* Scheme, pointer Args)
     {
-	if(args == _sc->NIL)
-	    return mk_cptr(_sc,llvm_zone_create(1024*100));
-	else
-	    return mk_cptr(_sc,llvm_zone_create(ivalue(pair_car(args))));
-    }
-
-    pointer SchemeFFI::defaultMallocZone(scheme* _sc, pointer args)
-    {
-        return mk_cptr(_sc,_sc->m_process->getDefaultZone()); //llvm_zone_default());
-    }
-
-    pointer SchemeFFI::destroyMallocZone(scheme* _sc, pointer args)
-    {
-	llvm_zone_t* ptr = (llvm_zone_t*) cptr_value(pair_car(args));
-	if(pair_cdr(args) != _sc->NIL)
-	{
-	  llvm_destroy_zone_after_delay(ptr, ivalue(pair_cadr(args)));
-	}
+        if(Args == Scheme->NIL)
+            return mk_cptr(Scheme,llvm_zone_create(1024*100));
         else
-	{
-	  llvm_zone_destroy(ptr);
-	}
-	return _sc->T;
+            return mk_cptr(Scheme,llvm_zone_create(ivalue(pair_car(Args))));
     }
 
-    pointer SchemeFFI::resetMallocZone(scheme* _sc, pointer args)
+    pointer defaultMallocZone(scheme* Scheme, pointer Args)
     {
-	llvm_zone_t* zone = (llvm_zone_t*) cptr_value(pair_car(args));
-	llvm_zone_reset(zone);
-	return _sc->T;
+        return mk_cptr(Scheme,Scheme->m_process->getDefaultZone()); //llvm_zone_default());
     }
 
-    pointer SchemeFFI::copyToDefaultZone(scheme* _sc, pointer args)
+    pointer destroyMallocZone(scheme* Scheme, pointer Args)
     {
-	return _sc->NIL;
+        llvm_zone_t* ptr = (llvm_zone_t*) cptr_value(pair_car(Args));
+        if(pair_cdr(Args) != Scheme->NIL)
+        {
+          llvm_destroy_zone_after_delay(ptr, ivalue(pair_cadr(Args)));
+        }
+        else
+        {
+          llvm_zone_destroy(ptr);
+        }
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::peekMemoryZone(scheme* _sc, pointer args)
+    pointer resetMallocZone(scheme* Scheme, pointer Args)
     {
-        return mk_cptr(_sc,llvm_peek_zone_stack());
+        llvm_zone_t* zone = (llvm_zone_t*) cptr_value(pair_car(Args));
+        llvm_zone_reset(zone);
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::popMemoryZone(scheme* _sc, pointer args)
+    pointer copyToDefaultZone(scheme* Scheme, pointer Args)
     {
-        return mk_cptr(_sc,llvm_pop_zone_stack());
+        return Scheme->NIL;
     }
 
-    pointer SchemeFFI::pushMemoryZone(scheme* _sc, pointer args)
+    pointer peekMemoryZone(scheme* Scheme, pointer Args)
     {
-        llvm_push_zone_stack((llvm_zone_t*)cptr_value(pair_car(args)));
-        return _sc->T;
+        return mk_cptr(Scheme,llvm_peek_zone_stack());
+    }
+
+    pointer popMemoryZone(scheme* Scheme, pointer Args)
+    {
+        return mk_cptr(Scheme,llvm_pop_zone_stack());
+    }
+
+    pointer pushMemoryZone(scheme* Scheme, pointer Args)
+    {
+        llvm_push_zone_stack((llvm_zone_t*)cptr_value(pair_car(Args)));
+        return Scheme->T;
     }
 
     ////////////////////////////////////////////
@@ -1577,23 +1585,29 @@ namespace extemp {
     //
     /////////////////////////////////////////////
 
-    pointer SchemeFFI::optimizeCompiles(scheme* _sc, pointer args)
-    {
-        EXTLLVM::OPTIMIZE_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0;
-        return _sc->T;
-    }
+pointer optimizeCompiles(scheme* Scheme, pointer Args)
+{
+    EXTLLVM::OPTIMIZE_COMPILES = (pair_car(Args) == Scheme->T);
+    return Scheme->T;
+}
 
-    pointer SchemeFFI::fastCompiles(scheme* _sc, pointer args)
-    {
-        EXTLLVM::FAST_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0;
-        return _sc->T;
-    }
+pointer fastCompiles(scheme* Scheme, pointer Args)
+{
+    EXTLLVM::FAST_COMPILES = (pair_car(Args) == Scheme->T);
+    return Scheme->T;
+}
 
-    pointer SchemeFFI::verifyCompiles(scheme* _sc, pointer args)
-    {
-        EXTLLVM::VERIFY_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0;
-        return _sc->T;
-    }
+pointer backgroundCompiles(scheme* Scheme, pointer Args)
+{
+    EXTLLVM::BACKGROUND_COMPILES = (pair_car(Args) == Scheme->T);
+    return Scheme->T;
+}
+
+pointer verifyCompiles(scheme* Scheme, pointer Args)
+{
+    EXTLLVM::VERIFY_COMPILES = (pair_car(Args) == Scheme->T);
+    return Scheme->T;
+}
 
   static long long llvm_emitcounter = 0;
 
@@ -1611,11 +1625,13 @@ static std::string SanitizeType(llvm::Type* Type)
 }
 
 static bool sEmitCode = false;
-  pointer SchemeFFI::jitCompileIRString(scheme* _sc, pointer args)
-  {
+static std::regex sGlobalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize);
+static std::regex sDefineSymRegex("define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize | std::regex::ECMAScript);
+
+static llvm::Module* jitCompile(const std::string& String)
+{
     // Create some module to put our function into it.
     using namespace llvm;
-    Module* M = EXTLLVM::I()->M;
     legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
     legacy::PassManager* PM_NO = extemp::EXTLLVM::I()->PM_NO;
 
@@ -1623,30 +1639,29 @@ static bool sEmitCode = false;
     sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
     char tmpbuf[1024];
 
-    char* assm = string_value(pair_car(args));
+    std::string asmcode(String);
     SMDiagnostic pa;
-    //ParseError pa;
-    long long num_of_funcs = M->getFunctionList().size();
 
     static std::string sInlineString; // This is a hack for now, but it *WORKS*
     static std::string sInlineBitcode;
     static std::unordered_set<std::string> sInlineSyms;
     if (sInlineString.empty()) {
+        sCompileQueueMutex.init();
+        // sCompileThread.start();
         {
             std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
             std::stringstream inString;
             inString << inStream.rdbuf();
             sInlineString = inString.str();
         }
-        std::regex globalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)");
-        std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), globalSymRegex, 1),
+        std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), sGlobalSymRegex, 1),
                 std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
         {
             std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
             std::stringstream inString;
             inString << inStream.rdbuf();
             std::string tString = inString.str();
-            std::copy(std::sregex_token_iterator(tString.begin(), tString.end(), globalSymRegex, 1),
+            std::copy(std::sregex_token_iterator(tString.begin(), tString.end(), sGlobalSymRegex, 1),
                     std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
         }
     }
@@ -1671,10 +1686,9 @@ std::cout << pa.getMessage().str() << std::endl;
             first = false;
         }
     }
-    std::string asmcode(assm);
     std::unique_ptr<llvm::Module> newModule;
     bool built(false);
-    if (!EXTLLVM::FAST_COMPILES) {
+    if (!EXTLLVM::FAST_COMPILES) { // this might not be necessary any more (benchmark later)
         auto context(LLVMContextCreate());
         newModule = parseAssemblyString(asmcode, pa, *unwrap(context));
         built = bool(newModule);
@@ -1682,15 +1696,13 @@ std::cout << pa.getMessage().str() << std::endl;
         LLVMContextDispose(context);
     }
     if (likely(!built)) {
-        std::regex globalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::ECMAScript);
         std::vector<std::string> symbols;
-        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), globalSymRegex, 1),
+        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sGlobalSymRegex, 1),
                 std::sregex_token_iterator(), std::inserter(symbols, symbols.begin()));
         std::sort(symbols.begin(), symbols.end());
         auto end(std::unique(symbols.begin(), symbols.end()));
         std::unordered_set<std::string> ignoreSyms;
-        globalSymRegex = std::regex("define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::ECMAScript);
-        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), globalSymRegex, 1),
+        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sDefineSymRegex, 1),
                 std::sregex_token_iterator(), std::inserter(ignoreSyms, ignoreSyms.begin()));
         std::string declarations;
         llvm::raw_string_ostream dstream(declarations);
@@ -1704,7 +1716,7 @@ std::cout << pa.getMessage().str() << std::endl;
             if (!gv) {
                 continue;
             }
-            auto func(extemp::EXTLLVM::I()->getFunction(sym));
+            auto func(extemp::EXTLLVM::I()->getFunction(sym, false));
             if (func) {
                 dstream << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
                 bool first(true);
@@ -1757,115 +1769,111 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
             }
         }
     }
-
     //std::stringstream ss;
     if (unlikely(!newModule))
-      {
+    {
 // std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
 // std::cout << pa.getMessage().str() << std::endl << pa.getLineNo() << std::endl;
         std::string errstr;
         llvm::raw_string_ostream ss(errstr);
         pa.print("LLVM IR",ss);
         printf("%s\n",ss.str().c_str());
-        return _sc->F;
-      }else{
-      if (extemp::EXTLLVM::VERIFY_COMPILES) {
-        if (verifyModule(*M)) {
-          std::cout << "\nInvalid LLVM IR\n";
-          return _sc->F;
-        }
-      }
-      llvm::Module *modulePtr = newModule.get();
-      extemp::EXTLLVM::I()->EE->addModule(std::move(newModule));
-      extemp::EXTLLVM::I()->addModule(modulePtr);
-      extemp::EXTLLVM::I()->EE->finalizeObject();
-
-      // when using MCJIT, return a pointer to the module with the new
-      // functions in it - which we'll use later to export the bitcode
-      // during AOT-compilation
-      return mk_cptr(_sc, modulePtr);
+        return nullptr;
+    } else if (extemp::EXTLLVM::VERIFY_COMPILES && verifyModule(*newModule)) {
+        std::cout << "\nInvalid LLVM IR\n";
+        return nullptr;
     }
-  }
+    llvm::Module *modulePtr = newModule.get();
+    extemp::EXTLLVM::I()->EE->addModule(std::move(newModule));
+    extemp::EXTLLVM::I()->EE->finalizeObject();
+    return modulePtr;
+}
 
-    pointer SchemeFFI::ff_set_name(scheme* _sc, pointer args)
+pointer jitCompileIRString(scheme* Scheme, pointer Args)
+  {
+    if (EXTLLVM::BACKGROUND_COMPILES) {
+        EXTMutex::ScopedLock lock(sCompileQueueMutex);
+        sCompileQueue.push(string_value(pair_car(Args)));
+        ++EXTLLVM::I()->m_pendingCompiles;
+        return Scheme->F;
+    }
+    auto modulePtr(jitCompile(string_value(pair_car(Args))));
+    if (!modulePtr) {
+        return Scheme->F;
+    }
+    extemp::EXTLLVM::I()->addModule(modulePtr);
+    return mk_cptr(Scheme, modulePtr);
+}
+
+
+    pointer ff_set_name(scheme* Scheme, pointer Args)
     {
-       pointer x = pair_car(args);
+       pointer x = pair_car(Args);
        foreign_func ff = x->_object._ff;
-       char* name = string_value(pair_cadr(args));
+       char* name = string_value(pair_cadr(Args));
        llvm_scheme_ff_set_name(ff,name);
-       return _sc->T;
+       return Scheme->T;
     }
 
-    pointer SchemeFFI::ff_get_name(scheme* _sc, pointer args)
+    pointer ff_get_name(scheme* Scheme, pointer Args)
     {
-       pointer x = pair_car(args);
+       pointer x = pair_car(Args);
        foreign_func ff = x->_object._ff;
        const char* name = llvm_scheme_ff_get_name(ff);
-       return mk_string(_sc,name);
+       return mk_string(Scheme,name);
     }
 
-  pointer SchemeFFI::get_function(scheme* _sc, pointer args)
+  pointer get_function(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
-    //Module* M = EXTLLVM::I()->M;
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
     if(func == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
-    return mk_cptr(_sc, func);
+    return mk_cptr(Scheme, func);
   }
 
-  pointer SchemeFFI::get_globalvar(scheme* _sc, pointer args)
+  pointer get_globalvar(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
 
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
-    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));
+    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(Args)));
     if(var == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
-    return mk_cptr(_sc, var);
+    return mk_cptr(Scheme, var);
   }
 
 
-  pointer SchemeFFI::get_function_calling_conv(scheme* _sc, pointer args)
+  pointer get_function_calling_conv(scheme* Scheme, pointer Args)
   {
-    using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
     if(func == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
 
     int cc = func->getCallingConv();
-    return mk_integer(_sc, cc);
+    return mk_integer(Scheme, cc);
   }
 
-  pointer SchemeFFI::get_function_varargs(scheme* _sc, pointer args)
+  pointer get_function_varargs(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
     if(func == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
-    return func->isVarArg() ? _sc->T : _sc->F;
+    return func->isVarArg() ? Scheme->T : Scheme->F;
   }
 
-  pointer SchemeFFI::llvm_print_all_closures(scheme* _sc, pointer args)
+  pointer llvm_print_all_closures(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
-    char* x = string_value(pair_car(args));
+    char* x = string_value(pair_car(Args));
     char rgx[1024];
     memset((void*)&rgx[0],0,1024);
     memcpy((void*)&rgx[0],x,strlen(x));
@@ -1887,13 +1895,13 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
         }
       }
     }
-    return _sc->T;
+    return Scheme->T;
   }
 
-  pointer SchemeFFI::llvm_closure_last_name(scheme* _sc, pointer args)
+  pointer llvm_closure_last_name(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
-    char* x = string_value(pair_car(args));
+    char* x = string_value(pair_car(Args));
     char rgx[1024];
     memset((void*)&rgx[0],0,1024);
     memcpy((void*)&rgx[0],x,strlen(x));
@@ -1913,15 +1921,15 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
       }
     }
     //std::cout << "fullname:" << last_name << std::endl;
-    if(last_name) return mk_string(_sc,last_name);
-    else return _sc->F;
+    if(last_name) return mk_string(Scheme,last_name);
+    else return Scheme->F;
   }
 
 
-    pointer SchemeFFI::llvm_print_closure(scheme* _sc, pointer args)
+    pointer llvm_print_closure(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
-    char* fname = string_value(pair_car(args));
+    char* fname = string_value(pair_car(Args));
 
     Module* M = NULL;
     std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
@@ -1940,38 +1948,38 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
         }
       }
     }
-    return _sc->T;
+    return Scheme->T;
   }
 
 
-  pointer SchemeFFI::llvm_disasm(scheme* _sc, pointer args)
+  pointer llvm_disasm(scheme* Scheme, pointer Args)
   {
     //using namespace llvm;
-    //long bytes = ivalue(pair_cadr(args));
-    //int x64 = (pair_caddr(args) == _sc->T) ? 1 : 0;
-    int lgth = list_length(_sc, args);
+    //long bytes = ivalue(pair_cadr(Args));
+    //int x64 = (pair_caddr(Args) == Scheme->T) ? 1 : 0;
+    int lgth = list_length(Scheme, Args);
     int syntax = 1;
     if(lgth > 1) {
-      syntax = ivalue(pair_cadr(args));
+      syntax = ivalue(pair_cadr(Args));
     }
     if (syntax > 1) {
       std::cout << "Syntax argument must be either 0: at&t or 1: intel" << std::endl;
       std::cout << "The default is 1: intel" << std::endl;
       syntax = 1;
     }
-    pointer name = SchemeFFI::llvm_closure_last_name(_sc, args);
-    unsigned char* fptr = (unsigned char*) cptr_value(SchemeFFI::get_function_pointer(_sc,cons(_sc,name,pair_cdr(args))));
+    pointer name = llvm_closure_last_name(Scheme, Args);
+    unsigned char* fptr = (unsigned char*) cptr_value(get_function_pointer(Scheme,cons(Scheme,name,pair_cdr(Args))));
     char* dasm = llvm_disassemble(fptr,syntax); //,bytes,x64);
-    return mk_string(_sc,dasm);
+    return mk_string(Scheme,dasm);
   }
 
-  pointer SchemeFFI::get_struct_size(scheme* _sc, pointer args)
+  pointer get_struct_size(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
 
     legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
 
-    char* struct_type_str = string_value(pair_car(args));
+    char* struct_type_str = string_value(pair_car(Args));
     unsigned long long hash = string_hash((unsigned char*)struct_type_str);
     char name[128];
     sprintf(name,"_xtmT%lld",hash);
@@ -1985,84 +1993,81 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
 
     if(newM == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
     StructType* type = newM->getTypeByName(name);
     if(type == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
     DataLayout* layout = new DataLayout(newM.get());
     const StructLayout* sl = layout->getStructLayout(type);
     long size = sl->getSizeInBytes();
     delete layout;
-    return mk_integer(_sc,size);
+    return mk_integer(Scheme,size);
   }
 
-  pointer SchemeFFI::get_named_struct_size(scheme* _sc, pointer args)
+  pointer get_named_struct_size(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
 
     Module* M = EXTLLVM::I()->M;
-    //StructType* type = M->getTypeByName(std::string(string_value(pair_car(args))));
-    StructType* type = extemp::EXTLLVM::I()->getNamedType(string_value(pair_car(args)));
+    //StructType* type = M->getTypeByName(std::string(string_value(pair_car(Args))));
+    StructType* type = extemp::EXTLLVM::I()->getNamedType(string_value(pair_car(Args)));
     if(type == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
     DataLayout* layout = new DataLayout(M);
     const StructLayout* sl = layout->getStructLayout(type);
     long size = sl->getSizeInBytes();
     delete layout;
-    return mk_integer(_sc,size);
+    return mk_integer(Scheme,size);
   }
 
-  pointer SchemeFFI::get_function_type(scheme* _sc, pointer args)
+  pointer get_function_type(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
     if(func == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
 
     std::string typestr;
     llvm::raw_string_ostream ss(typestr);
     func->getFunctionType()->print(ss);
     //printf("%s\n",ss.str().c_str());
-    pointer str = mk_string(_sc, ss.str().c_str()); //func->getFunctionType()->getDescription().c_str());
+    pointer str = mk_string(Scheme, ss.str().c_str()); //func->getFunctionType()->getDescription().c_str());
     return str;
   }
 
 
-  pointer SchemeFFI::get_global_module(scheme* _sc, pointer args)
+  pointer get_global_module(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
 
     Module* M = EXTLLVM::I()->M;
     if(M == NULL)
       {
-        return _sc->F;
+        return Scheme->F;
       }
-    return mk_cptr(_sc, M);
+    return mk_cptr(Scheme, M);
   }
 
 
-  pointer SchemeFFI::export_llvmmodule_bitcode(scheme* _sc, pointer args)
+  pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
 
-    Module* m = (Module *)cptr_value(pair_car(args));
+    Module* m = (Module *)cptr_value(pair_car(Args));
 
     if(m == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
 
-    char* filename = string_value(pair_cadr(args));
+    char* filename = string_value(pair_cadr(Args));
 #ifdef _WIN32
     std::string str;
     std::ofstream fout(filename);
@@ -2099,23 +2104,19 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     llvm::raw_fd_ostream ss(filename, errcode, llvm::sys::fs::F_RW);
     if(errcode) {
       std::cout << errcode.message() << std::endl;
-      return _sc->F;
+      return Scheme->F;
     }
     llvm::WriteBitcodeToFile(m,ss);
 #endif
-    return _sc->T;
+    return Scheme->T;
   }
 
-  pointer SchemeFFI::get_function_args(scheme* _sc, pointer args)
+  pointer get_function_args(scheme* Scheme, pointer Args)
   {
-    using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
     if(func == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
 
     std::string typestr;
@@ -2130,15 +2131,15 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
       tmp_name = tmp_str_a;
     }
 
-    pointer str = mk_string(_sc, tmp_name); //_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
-    pointer p = cons(_sc, str, _sc->NIL);
+    pointer str = mk_string(Scheme, tmp_name); //Scheme, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
+    pointer p = cons(Scheme, str, Scheme->NIL);
 
-    Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
+    llvm::Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
     while(funcargs != func->getArgumentList().end())
       {
-        Argument* a = &*funcargs;
+        llvm::Argument* a = &*funcargs;
         {
-            EnvInjector injector(_sc, p);
+            EnvInjector injector(Scheme, p);
         std::string typestr2;
         llvm::raw_string_ostream ss2(typestr2);
         a->getType()->print(ss2);
@@ -2151,494 +2152,424 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
           tmp_name = tmp_str_a;
         }
 
-        pointer str = mk_string(_sc, tmp_name); //_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
+        pointer str = mk_string(Scheme, tmp_name); //Scheme, ss2.str().c_str()); //a->getType()->getDescription().c_str());
         }
-        p = cons(_sc, str, p);
+        p = cons(Scheme, str, p);
         funcargs++;
       }
-    return reverse(_sc, p);
+    return reverse(Scheme, p);
   }
 
-    pointer SchemeFFI::remove_global_var(scheme* _sc, pointer args)
+pointer remove_global_var(scheme* Scheme, pointer Args)
+{
+    auto var(EXTLLVM::I()->EE->FindGlobalVariableNamed(string_value(pair_car(Args))));
+    if (!var)
     {
-	// Create some module to put our function into it.
-	using namespace llvm;
-
-	// Module* M = EXTLLVM::I()->M;
-	// llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
-	llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));
-	if(var == 0)
-	{
-	    return _sc->F;
-	}
-	var->dropAllReferences();
-	var->removeFromParent();
-	return _sc->T;
+        return Scheme->F;
     }
+    var->dropAllReferences();
+    var->removeFromParent();
+    return Scheme->T;
+}
 
-  pointer SchemeFFI::remove_function(scheme* _sc, pointer args)
-  {
-    // Create some module to put our function into it.
-    using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
-    if(func == 0)
-      {
-        return _sc->F;
-      }
-    if(func->mayBeOverridden()) {
-	    func->dropAllReferences();
-	    func->removeFromParent();
-	    return _sc->T;
-    }else{
-	    printf("Cannot remove function with dependencies\n");
-	    return _sc->F;
+pointer remove_function(scheme* Scheme, pointer Args)
+{
+    auto func(EXTLLVM::I()->EE->FindFunctionNamed(string_value(pair_car(Args))));
+    if (!func)
+    {
+        return Scheme->F;
     }
-  }
+    if (func->mayBeOverridden()) {
+        func->dropAllReferences();
+        func->removeFromParent();
+        return Scheme->T;
+    } else {
+        printf("Cannot remove function with dependencies\n");
+        return Scheme->F;
+    }
+}
 
-  pointer SchemeFFI::erase_function(scheme* _sc, pointer args)
-  {
-    // Create some module to put our function into it.
-    using namespace llvm;
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
-    if(func == 0)
-      {
-        return _sc->F;
-      }
+pointer erase_function(scheme* Scheme, pointer Args)
+{
+    auto func(EXTLLVM::I()->EE->FindFunctionNamed(string_value(pair_car(Args))));
+    if (!func) {
+        return Scheme->F;
+    }
     func->deleteBody();
     func->eraseFromParent();
+    return Scheme->T;
+}
 
-    return _sc->T;
-  }
-
-    pointer SchemeFFI::callClosure(scheme* _sc, pointer args)
+    pointer callClosure(scheme* Scheme, pointer Args)
     {
-	using namespace llvm;
-	uint32_t** closure = (uint32_t**) cptr_value(pair_car(args));
-	void* eptr = (void*) *(closure+0);
-	int64_t (*fptr)(void*, int64_t) = (int64_t (*)(void*, int64_t)) *(closure+1);
-	return mk_integer(_sc, (*fptr)(eptr,ivalue(pair_cadr(args))));
+        using namespace llvm;
+        uint32_t** closure = (uint32_t**) cptr_value(pair_car(Args));
+        void* eptr = (void*) *(closure+0);
+        int64_t (*fptr)(void*, int64_t) = (int64_t (*)(void*, int64_t)) *(closure+1);
+        return mk_integer(Scheme, (*fptr)(eptr,ivalue(pair_cadr(Args))));
     }
 
-  pointer SchemeFFI::get_global_variable_type(scheme* _sc, pointer args)
+  pointer get_global_variable_type(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
 
     //Module* M = EXTLLVM::I()->M;
     //Module::global_iterator i = M->global_begin();
-    //GlobalVariable* var = M->getNamedGlobal(std::string(string_value(pair_car(args))));
-    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(args)));
+    //GlobalVariable* var = M->getNamedGlobal(std::string(string_value(pair_car(Args))));
+    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(Args)));
     if(var == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
     std::string typestr;
     llvm::raw_string_ostream ss(typestr);
     var->getType()->print(ss);
-    return mk_string(_sc, ss.str().c_str()); //var->getType()->getDescription().c_str());
+    return mk_string(Scheme, ss.str().c_str()); //var->getType()->getDescription().c_str());
   }
 
-  pointer SchemeFFI::get_function_pointer(scheme* _sc, pointer args)
+  pointer get_function_pointer(scheme* Scheme, pointer Args)
   {
-    using namespace llvm;
-
-    llvm::Function* func = EXTLLVM::I()->getFunction(string_value(pair_car(args)));
-    if(func == 0)
-      {
-        return _sc->F;
-      }
-
-    void* p;
-
-    // has the function been loaded somewhere else, e.g. dlsym
-      p = EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
-    if(p==NULL) // look for it as a JIT-compiled function
-      p = EXTLLVM::I()->EE->getPointerToFunction(func);
-    if(p==NULL) {
-      return _sc->F;
+    auto name(string_value(pair_car(Args)));
+    // llvm::Function* func = EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
+    void* p = EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(name);
+    if (!p) { // look for it as a JIT-compiled function
+        p = reinterpret_cast<void*>(EXTLLVM::I()->EE->getFunctionAddress(name));
+        if (!p) {
+            return Scheme->F;
+        }
     }
-
-    return mk_cptr(_sc, p);
+    return mk_cptr(Scheme, p);
   }
 
-  pointer SchemeFFI::llvm_call_void_native(scheme* _sc, pointer args)
+  pointer llvm_call_void_native(scheme* Scheme, pointer Args)
   {
     using namespace llvm;
 
     //Module* M = EXTLLVM::I()->M;
     char name[1024];
-    sprintf(name,"%s_native",string_value(pair_car(args)));
-    //llvm::Function* func = M->getFunction(std::string(name));
+    sprintf(name,"%s_native",string_value(pair_car(Args)));
     llvm::Function* func = extemp::EXTLLVM::I()->getFunction(name);
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    //func->setCallingConv(CallingConv::C); //kCStackBased);
     if(func == 0)
       {
-        return _sc->F;
+        return Scheme->F;
       }
     // this should be safe without a lock
     void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
 
     if(p==NULL) {
-	    //[[LogView sharedInstance] error:@"LLVM: Bad Function Ptr\n"];
-	    return _sc->F;
+            //[[LogView sharedInstance] error:@"LLVM: Bad Function Ptr\n"];
+            return Scheme->F;
     }
 
     void(*f)(void) = (void(*)(void)) p;
     f();
 
-    return _sc->T;
-  }
-
-  pointer SchemeFFI::recompile_and_link_function(scheme* _sc, pointer args)
-  {
-    using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
-    //llvm::Function* func = M->getFunction(fname); //std::string(string_value(pair_car(args))));
-    //func->setCallingConv(CallingConv::C); //kCStackBased);
-    if(func == 0)
-      {
-        return _sc->F;
-      }
-    //std::cout << "fname: " << fname << std::endl;
-    //std::cout << "M: " << M << std::endl;
-    //std::cout << "FUNC: " << func << std::endl;
-    //std::cout << "EE: " << EXTLLVM::I()->EE << std::endl;
-    void* p = 0;
-    try{
-      EXTLLVM* xll = EXTLLVM::I();
-      ExecutionEngine* EE = xll->EE;
-      void* p = NULL;
-    }catch(std::exception& e) {
-      std::cout << "EXCEPT: " << e.what() << std::endl;
-    }
-
-    if(p==NULL) {
-	    return _sc->F;
-    }
-
-    //const llvm::GlobalValue* f2 = NativeScheme::I()->EE->getGlobalValueAtAddress(p);
-    //std::cout << "FUNC: " << func << "  fptr: " << p << "   f2: " << f2 << std::endl;
-
-    return mk_cptr(_sc, p);
+    return Scheme->T;
   }
 
     //
     // This will not be threadsafe whenever a bind-func is done!
     //
-    pointer SchemeFFI::call_compiled(scheme* _sc, pointer args)
+    pointer call_compiled(scheme* Scheme, pointer Args)
     {
-	using namespace llvm;
+        using namespace llvm;
 
-	ExecutionEngine* EE = EXTLLVM::I()->EE;
+        ExecutionEngine* EE = EXTLLVM::I()->EE;
 
 #ifdef LLVM_EE_LOCK
   llvm::MutexGuard locked(EE->lock);
 #endif
 
-        Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = (Function*) cptr_value(pair_car(args));
-	if(func == 0)
-	{
-	    //std::cout << "no such function\n" << std::endl;
-	    printf("No such function\n");
-	    return _sc->F;
-	}
-	func->getArgumentList();
-	args = pair_cdr(args);
+        llvm::Function* func = (Function*) cptr_value(pair_car(Args));
+        if(func == 0)
+        {
+            printf("No such function\n");
+            return Scheme->F;
+        }
+        func->getArgumentList();
+        Args = pair_cdr(Args);
+        int lgth = list_length(Scheme, Args);
+        Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
+        if(lgth != func->getArgumentList().size())
+        {
+            printf("Wrong number of arguments for function!\n");
+            return Scheme->F;
+        }
+        std::vector<llvm::GenericValue> fargs(lgth);
+        //std::cout << "ARGS: " << lgth << std::endl;
+        for(int i=0;i<lgth;i++,++funcargs)
+        {
+            Argument* a = &*funcargs;
+            pointer p = list_ref(Scheme, i, Args);
+            if(is_integer(p)) {
+                if(a->getType()->getTypeID() != Type::IntegerTyID)
+                {
+                    printf("Bad argument type %i\n",i);
+                    return Scheme->F;
+                }
+                int width = a->getType()->getPrimitiveSizeInBits();
+                //std::cout << "TYPE: " << a->getType()->getTypeID() << std::endl;
+                fargs[i].IntVal = APInt(width,ivalue(p));
+            }
+            else if(is_real(p))
+            {
 
-	//llvm::Function* func = NativeScheme::LLVM_JIT->getFunction(std::string("testplusthree"));
-	//llvm::Argument* arg = func->arg_begin();
-	int lgth = list_length(_sc, args);
-	Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
-	if(lgth != func->getArgumentList().size())
-	{
-	    printf("Wrong number of arguments for function!\n");
-	    return _sc->F;
-	}
-	std::vector<llvm::GenericValue> fargs(lgth);
-	//std::cout << "ARGS: " << lgth << std::endl;
-	for(int i=0;i<lgth;i++,++funcargs)
-	{
-	    Argument* a = &*funcargs;
-	    pointer p = list_ref(_sc, i, args);
-	    if(is_integer(p)) {
-		if(a->getType()->getTypeID() != Type::IntegerTyID)
-		{
-		    printf("Bad argument type %i\n",i);
-		    return _sc->F;
-		}
-		int width = a->getType()->getPrimitiveSizeInBits();
-		//std::cout << "TYPE: " << a->getType()->getTypeID() << std::endl;
-		fargs[i].IntVal = APInt(width,ivalue(p));
-	    }
-	    else if(is_real(p))
-	    {
+                if(a->getType()->getTypeID() == Type::FloatTyID)
+                {
+                    fargs[i].FloatVal = (float) rvalue(p);
+                }
+                else if(a->getType()->getTypeID() == Type::DoubleTyID)
+                {
+                    fargs[i].DoubleVal = rvalue(p);
+                }
+                else
+                {
+                    printf("Bad argument type %i\n",i);
+                    return Scheme->F;
+                }
+            }
+            else if(is_string(p))
+            {
+                if(a->getType()->getTypeID() != Type::PointerTyID)
+                {
+                    printf("Bad argument type %i\n",i);
+                    return Scheme->F;
+                }
+                //std::cout << "PTRVALUE: " << cptr_value(p) << std::endl;
+                fargs[i].PointerVal = string_value(p);
+            }
+            else if(is_cptr(p))
+            {
+                if(a->getType()->getTypeID() != Type::PointerTyID)
+                {
+                    printf("Bad argument type %i\n",i);
+                    return Scheme->F;
+                }
+                fargs[i].PointerVal = cptr_value(p);
+                //fargs[i].PointerVal = (void*)p;
+            }
+            else if(is_closure(p))
+            {
+                //ascii_print_color(1,1,10); // error color
+                printf("Bad argument at index %i you can't pass in a scheme closure.\n",i);
+                //ascii_print_color(0,9,10);
+                return Scheme->F;
+            }
+            else {
+                //ascii_print_color(1,1,10); // error color
+                printf("Bad argument at index %i\n",i);
+                //ascii_print_color(0,9,10); // default
+                return Scheme->F;
+            }
 
-		if(a->getType()->getTypeID() == Type::FloatTyID)
-		{
-		    fargs[i].FloatVal = (float) rvalue(p);
-		}
-		else if(a->getType()->getTypeID() == Type::DoubleTyID)
-		{
-		    fargs[i].DoubleVal = rvalue(p);
-		}
-		else
-		{
-		    printf("Bad argument type %i\n",i);
-		    return _sc->F;
-		}
-	    }
-	    else if(is_string(p))
-	    {
-		if(a->getType()->getTypeID() != Type::PointerTyID)
-		{
-		    printf("Bad argument type %i\n",i);
-		    return _sc->F;
-		}
-		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl;
-		fargs[i].PointerVal = string_value(p);
-	    }
-	    else if(is_cptr(p))
-	    {
-		if(a->getType()->getTypeID() != Type::PointerTyID)
-		{
-		    printf("Bad argument type %i\n",i);
-		    return _sc->F;
-		}
-		fargs[i].PointerVal = cptr_value(p);
-		//fargs[i].PointerVal = (void*)p;
-	    }
-	    else if(is_closure(p))
-	    {
-		//ascii_print_color(1,1,10); // error color
-		printf("Bad argument at index %i you can't pass in a scheme closure.\n",i);
-		//ascii_print_color(0,9,10);
-		return _sc->F;
-	    }
-	    else {
-		//ascii_print_color(1,1,10); // error color
-		printf("Bad argument at index %i\n",i);
-		//ascii_print_color(0,9,10); // default
-		return _sc->F;
-	    }
-
-	}
+        }
   GenericValue gv = EE->runFunction(func,fargs);
 
-	//std::cout << "GV: " << gv.DoubleVal << " " << gv.FloatVal << " " << gv.IntVal.getZExtValue() << std::endl;
-	switch(func->getReturnType()->getTypeID())
-	{
-	case Type::FloatTyID:
-	    return mk_real(_sc, gv.FloatVal);
-	case Type::DoubleTyID:
-	    return mk_real(_sc, gv.DoubleVal);
-	case Type::IntegerTyID:
-	    return mk_integer(_sc, gv.IntVal.getZExtValue()); //  getRawData());
-	case Type::PointerTyID:
-	    return mk_cptr(_sc, gv.PointerVal);
-	case Type::VoidTyID:
-	    return _sc->T;
-	default:
-	    return _sc->F;
-	}
+        //std::cout << "GV: " << gv.DoubleVal << " " << gv.FloatVal << " " << gv.IntVal.getZExtValue() << std::endl;
+        switch(func->getReturnType()->getTypeID())
+        {
+        case Type::FloatTyID:
+            return mk_real(Scheme, gv.FloatVal);
+        case Type::DoubleTyID:
+            return mk_real(Scheme, gv.DoubleVal);
+        case Type::IntegerTyID:
+            return mk_integer(Scheme, gv.IntVal.getZExtValue()); //  getRawData());
+        case Type::PointerTyID:
+            return mk_cptr(Scheme, gv.PointerVal);
+        case Type::VoidTyID:
+            return Scheme->T;
+        default:
+            return Scheme->F;
+        }
     }
 
     // this all here to conver 32bit floats (as a string) into llvms hex float 32 notation :(
-    pointer SchemeFFI::llvm_convert_float_constant(scheme* _sc, pointer args)
+    pointer llvm_convert_float_constant(scheme* Scheme, pointer Args)
     {
-	char* floatin = string_value(pair_car(args));
-	char floatout[256];
+        char* floatin = string_value(pair_car(Args));
+        char floatout[256];
         // if already converted to hex value just return Hex String Unchanged
-        if(floatin[1]=='x') return pair_car(args);
+        if(floatin[1]=='x') return pair_car(Args);
 #ifdef _WIN32
-	float f = (float) strtod(floatin, (char**) &floatout);
+        float f = (float) strtod(floatin, (char**) &floatout);
 #else
-	float f = strtof(floatin, (char**) &floatout);
+        float f = strtof(floatin, (char**) &floatout);
 #endif
-	llvm::APFloat apf(f);
+        llvm::APFloat apf(f);
 
-	bool ignored;
-	bool isDouble = false; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
-	double Val = isDouble ? apf.convertToDouble() :
-	apf.convertToFloat();
+        bool ignored;
+        bool isDouble = false; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
+        double Val = isDouble ? apf.convertToDouble() :
+        apf.convertToFloat();
         // char hexstr[128];
         // apf.convertToHexString(hexstr,0,false,llvm::APFloat::rmTowardZero);
         // std::string StrVal(hexstr);
-	std::string StrVal = xtm_ftostr(apf);
+        std::string StrVal = xtm_ftostr(apf);
 
-	// Check to make sure that the stringized number is not some string like
-	// "Inf" or NaN, that atof will accept, but the lexer will not.  Check
-	// that the string matches the "[-+]?[0-9]" regex.
-	//
-	if ((StrVal[0] >= '0' && StrVal[0] <= '9') ||
-	    ((StrVal[0] == '-' || StrVal[0] == '+') &&
-	     (StrVal[1] >= '0' && StrVal[1] <= '9'))) {
-	    // Reparse stringized version!
-	    if (atof(StrVal.c_str()) == Val) {
-	      return mk_string(_sc, StrVal.c_str());
-	    }
-	}
+        // Check to make sure that the stringized number is not some string like
+        // "Inf" or NaN, that atof will accept, but the lexer will not.  Check
+        // that the string matches the "[-+]?[0-9]" regex.
+        //
+        if ((StrVal[0] >= '0' && StrVal[0] <= '9') ||
+            ((StrVal[0] == '-' || StrVal[0] == '+') &&
+             (StrVal[1] >= '0' && StrVal[1] <= '9'))) {
+            // Reparse stringized version!
+            if (atof(StrVal.c_str()) == Val) {
+              return mk_string(Scheme, StrVal.c_str());
+            }
+        }
 
-	// Otherwise we could not reparse it to exactly the same value, so we must
-	// output the string in hexadecimal format!  Note that loading and storing
-	// floating point types changes the bits of NaNs on some hosts, notably
-	// x86, so we must not use these types.
-	assert(sizeof(double) == sizeof(uint64_t) && "assuming that double is 64 bits!");
-	char Buffer[40];
-	//APFloat apf = CFP->getValueAPF();
-	// Floats are represented in ASCII IR as double, convert.
-	//if (!isDouble) apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
-	apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
+        // Otherwise we could not reparse it to exactly the same value, so we must
+        // output the string in hexadecimal format!  Note that loading and storing
+        // floating point types changes the bits of NaNs on some hosts, notably
+        // x86, so we must not use these types.
+        assert(sizeof(double) == sizeof(uint64_t) && "assuming that double is 64 bits!");
+        char Buffer[40];
+        //APFloat apf = CFP->getValueAPF();
+        // Floats are represented in ASCII IR as double, convert.
+        //if (!isDouble) apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
+        apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
 
-	char tmpstr[256];
-	tmpstr[0] = '0';
-	tmpstr[1] = 'x';
-	tmpstr[2] = 0;
-	char* v = llvm::utohex_buffer(uint64_t(apf.bitcastToAPInt().getZExtValue()), Buffer+40);
-	strcat(tmpstr, v);
-	//std::cout << "STR: " << tmpstr << "  v: " << v <<  std::endl;
-	return mk_string(_sc, tmpstr);
+        char tmpstr[256];
+        tmpstr[0] = '0';
+        tmpstr[1] = 'x';
+        tmpstr[2] = 0;
+        char* v = llvm::utohex_buffer(uint64_t(apf.bitcastToAPInt().getZExtValue()), Buffer+40);
+        strcat(tmpstr, v);
+        //std::cout << "STR: " << tmpstr << "  v: " << v <<  std::endl;
+        return mk_string(Scheme, tmpstr);
     }
 
 
      // this all here to conver 64bit floats (as a string) into llvms hex floating point notation :(
-     pointer SchemeFFI::llvm_convert_double_constant(scheme* _sc, pointer args)
+     pointer llvm_convert_double_constant(scheme* Scheme, pointer Args)
      {
- 	char* floatin = string_value(pair_car(args));
- 	char floatout[256];
+        char* floatin = string_value(pair_car(Args));
+        char floatout[256];
         // if already converted to hex value just return Hex String Unchanged
-        if(floatin[1]=='x') return pair_car(args);
+        if(floatin[1]=='x') return pair_car(Args);
  #ifdef _WIN32
- 	double f = strtod(floatin, (char**) &floatout);
+        double f = strtod(floatin, (char**) &floatout);
  #else
- 	double f = strtod(floatin, (char**) &floatout);
+        double f = strtod(floatin, (char**) &floatout);
  #endif
- 	llvm::APFloat apf(f);
+        llvm::APFloat apf(f);
 
-	bool ignored;
-	bool isDouble = true; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
- 	double Val = isDouble ? apf.convertToDouble() : apf.convertToFloat();
+        bool ignored;
+        bool isDouble = true; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
+        double Val = isDouble ? apf.convertToDouble() : apf.convertToFloat();
 
         // char hexstr[128];
         // apf.convertToHexString(hexstr,0,false,llvm::APFloat::rmTowardZero);
         // std::string StrVal(hexstr);
- 	std::string StrVal = xtm_ftostr(apf);
+        std::string StrVal = xtm_ftostr(apf);
 
- 	// Check to make sure that the stringized number is not some string like
- 	// "Inf" or NaN, that atof will accept, but the lexer will not.  Check
- 	// that the string matches the "[-+]?[0-9]" regex.
- 	//
- 	if ((StrVal[0] >= '0' && StrVal[0] <= '9') ||
- 	    ((StrVal[0] == '-' || StrVal[0] == '+') &&
- 	     (StrVal[1] >= '0' && StrVal[1] <= '9'))) {
- 	    // Reparse stringized version!
- 	    if (atof(StrVal.c_str()) == Val) {
- 		return mk_string(_sc, StrVal.c_str());
- 	    }
- 	}
+        // Check to make sure that the stringized number is not some string like
+        // "Inf" or NaN, that atof will accept, but the lexer will not.  Check
+        // that the string matches the "[-+]?[0-9]" regex.
+        //
+        if ((StrVal[0] >= '0' && StrVal[0] <= '9') ||
+            ((StrVal[0] == '-' || StrVal[0] == '+') &&
+             (StrVal[1] >= '0' && StrVal[1] <= '9'))) {
+            // Reparse stringized version!
+            if (atof(StrVal.c_str()) == Val) {
+                return mk_string(Scheme, StrVal.c_str());
+            }
+        }
 
- 	// Otherwise we could not reparse it to exactly the same value, so we must
- 	// output the string in hexadecimal format!  Note that loading and storing
- 	// floating point types changes the bits of NaNs on some hosts, notably
- 	// x86, so we must not use these types.
- 	assert(sizeof(double) == sizeof(uint64_t) && "assuming that double is 64 bits!");
- 	char Buffer[40];
- 	//APFloat apf = CFP->getValueAPF();
- 	// Floats are represented in ASCII IR as double, convert.
- 	//if (!isDouble) apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
- 	//apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
+        // Otherwise we could not reparse it to exactly the same value, so we must
+        // output the string in hexadecimal format!  Note that loading and storing
+        // floating point types changes the bits of NaNs on some hosts, notably
+        // x86, so we must not use these types.
+        assert(sizeof(double) == sizeof(uint64_t) && "assuming that double is 64 bits!");
+        char Buffer[40];
+        //APFloat apf = CFP->getValueAPF();
+        // Floats are represented in ASCII IR as double, convert.
+        //if (!isDouble) apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
+        //apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
 
- 	char tmpstr[256];
- 	tmpstr[0] = '0';
- 	tmpstr[1] = 'x';
- 	tmpstr[2] = 0;
- 	char* v = llvm::utohex_buffer(uint64_t(apf.bitcastToAPInt().getZExtValue()), Buffer+40);
- 	strcat(tmpstr, v);
- 	//std::cout << "STR: " << tmpstr << "  v: " << v <<  std::endl;
- 	return mk_string(_sc, tmpstr);
+        char tmpstr[256];
+        tmpstr[0] = '0';
+        tmpstr[1] = 'x';
+        tmpstr[2] = 0;
+        char* v = llvm::utohex_buffer(uint64_t(apf.bitcastToAPInt().getZExtValue()), Buffer+40);
+        strcat(tmpstr, v);
+        //std::cout << "STR: " << tmpstr << "  v: " << v <<  std::endl;
+        return mk_string(Scheme, tmpstr);
      }
 
 
-    pointer SchemeFFI::llvm_count_set(scheme* _sc, pointer args)
+    pointer llvm_count_set(scheme* Scheme, pointer Args)
     {
-        EXTLLVM::LLVM_COUNT = ivalue(pair_car(args));
-	return mk_integer(_sc, EXTLLVM::LLVM_COUNT);
+        EXTLLVM::LLVM_COUNT = ivalue(pair_car(Args));
+        return mk_integer(Scheme, EXTLLVM::LLVM_COUNT);
     }
 
 
-    pointer SchemeFFI::llvm_count_inc(scheme* _sc, pointer args)
+    pointer llvm_count_inc(scheme* Scheme, pointer Args)
     {
-	EXTLLVM::LLVM_COUNT++;
-	return mk_integer(_sc, EXTLLVM::LLVM_COUNT);
+        EXTLLVM::LLVM_COUNT++;
+        return mk_integer(Scheme, EXTLLVM::LLVM_COUNT);
     }
 
-    pointer SchemeFFI::llvm_count(scheme* _sc, pointer args)
+    pointer llvm_count(scheme* Scheme, pointer Args)
     {
-	return mk_integer(_sc, EXTLLVM::LLVM_COUNT);
+        return mk_integer(Scheme, EXTLLVM::LLVM_COUNT);
     }
 
-    pointer SchemeFFI::printLLVMModule(scheme* _sc, pointer args)
+    pointer printLLVMModule(scheme* Scheme, pointer Args)
     {
-	llvm::Module* M = EXTLLVM::I()->M;
-	std::string str;
-	llvm::raw_string_ostream ss(str);
+        llvm::Module* M = EXTLLVM::I()->M;
+        std::string str;
+        llvm::raw_string_ostream ss(str);
 
-	if(list_length(_sc, args) > 0) {
-    llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(args)));
-    //llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(args))));
-	    if(val == NULL) {
-		std::cerr << "No such value found in LLVM Module" << std::endl;
-		return _sc->F;
-	    }
-	    ss << *val;
-	    printf("At address: %p\n%s\n",val,str.c_str());
-	} else {
-	    ss << *M;
-	}
+        if(list_length(Scheme, Args) > 0) {
+            const llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(Args)));
+    //llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(Args))));
+            if(val == NULL) {
+                std::cerr << "No such value found in LLVM Module" << std::endl;
+                return Scheme->F;
+            }
+            ss << *val;
+            printf("At address: %p\n%s\n",val,str.c_str());
+        } else {
+            ss << *M;
+        }
 
-	printf("%s",str.c_str());
-	return _sc->T;
+        printf("%s",str.c_str());
+        return Scheme->T;
     }
 
-pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
+pointer printLLVMFunction(scheme* Scheme, pointer Args)
 {
-  //llvm::Module* M = EXTLLVM::I()->M;
-  //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(args)));
-	std::string str;
-	llvm::raw_string_ostream ss(str);
-	ss << *func;
-	printf("%s",str.c_str());
-	return _sc->T;
+  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
+        std::string str;
+        llvm::raw_string_ostream ss(str);
+        ss << *func;
+        printf("%s",str.c_str());
+        return Scheme->T;
 }
 
-    pointer SchemeFFI::symbol_pointer(scheme* _sc, pointer args)
+    pointer symbol_pointer(scheme* Scheme, pointer Args)
     {
-	void* library = cptr_value(pair_car(args));
-	char* symname = string_value(pair_cadr(args));
+        void* library = cptr_value(pair_car(Args));
+        char* symname = string_value(pair_cadr(Args));
 
 #ifdef _WIN32
         void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
 #else
-	void* ptr = dlsym(library, symname);
+        void* ptr = dlsym(library, symname);
 #endif
-	if(!ptr) {
-	    return _sc->F;
-	}
-	return mk_cptr(_sc,ptr);
+        if(!ptr) {
+            return Scheme->F;
+        }
+        return mk_cptr(Scheme,ptr);
     }
 
-  pointer SchemeFFI::bind_symbol(scheme* _sc, pointer args)
+  pointer bind_symbol(scheme* Scheme, pointer Args)
   {
-    void* library = cptr_value(pair_car(args));
-    char* symname = string_value(pair_cadr(args));
+    void* library = cptr_value(pair_car(Args));
+    char* symname = string_value(pair_cadr(Args));
 
     llvm::Module* M = EXTLLVM::I()->M;
     llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
@@ -2652,17 +2583,17 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 #endif
     if(ptr) {
       EE->updateGlobalMapping(symname, (uint64_t)ptr);
-      return _sc->T;
+      return Scheme->T;
     }else{
       // printf("Could not find symbol named %s\n",symname);
-      return _sc->F;
+      return Scheme->F;
     }
   }
 
-  pointer SchemeFFI::update_mapping(scheme* _sc, pointer args)
+  pointer update_mapping(scheme* Scheme, pointer Args)
   {
-    char* symname = string_value(pair_car(args));
-    void* ptr = cptr_value(pair_cadr(args));
+    char* symname = string_value(pair_car(Args));
+    void* ptr = cptr_value(pair_cadr(Args));
 
     llvm::Module* M = EXTLLVM::I()->M;
     llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
@@ -2671,74 +2602,72 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 
     // returns previous value of the mapping, or NULL if not set
     uint64_t oldval = EE->updateGlobalMapping(symname, (uint64_t)ptr);
-    return mk_cptr(_sc, (void*)oldval);
+    return mk_cptr(Scheme, (void*)oldval);
   }
 
     // For simple preprocessor alias's
-pointer SchemeFFI::add_llvm_alias(scheme* _sc, pointer args)
+pointer add_llvm_alias(scheme* Scheme, pointer Args)
 {
-	char* name = string_value(pair_car(args));
-	char* type = string_value(pair_cadr(args));
-  LLVM_ALIAS_TABLE[std::string(name)] = std::string(type);
-	return _sc->T;
+    LLVM_ALIAS_TABLE[string_value(pair_car(Args))] = string_value(pair_cadr(Args));
+    return Scheme->T;
 }
 
-pointer SchemeFFI::get_llvm_alias(scheme* _sc, pointer args)
+pointer get_llvm_alias(scheme* Scheme, pointer Args)
 {
-	char* name = string_value(pair_car(args));
-  auto iter(LLVM_ALIAS_TABLE.find(std::string(name)));
-	if (iter != LLVM_ALIAS_TABLE.end()) {
-    return mk_string(_sc, iter->second.c_str());
-  }
-  return _sc->F;
+    char* name = string_value(pair_car(Args));
+    auto iter(LLVM_ALIAS_TABLE.find(std::string(string_value(pair_car(Args)))));
+    if (iter != LLVM_ALIAS_TABLE.end()) {
+        return mk_string(Scheme, iter->second.c_str());
+    }
+    return Scheme->F;
 }
 
-pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
+pointer get_named_type(scheme* Scheme, pointer Args)
 {
-	char* n = string_value(pair_car(args));
-	char nk[256];
-	char* name = nk;
-	strcpy(name,n);
-	if (name[0] == '%') name = name+1;
+        char* n = string_value(pair_car(Args));
+        char nk[256];
+        char* name = nk;
+        strcpy(name,n);
+        if (name[0] == '%') name = name+1;
 
-	int ptrdepth = 0;
-	while(name[strlen(name)-1] == '*') {
-	  name[strlen(name)-1]='\0';
+        int ptrdepth = 0;
+        while(name[strlen(name)-1] == '*') {
+          name[strlen(name)-1]='\0';
     ptrdepth++;
-	}
+        }
 
-	//llvm::Module* M = EXTLLVM::I()->M;
-	//const llvm::Type* tt = M->getTypeByName(name);
+        //llvm::Module* M = EXTLLVM::I()->M;
+        //const llvm::Type* tt = M->getTypeByName(name);
   const llvm::Type* tt = extemp::EXTLLVM::I()->getNamedType(name);
 
-	if(tt) {
-	  //return mk_string(_sc,M->getTypeName(tt).c_str());
-	  std::string typestr;
-	  llvm::raw_string_ostream ss(typestr);
-	  tt->print(ss);
+        if(tt) {
+          //return mk_string(Scheme,M->getTypeName(tt).c_str());
+          std::string typestr;
+          llvm::raw_string_ostream ss(typestr);
+          tt->print(ss);
 
 
-	  const char* tmp_name = ss.str().c_str();
-	  if(tt->isStructTy()) {
+          const char* tmp_name = ss.str().c_str();
+          if(tt->isStructTy()) {
       const char* eq_type_string = " = type ";
-	    rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
-	    tmp_name = tmp_str_b;
-	  }
+            rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
+            tmp_name = tmp_str_b;
+          }
 
-	  //add back any requried '*'s
-	  if(ptrdepth>0) {
-	    char tmpstr[256];
-	    memset(tmpstr,0,256);
+          //add back any requried '*'s
+          if(ptrdepth>0) {
+            char tmpstr[256];
+            memset(tmpstr,0,256);
       strcpy(tmpstr,tmp_name);
-	    for( ;ptrdepth>0;ptrdepth--) {
-	      tmpstr[strlen(tmpstr)]='*';
-	    }
-	    tmp_name = tmpstr;
-	  }
-	  return mk_string(_sc,tmp_name);
-	} else {
-	  return _sc->NIL;
-	}
+            for( ;ptrdepth>0;ptrdepth--) {
+              tmpstr[strlen(tmpstr)]='*';
+            }
+            tmp_name = tmpstr;
+          }
+          return mk_string(Scheme,tmp_name);
+        } else {
+          return Scheme->NIL;
+        }
 }
 
     ////////////////////////////////////////////////////////////
@@ -2747,97 +2676,99 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
     //
     ////////////////////////////////////////////////////////////
 
-    pointer SchemeFFI::setDSPClosure(scheme* _sc, pointer args)
+    pointer setDSPClosure(scheme* Scheme, pointer Args)
     {
-	AudioDevice::I()->setDSPClosure(cptr_value(pair_car(args)));
-	return _sc->T;
+        AudioDevice::I()->setDSPClosure(cptr_value(pair_car(Args)));
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::setDSPMTClosure(scheme* _sc, pointer args)
+    pointer setDSPMTClosure(scheme* Scheme, pointer Args)
     {
-      AudioDevice::I()->setDSPMTClosure(cptr_value(pair_car(args)),ivalue(pair_cadr(args)));
-	return _sc->T;
+      AudioDevice::I()->setDSPMTClosure(cptr_value(pair_car(Args)),ivalue(pair_cadr(Args)));
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::setDSPWrapper(scheme* _sc, pointer args)
+    pointer setDSPWrapper(scheme* Scheme, pointer Args)
     {
-	AudioDevice::I()->setDSPWrapper((dsp_f_ptr)cptr_value(pair_car(args)));
-	return _sc->T;
+        AudioDevice::I()->setDSPWrapper((dsp_f_ptr)cptr_value(pair_car(Args)));
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::setDSPWrapperArray(scheme* _sc, pointer args)
+    pointer setDSPWrapperArray(scheme* Scheme, pointer Args)
     {
-	AudioDevice::I()->setDSPWrapperArray((dsp_f_ptr_array)cptr_value(pair_car(args)));
-	return _sc->T;
+        AudioDevice::I()->setDSPWrapperArray((dsp_f_ptr_array)cptr_value(pair_car(Args)));
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::setDSPMTWrapper(scheme* _sc, pointer args)
+    pointer setDSPMTWrapper(scheme* Scheme, pointer Args)
     {
-      AudioDevice::I()->setDSPMTWrapper((dsp_f_ptr_sum)cptr_value(pair_car(args)),
-                                         (dsp_f_ptr)cptr_value(pair_cadr(args)));
-      return _sc->T;
+      AudioDevice::I()->setDSPMTWrapper((dsp_f_ptr_sum)cptr_value(pair_car(Args)),
+                                         (dsp_f_ptr)cptr_value(pair_cadr(Args)));
+      return Scheme->T;
     }
 
-    pointer SchemeFFI::setDSPMTWrapperArray(scheme* _sc, pointer args)
+    pointer setDSPMTWrapperArray(scheme* Scheme, pointer Args)
     {
-      AudioDevice::I()->setDSPMTWrapperArray((dsp_f_ptr_sum_array)cptr_value(pair_car(args)),
-                                             (dsp_f_ptr_array)cptr_value(pair_cadr(args)));
-	return _sc->T;
+      AudioDevice::I()->setDSPMTWrapperArray((dsp_f_ptr_sum_array)cptr_value(pair_car(Args)),
+                                             (dsp_f_ptr_array)cptr_value(pair_cadr(Args)));
+        return Scheme->T;
     }
 
-    pointer SchemeFFI::initMTAudio(scheme* _sc, pointer args)
+    pointer initMTAudio(scheme* Scheme, pointer Args)
     {
-      pointer val = pair_cadr(args);
-      bool zerolatency = (val == _sc->T) ? true : false;
-      AudioDevice::I()->initMTAudio(ivalue(pair_car(args)),zerolatency);
-      return _sc->T;
+      pointer val = pair_cadr(Args);
+      bool zerolatency = (val == Scheme->T) ? true : false;
+      AudioDevice::I()->initMTAudio(ivalue(pair_car(Args)),zerolatency);
+      return Scheme->T;
     }
 
-    pointer SchemeFFI::initMTAudioBuf(scheme* _sc, pointer args)
+    pointer initMTAudioBuf(scheme* Scheme, pointer Args)
     {
-      pointer val = pair_cadr(args);
-      bool zerolatency = (val == _sc->T) ? true : false;
-      AudioDevice::I()->initMTAudioBuf(ivalue(pair_car(args)),zerolatency);
-      return _sc->T;
+      pointer val = pair_cadr(Args);
+      bool zerolatency = (val == Scheme->T) ? true : false;
+      AudioDevice::I()->initMTAudioBuf(ivalue(pair_car(Args)),zerolatency);
+      return Scheme->T;
     }
 
-    pointer SchemeFFI::getAudioLoad(scheme* _sc, pointer args)
+    pointer getAudioLoad(scheme* Scheme, pointer Args)
     {
       double load = AudioDevice::getCPULoad();
-      return mk_real(_sc,load);
+      return mk_real(Scheme,load);
     }
 
-  pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
+  pointer getClockTime(scheme* Scheme, pointer Args)
   {
-    return mk_real(_sc, getRealTime()+UNIV::CLOCK_OFFSET);
+    return mk_real(Scheme, getRealTime()+UNIV::CLOCK_OFFSET);
   }
 
-  pointer SchemeFFI::adjustClockOffset(scheme* _sc, pointer args)
+  pointer adjustClockOffset(scheme* Scheme, pointer Args)
   {
-    UNIV::CLOCK_OFFSET = rvalue(pair_car(args)) + UNIV::CLOCK_OFFSET;
-    return mk_real(_sc,UNIV::CLOCK_OFFSET);
+    UNIV::CLOCK_OFFSET = rvalue(pair_car(Args)) + UNIV::CLOCK_OFFSET;
+    return mk_real(Scheme,UNIV::CLOCK_OFFSET);
   }
 
-  pointer SchemeFFI::setClockOffset(scheme* _sc, pointer args)
+  pointer setClockOffset(scheme* Scheme, pointer Args)
   {
-    UNIV::CLOCK_OFFSET = rvalue(pair_car(args));
-    return pair_car(args);
+    UNIV::CLOCK_OFFSET = rvalue(pair_car(Args));
+    return pair_car(Args);
   }
 
-  pointer SchemeFFI::getClockOffset(scheme* _sc, pointer args)
+  pointer getClockOffset(scheme* Scheme, pointer Args)
   {
-    return mk_real(_sc, UNIV::CLOCK_OFFSET);
+    return mk_real(Scheme, UNIV::CLOCK_OFFSET);
   }
 
-  pointer SchemeFFI::lastSampleBlockClock(scheme* _sc, pointer args)
+  pointer lastSampleBlockClock(scheme* Scheme, pointer Args)
   {
-    pointer p1 = mk_integer(_sc,UNIV::TIME);
-    EnvInjector(_sc, p1);
-    pointer p2 = mk_real(_sc,AudioDevice::REALTIME + UNIV::CLOCK_OFFSET);
-    EnvInjector(_sc, p2);
-    pointer p3 = cons(_sc, p1, p2);
+    pointer p1 = mk_integer(Scheme,UNIV::TIME);
+    EnvInjector(Scheme, p1);
+    pointer p2 = mk_real(Scheme,AudioDevice::REALTIME + UNIV::CLOCK_OFFSET);
+    EnvInjector(Scheme, p2);
+    pointer p3 = cons(Scheme, p1, p2);
     return p3;
   }
+
+}
 
 } // end namespace
 

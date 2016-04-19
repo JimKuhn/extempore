@@ -1,3 +1,5 @@
+#include <iostream>
+
 /*
  * Copyright (c) 2011, Andrew Sorensen
  *
@@ -42,7 +44,9 @@
 #include <memory>
  //#include <ucontext.h>
 
+#include "EXTMutex.h"
 #include "BranchPrediction.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/IR/Module.h"
 
 struct zone_hooks_t {
@@ -208,13 +212,6 @@ inline llvm_zone_t* llvm_peek_zone_stack()
     return z;
 }
 
-inline llvm_zone_t* llvm_zone_callback_setup()
-{
-    auto zone(llvm_threads_get_callback_zone());
-    llvm_push_zone_stack(zone);
-    return llvm_zone_reset(zone);
-}
-
 bool llvm_ptr_in_zone(llvm_zone_t*, void*);
 bool llvm_ptr_in_current_zone(void*);
 
@@ -303,88 +300,119 @@ static inline uint64_t string_hash(unsigned char* str)
 ///////////////////////////////////////////////////
 
 namespace llvm {
-  class Module;
-  class GlobalVariable;
-  class GlobalValue;
-  class Function;
-  class StructType;
-  class ModuleProvider;
-  class SectionMemoryManager;
-  class ExecutionEngine;
 
-  namespace legacy {
-    class PassManager;
-  }
+class Module;
+class GlobalVariable;
+class GlobalValue;
+class Function;
+class StructType;
+class ModuleProvider;
+class SectionMemoryManager;
+class ExecutionEngine;
+
+namespace legacy {
+
+class PassManager;
+
+}
+
 } // end llvm namespace
 
 namespace extemp {
 
-    class EXTLLVM {
-    public:
-	EXTLLVM();
-	~EXTLLVM();
-	static EXTLLVM* I() { return &SINGLETON; }
+class EXTLLVM {
+public:
+    EXTLLVM();
 
-	void initLLVM();
+    static EXTLLVM* I() { return &SINGLETON; }
 
-  llvm::Module* activeModule();
-  llvm::Function* getFunction(const char* name) {
-    for (auto& m : Ms) {
-      auto f(m->getFunction(name));
-      if (f) {
-        return f;
-      }
+    void initLLVM();
+
+    llvm::Module* activeModule();
+    llvm::Function* getFunction(const char* name, bool Wait = true) {
+        extemp::EXTMutex::ScopedLock lock(m_modulesMutex);
+        bool again;
+        do {
+            again = (m_pendingCompiles > 0);
+            for (auto& m : Ms) {
+                auto f(m->getFunction(name));
+                if (f) {
+                  return f;
+                }
+            }
+        } while (again && Wait);
+        return nullptr;
     }
-    return nullptr;
-  }
-  llvm::GlobalVariable* getGlobalVariable(const char* name) {
-    for (auto& m : Ms) {
-      auto gv(m->getGlobalVariable(name));
-      if (gv) {
-        return gv;
-      }
+    llvm::GlobalVariable* getGlobalVariable(const char* name) {
+        extemp::EXTMutex::ScopedLock lock(m_modulesMutex);
+        bool again;
+        do {
+            again = (m_pendingCompiles > 0);
+            for (auto& m : Ms) {
+                auto gv(m->getGlobalVariable(name));
+                if (gv) {
+                    return gv;
+                }
+            }
+        } while (again);
+        return nullptr;
     }
-    return nullptr;
-  }
-  llvm::GlobalValue* getGlobalValue(const char* name) {
-    for (auto& m : Ms) {
-      auto gv(m->getNamedValue(name));
-      if (gv) {
-        return gv;
-      }
+    const llvm::GlobalValue* getGlobalValue(const char* name) {
+        // std::cout << name << ": " << EE->getGlobalValueAddress(name) << " = " <<
+        //         EE->getGlobalValueAtAddress(reinterpret_cast<void*>(EE->getGlobalValueAddress(name))) << std::endl;
+        // std::cout << "  " << EE->FindGlobalVariableNamed(name) << std::endl;
+
+        extemp::EXTMutex::ScopedLock lock(m_modulesMutex);
+        bool again;
+        do {
+            again = (m_pendingCompiles > 0);
+            for (auto& m : Ms) {
+                auto gv(m->getNamedValue(name));
+                if (gv) {
+                    return gv;
+                }
+            }
+        } while (again);
+        return nullptr;
+        // return EE->getGlobalValueAtAddress(reinterpret_cast<void*>(EE->getGlobalValueAddress(name)));
     }
-    return nullptr;
-  }
-  llvm::StructType* getNamedType(const char* name) {
-    for (auto& m : Ms) {
-      auto t(m->getTypeByName(name));
-      if (t) {
-        return t;
-      }
+    llvm::StructType* getNamedType(const char* name) {
+        extemp::EXTMutex::ScopedLock lock(m_modulesMutex);
+        for (auto& m : Ms) {
+            auto t(m->getTypeByName(name));
+            if (t) {
+                return t;
+            }
+        }
+        return nullptr;
     }
-    return nullptr;
-  }
-  uint64_t getSymbolAddress(const std::string&);
-  void addModule(llvm::Module* m) { Ms.push_back(m); }
-  std::vector<llvm::Module*>& getModules() { return Ms; }
+    uint64_t getSymbolAddress(const std::string&);
+    void addModule(llvm::Module* m) {
+        extemp::EXTMutex::ScopedLock lock(m_modulesMutex);
+        Ms.push_back(m);
+    }
+    std::vector<llvm::Module*>& getModules() { return Ms; } // not going to protect these!!!
 
-	static int64_t LLVM_COUNT;
-	static bool OPTIMIZE_COMPILES;
-	static bool VERIFY_COMPILES;
-  static bool FAST_COMPILES;
+    static int64_t LLVM_COUNT;
+    static bool OPTIMIZE_COMPILES;
+    static bool VERIFY_COMPILES;
+    static bool FAST_COMPILES;
+    static bool BACKGROUND_COMPILES;
 
 
-	llvm::Module* M;
-	llvm::ModuleProvider* MP;
-	llvm::ExecutionEngine* EE;
-  llvm::legacy::PassManager* PM;
-  llvm::legacy::PassManager* PM_NO;
-  std::unique_ptr<llvm::SectionMemoryManager> MM;
-
-    private:
-  std::vector<llvm::Module*> Ms;
-	static EXTLLVM SINGLETON;
-    };
+    llvm::Module* M;
+    llvm::ModuleProvider* MP;
+    llvm::ExecutionEngine* EE;
+    llvm::legacy::PassManager* PM;
+    llvm::legacy::PassManager* PM_NO;
+    std::unique_ptr<llvm::SectionMemoryManager> MM;
+private:
+    std::vector<llvm::Module*> Ms;
+    static EXTLLVM SINGLETON;
+public: // hack
+    extemp::EXTMutex m_modulesMutex;
+    std::atomic_uint m_pendingCompiles;
+};
 
 } // end extemp namespace
 
