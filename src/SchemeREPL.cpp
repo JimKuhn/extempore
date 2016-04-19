@@ -61,8 +61,8 @@ namespace extemp {
 
 std::unordered_map<std::string, SchemeREPL*> SchemeREPL::sm_repls;
 
-SchemeREPL::SchemeREPL(const std::string& Title): m_title(Title), m_serverSocket(0), m_connected(false),
-        m_active(true), m_writeLock("repl_lock")
+SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process): m_title(Title), m_process(Process),
+        m_serverSocket(0), m_connected(false), m_active(true), m_writeLock("repl_lock")
 {
     ascii_default();
     printf("\nStarting ");

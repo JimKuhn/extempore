@@ -51,10 +51,6 @@ void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);
 
 pointer scmAddForeignFunc(scheme* sc, pointer args);
 
-pointer getNameOfCurrentProcess(scheme* _sc, pointer args);
-pointer ipcSetPriority(scheme* _sc, pointer args);
-pointer ipcGetPriority(scheme* _sc, pointer args);
-
 // misc scheme ties
 pointer assocstrcmp(scheme* _sc, pointer args);
 pointer assocstrcmpall(scheme* _sc, pointer args);

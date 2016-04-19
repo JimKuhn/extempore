@@ -171,7 +171,8 @@ static char* tmp_str_a = reinterpret_cast<char*>(malloc(1024));
 static char* tmp_str_b = (char*) malloc(4096);
 static std::unordered_map<std::string,std::string> LLVM_ALIAS_TABLE;
 
-#include "SchemeFFI.inc"
+#include "ffi/utility.inc"
+#include "ffi/ipc.inc"
 
 void initSchemeFFI(scheme* sc)
 {
@@ -191,19 +192,8 @@ void initSchemeFFI(scheme* sc)
         const char*  name;
         foreign_func func;
     } funcTable[] = {
-        {     "ascii-print-color",              &asciiColor                   },
-        {     "emit",                           &emit                         },
-        {     "quit",                           &exit_extempore               },
-        //IPC stuff
-        {     "ipc:new",                        &newSchemeProcess             },
-        {     "ipc:connect",                    &connectToProcess             },
-        {     "ipc:call-async",                 &ipcCall                      },
-        {     "ipc:define",                     &ipcDefine                    },
-        {     "ipc:eval-string",                &ipcEval                      },
-        {     "ipc:load",                       &ipcLoad                      },
-        {     "ipc:set-priority",               &ipcSetPriority               },
-        {     "ipc:get-priority",               &ipcGetPriority               },
-        {     "ipc:get-process-name",           &getNameOfCurrentProcess      },
+        UTILITY_DEFS,
+        IPC_DEFS,
         // misc scheme ties
         {     "assoc-strcmp",                   &assocstrcmp                  },
         {     "assoc-strcmp-all",               &assocstrcmpall               },
@@ -629,47 +619,6 @@ void initSchemeFFI(scheme* sc)
                 return Scheme->T;
     }
 
-
-
-
-  pointer ipcSetPriority(scheme* Scheme, pointer Args)
-  {
-    std::string process(string_value(pair_car(Args)));
-    SchemeREPL* repl = SchemeREPL::I(process);
-    if(!repl) {
-      std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
-      return Scheme->F;
-    }
-    int priority = ivalue(pair_cadr(Args));
-    SchemeProcess::I(process)->setPriority(priority);
-    return Scheme->T;
-  }
-
-  pointer ipcGetPriority(scheme* Scheme, pointer Args)
-  {
-    std::string process(string_value(pair_car(Args)));
-    SchemeREPL* repl = SchemeREPL::I(process);
-    if(!repl) {
-      std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
-      return Scheme->F;
-    }
-    int priority = SchemeProcess::I(process)->getPriority();
-    return mk_integer(Scheme, priority);
-  }
-
-    pointer getNameOfCurrentProcess(scheme* Scheme, pointer Args)
-    {
-            const char* name = Scheme->m_process->getName().c_str();
-                return mk_string(Scheme,name);
-        //if(args == Scheme->NIL) return mk_string(Scheme, name);
-        //else { printf("Error getting name of current process\n"); return Scheme->F; }
-        /*
-          NSDictionary* dict = (NSDictionary*) objc_value(pair_car(Args));
-          NSString* alias_name = [dict objectForKey:[NSString stringWithCString:name]];
-          if(alias_name == NULL) return mk_string(Scheme, name);
-          return mk_string(Scheme, [alias_name UTF8String]);
-        */
-    }
 
     pointer assocstrcmp(scheme* Scheme, pointer Args)
     {

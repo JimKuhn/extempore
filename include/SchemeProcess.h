@@ -113,8 +113,7 @@ private:
     char            m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH];
 
     static const char*                           sm_banner;
-    static __thread SchemeProcess*           sm_current;
-    static std::map<std::string, SchemeProcess*> sm_nameMap;
+    static __thread SchemeProcess*               sm_current;
 private:
     void schemeCallback(TaskI* Task) {
         addCallback(Task, SchemeTask::Type::SCHEME_CALLBACK);
@@ -174,13 +173,6 @@ public:
     bool start();
 
     static SchemeProcess* I() { return sm_current; }
-    static SchemeProcess* I(const std::string& Name) {
-        auto iter(sm_nameMap.find(Name));
-        if (unlikely(iter == sm_nameMap.end())) {
-            throw std::runtime_error("Error: SchemeProcess does not exist");
-        }
-        return iter->second;
-    }
 };
 
 class SchemeObj

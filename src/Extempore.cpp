@@ -281,11 +281,11 @@ int main(int argc, char** argv)
     std::cout << std::endl;
     ascii_default();
 #ifdef _WIN32
-	// on Windows with MCJIT we need to add "-elf" to the target triple, see
-	// http://lists.cs.uiuc.edu/pipermail/llvmdev/2013-December/068407.html
-	if (extemp::UNIV::ARCH.empty()) {
-		extemp::UNIV::ARCH.push_back(llvm::sys::getProcessTriple() + "-elf");
-	}
+        // on Windows with MCJIT we need to add "-elf" to the target triple, see
+        // http://lists.cs.uiuc.edu/pipermail/llvmdev/2013-December/068407.html
+        if (extemp::UNIV::ARCH.empty()) {
+                extemp::UNIV::ARCH.push_back(llvm::sys::getProcessTriple() + "-elf");
+        }
 #endif
 
     extemp::TaskScheduler::I()->start();
@@ -319,11 +319,11 @@ int main(int argc, char** argv)
     bool startup_ok = true;
     extemp::SchemeProcess* utility = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
     startup_ok &= utility->start();
-    extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
-    utility_repl->connectToProcessAtHostname(host,utility_port);
-       primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
-   startup_ok &= primary->start();
-   if (!startup_ok) {
+    extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name, utility);
+    utility_repl->connectToProcessAtHostname(host, utility_port);
+    primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
+    startup_ok &= primary->start();
+    if (!startup_ok) {
         ascii_error();
     printf("Error");
         ascii_default();
@@ -331,7 +331,7 @@ int main(int argc, char** argv)
     fflush(NULL);
     exit(1);
    }
-    extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name);
+    extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
     primary_repl->connectToProcessAtHostname(host, primary_port);
 #ifdef __APPLE__
     [[NSApplication sharedApplication] run];

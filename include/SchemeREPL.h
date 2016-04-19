@@ -44,6 +44,8 @@
 
 namespace extemp {
 
+class SchemeProcess;
+
 class SchemeREPL {
 private:
     typedef std::unordered_map<std::string, SchemeREPL*> repls_type;
@@ -51,6 +53,7 @@ private:
     static const int BUFLENGTH = 1024;
 private:
     std::string                   m_title;
+    SchemeProcess*                m_process;
 #ifdef EXT_BOOST
     boost::asio::ip::tcp::socket* m_serverSocket;
     boost::asio::io_service*      m_serverIoService;
@@ -64,12 +67,13 @@ private:
 
     static repls_type sm_repls;
 public:
-	SchemeREPL(const std::string& Title);
+	SchemeREPL(const std::string& Title, SchemeProcess* Process);
 
     const std::string& getTitle() { return m_title; }
     void writeString(std::string&&); // ick (modifying)
     bool connectToProcessAtHostname(const std::string&, int);
     void closeREPL();
+    SchemeProcess* getProcess() { return m_process; }
 
     static SchemeREPL* I(const std::string& name)
     {
