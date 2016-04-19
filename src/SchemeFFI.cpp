@@ -1625,6 +1625,9 @@ static std::string SanitizeType(llvm::Type* Type)
 }
 
 static bool sEmitCode = false;
+static std::regex sGlobalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize);
+static std::regex sDefineSymRegex("define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize | std::regex::ECMAScript);
+
 static llvm::Module* jitCompile(const std::string& String)
 {
     // Create some module to put our function into it.
@@ -1651,15 +1654,14 @@ static llvm::Module* jitCompile(const std::string& String)
             inString << inStream.rdbuf();
             sInlineString = inString.str();
         }
-        std::regex globalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)");
-        std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), globalSymRegex, 1),
+        std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), sGlobalSymRegex, 1),
                 std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
         {
             std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
             std::stringstream inString;
             inString << inStream.rdbuf();
             std::string tString = inString.str();
-            std::copy(std::sregex_token_iterator(tString.begin(), tString.end(), globalSymRegex, 1),
+            std::copy(std::sregex_token_iterator(tString.begin(), tString.end(), sGlobalSymRegex, 1),
                     std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
         }
     }
@@ -1694,15 +1696,13 @@ std::cout << pa.getMessage().str() << std::endl;
         LLVMContextDispose(context);
     }
     if (likely(!built)) {
-        std::regex globalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::ECMAScript);
         std::vector<std::string> symbols;
-        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), globalSymRegex, 1),
+        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sGlobalSymRegex, 1),
                 std::sregex_token_iterator(), std::inserter(symbols, symbols.begin()));
         std::sort(symbols.begin(), symbols.end());
         auto end(std::unique(symbols.begin(), symbols.end()));
         std::unordered_set<std::string> ignoreSyms;
-        globalSymRegex = std::regex("define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::ECMAScript);
-        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), globalSymRegex, 1),
+        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sDefineSymRegex, 1),
                 std::sregex_token_iterator(), std::inserter(ignoreSyms, ignoreSyms.begin()));
         std::string declarations;
         llvm::raw_string_ostream dstream(declarations);
