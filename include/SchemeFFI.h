@@ -49,13 +49,6 @@ void addGlobal(scheme* sc, char* symbol_name, pointer arg);
 void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func);
 void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);
 
-// regex stuff
-pointer regex_match(scheme* _sc, pointer args);
-pointer regex_matched(scheme* _sc, pointer args);
-pointer regex_match_all(scheme* _sc, pointer args);
-pointer regex_split(scheme* _sc, pointer args);
-pointer regex_replace(scheme* _sc, pointer args);
-
 // memory zone stuff
 void freeWithDelay(TaskI* task);
 void destroyMallocZoneWithDelay(TaskI* task);

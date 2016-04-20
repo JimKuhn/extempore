@@ -160,6 +160,7 @@ static std::unordered_map<std::string,std::string> LLVM_ALIAS_TABLE;
 #include "ffi/sys_dsp.inc"
 #include "ffi/sys_zone.inc"
 #include "ffi/misc.inc"
+#include "ffi/regex.inc"
 
 void initSchemeFFI(scheme* sc)
 {
@@ -187,12 +188,7 @@ void initSchemeFFI(scheme* sc)
         SYS_DSP_DEFS,
         SYS_ZONE_DEFS,
         MISC_DEFS,
-        // regex stuff
-        {     "regex:match?",                   &regex_match                  },
-        {     "regex:matched",                  &regex_matched                },
-        {     "regex:match-all",                &regex_match_all              },
-        {     "regex:split",                    &regex_split                  },
-        {     "regex:replace",                  &regex_replace                },
+        REGEX_DEFS,
         // llvm stuff
         {     "llvm:optimize",                  &optimizeCompiles             },
         {     "llvm:fast-compile",              &fastCompiles                 },
@@ -271,23 +267,6 @@ void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func)
         scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_cptr(sc, ptr));
     }
 
-    ///////////////////////////////////////////////////////
-    //
-    // MISC STUFF
-    //
-    //////////////////////////////////////////////////////
-
-
-
-
-
-
-
-
-
-
-
-
     pointer impcirGetType(scheme* Scheme, pointer Args)
     {
                 std::string key(string_value(pair_car(Args)));
@@ -315,265 +294,12 @@ void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func)
                 return Scheme->T;
     }
 
-
-
-
-
-
-
-
-
-
     ///////////////////////////////////////////////////////
     //
     // REGEX STUFF
     //
     //////////////////////////////////////////////////////
 
-    pointer regex_match(scheme* Scheme, pointer Args)
-    {
-        char* data = string_value(pair_car(Args));
-        char* pattern = string_value(pair_cadr(Args));
-
-        pcre *re;
-        const char *error;
-        int erroffset;
-
-        re = pcre_compile(      pattern, /* the pattern */
-                        0, /* default options */
-                        &error, /* for error message */
-                        &erroffset, /* for error offset */
-                        NULL); /* use default character tables */
-
-        int rc;
-        int ovector[30];
-        rc = pcre_exec( re, /* result of pcre_compile() */
-                        NULL, /* we didn’t study the pattern */
-                        data, /* the subject string */
-                        strlen(data), /* the length of the subject string */
-                        0, /* start at offset 0 in the subject */
-                        0, /* default options */
-                        ovector, /* vector of integers for substring information */
-                        30); /* number of elements (NOT size in bytes) */
-
-        return (rc>=0) ? Scheme->T : Scheme->F;
-    }
-
-    pointer regex_matched(scheme* Scheme, pointer Args)
-    {
-        char* data = string_value(pair_car(Args));
-        char* pattern = string_value(pair_cadr(Args));
-
-        pcre *re;
-        const char *error;
-        int erroffset;
-        re = pcre_compile(      pattern, /* the pattern */
-                                0, /* default options */
-                                &error, /* for error message */
-                                &erroffset, /* for error offset */
-                                NULL); /* use default character tables */
-
-        int rc;
-        int ovector[60];
-        rc = pcre_exec( re, /* result of pcre_compile() */
-                        NULL, /* we didn’t study the pattern */
-                        data, /* the subject string */
-                        strlen(data), /* the length of the subject string */
-                        0, /* start at offset 0 in the subject */
-                        0, /* default options */
-                        ovector, /* vector of integers for substring information */
-                        60); /* number of elements (NOT size in bytes) */
-
-        // make pointer to hold return results
-        pointer list = Scheme->NIL;
-
-        // if failed to match return empty list
-        if(rc<0) return list;
-
-        for(int i=0, p=0;i<rc;i++)
-        {
-            //std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
-            p=i*2;
-            if(ovector[p]==-1) {
-                EnvInjector injector(Scheme, list);
-                pointer tlist = cons(Scheme,mk_string(Scheme,""),list);
-                list = tlist;
-            }else{
-                int range = ovector[p+1] - ovector[p];
-                char* b = (char*) alloca(range+1);
-                b[range] = '\0';
-                char* a = data+ovector[p];
-                char* substring = strncpy(b, a, range);
-                EnvInjector injector(Scheme, list);
-                pointer tlist = cons(Scheme,mk_string(Scheme,substring),list);
-                list = tlist;
-            }
-        }
-
-        return reverse(Scheme,list);
-    }
-
-    pointer regex_match_all(scheme* Scheme, pointer Args)
-    {
-        char* data = string_value(pair_car(Args));
-        char* pattern = string_value(pair_cadr(Args));
-
-        pcre *re;
-        const char *error;
-        int erroffset;
-        re = pcre_compile(      pattern, /* the pattern */
-                                0, /* default options */
-                                &error, /* for error message */
-                                &erroffset, /* for error offset */
-                                NULL); /* use default character tables */
-
-        // pointer to hold return results
-        pointer list = Scheme->NIL;
-        int rc;
-        int ovector[60];
-
-        while(true) {
-            rc = pcre_exec(     re, /* result of pcre_compile() */
-                                NULL, /* we didn’t study the pattern */
-                                data, /* the subject string */
-                                strlen(data), /* the length of the subject string */
-                                0, /* start at offset 0 in the subject */
-                                0, /* default options */
-                                ovector, /* vector of integers for substring information */
-                                60); /* number of elements (NOT size in bytes) */
-
-            //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << std::endl;
-            if(rc<1) {
-                return reverse(Scheme,list);
-            }
-            int range = ovector[1] - ovector[0];
-            char* b = (char*) alloca(range+1);
-            b[range] = '\0';
-            char* a = data+ovector[0];
-            char* substring = strncpy(b, a, range);
-            EnvInjector injector(Scheme, list);
-            pointer tlist = cons(Scheme,mk_string(Scheme,substring),list);
-            list = tlist;
-            data = data+range+ovector[0];
-        }
-
-        // shouldn't ever reach here!
-        return Scheme->NIL;
-    }
-
-    pointer regex_split(scheme* Scheme, pointer Args)
-    {
-        char* data = string_value(pair_car(Args));
-        char* pattern = string_value(pair_cadr(Args));
-
-        pcre *re;
-        const char *error;
-        int erroffset;
-        re = pcre_compile(      pattern, /* the pattern */
-                                0, /* default options */
-                                &error, /* for error message */
-                                &erroffset, /* for error offset */
-                                NULL); /* use default character tables */
-
-        // pointer to hold return results
-        pointer list = Scheme->NIL;
-        int rc;
-        int ovector[60];
-
-        while(true) {
-            rc = pcre_exec(     re, /* result of pcre_compile() */
-                                NULL, /* we didn’t study the pattern */
-                                data, /* the subject string */
-                                strlen(data), /* the length of the subject string */
-                                0, /* start at offset 0 in the subject */
-                                0, /* default options */
-                                ovector, /* vector of integers for substring information */
-                                60); /* number of elements (NOT size in bytes) */
-
-            //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << std::endl;
-            if(rc<1) {
-                if(strlen(data)>0) // append remaining chars if any left
-                {
-                    list = cons(Scheme,mk_string(Scheme,data),list);
-                }
-                return reverse(Scheme,list);
-            }
-            int range = ovector[0];
-            char* b = (char*) alloca(range+1);
-            b[range] = '\0';
-            char* substring = strncpy(b, data, range);
-            EnvInjector injector(Scheme, list);
-            pointer tlist = cons(Scheme,mk_string(Scheme,substring),list);
-            list = tlist;
-            data = data+ovector[1];
-        }
-
-        // shouldn't ever reach here!
-        return Scheme->NIL;
-    }
-
-    pointer regex_replace(scheme* Scheme, pointer Args)
-    {
-        char* data = string_value(pair_car(Args));
-        char* pattern = string_value(pair_cadr(Args));
-        char* replace = string_value(pair_caddr(Args));
-
-        pcre *re;
-        const char *error;
-        int erroffset;
-        re = pcre_compile(      pattern, /* the pattern */
-                                0, /* default options */
-                                &error, /* for error message */
-                                &erroffset, /* for error offset */
-                                NULL); /* use default character tables */
-
-        int rc;
-        int ovector[60];
-
-        rc = pcre_exec( re, /* result of pcre_compile() */
-                        NULL, /* we didn’t study the pattern */
-                        data, /* the subject string */
-                        strlen(data), /* the length of the subject string */
-                        0, /* start at offset 0 in the subject */
-                        0, /* default options */
-                        ovector, /* vector of integers for substring information */
-                        60); /* number of elements (NOT size in bytes) */
-
-        // no match found return original string
-        if(rc<1) return mk_string(Scheme,data);
-
-        // ok we have a match
-        // first replace any groups in replace string (i.e. $1 $2 ...)
-        char* res = (char*) "";
-        char* sep = (char*) "$";
-        char* tmp = 0;
-        int pos,range,size = 0;
-        char* p = strtok(replace,sep);
-        do{
-            char* cc;
-            pos = strtol(p,&cc,10);
-            range = (pos>0) ? ovector[(pos*2)+1] - ovector[pos*2] : 0;
-            size = strlen(res);
-            tmp = (char*) alloca(size+range+strlen(cc)+1);
-            tmp[size+range+strlen(cc)] = '\0';
-            memcpy(tmp,res,size);
-            memcpy(tmp+size,data+ovector[pos*2],range);
-            memcpy(tmp+size+range,cc,strlen(cc));
-            res = tmp;
-            p = strtok(NULL, sep);
-        }while(p);
-
-        // now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
-        int lgth = ovector[0] + strlen(res) + strlen(data) - ovector[1] + 1;
-        range = ovector[1] - ovector[0];
-        char* result = (char*) alloca(lgth);
-        result[lgth - 1] = '\0';
-        memcpy(result,data,ovector[0]);
-        memcpy(result+ovector[0],res,strlen(res));
-        memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);
-
-        return mk_string(Scheme,result);
-    }
 
     void freeWithDelay(TaskI* task)
     {
