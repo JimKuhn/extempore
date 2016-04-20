@@ -891,7 +891,7 @@ void initSchemeFFI(scheme* sc)
         }while(p);
 
         // now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
-        int lgth = (strlen(data)-range)+strlen(res)+1;
+        int lgth = ovector[0] + strlen(res) + strlen(data) - ovector[1] + 1;
         range = ovector[1] - ovector[0];
         char* result = (char*) alloca(lgth);
         result[lgth - 1] = '\0';
@@ -1959,7 +1959,7 @@ pointer get_named_type(scheme* Scheme, pointer Args)
 
           const char* tmp_name = ss.str().c_str();
           if(tt->isStructTy()) {
-      const char* eq_type_string = " = type ";
+            const char* eq_type_string = " = type ";
             rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
             tmp_name = tmp_str_b;
           }
@@ -1967,10 +1967,12 @@ pointer get_named_type(scheme* Scheme, pointer Args)
           //add back any requried '*'s
           if(ptrdepth>0) {
             char tmpstr[256];
-      strcpy(tmpstr,tmp_name);
-            for( ;ptrdepth>0;ptrdepth--) {
-              tmpstr[strlen(tmpstr)]='*';
+            strcpy(tmpstr,tmp_name);
+            auto len(strlen(tmpstr));
+            for( ;ptrdepth>0;ptrdepth--, ++len) {
+              tmpstr[len]='*';
             }
+            tmpstr[len] = '\0';
             tmp_name = tmpstr;
           }
           return mk_string(Scheme,tmp_name);

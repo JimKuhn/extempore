@@ -435,7 +435,7 @@ bool rsplit(char* regex, char* str, char* a, char* b)
   a[range] = '\0';;
   memcpy(a, data, range);
   b[length - range2] = '\0';
-  memcpy(b, data + range2, length- range2);
+  memcpy(b, data + range2, length - range2);
   return true;
 }
 
@@ -502,10 +502,10 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
       cnt++;
         }while(p);
         // now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
-        int lgth = (strlen(data)-range)+strlen(res)+1;
+        int lgth = ovector[0] + strlen(res) + strlen(data) - ovector[1] + 1;
         range = ovector[1] - ovector[0];
         //char* result = (char*) alloca(lgth);
-  if(lgth>4096) return str;
+        if(lgth>4096) return str;
         result[lgth - 1] = '\0'; // TODO: lots of this can be simplified
         memcpy(result,data,ovector[0]);
         memcpy(result+ovector[0],res,strlen(res));
