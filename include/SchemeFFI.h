@@ -49,37 +49,6 @@ void addGlobal(scheme* sc, char* symbol_name, pointer arg);
 void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func);
 void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);
 
-pointer scmAddForeignFunc(scheme* sc, pointer args);
-
-// misc stuff
-pointer dataGETi64(scheme* _sc, pointer args);
-pointer dataGETdouble(scheme* _sc, pointer args);
-pointer dataGETfloat(scheme* _sc, pointer args);
-pointer dataSETi64(scheme* _sc, pointer args);
-pointer dataSETdouble(scheme* _sc, pointer args);
-pointer dataSETfloat(scheme* _sc, pointer args);
-
-pointer Base64Encode(scheme* _sc, pointer args);
-pointer Base64Decode(scheme* _sc, pointer args);
-pointer CNameEncode(scheme* _sc, pointer args);
-pointer CNameDecode(scheme* _sc, pointer args);
-
-pointer cptrToString(scheme* _sc, pointer args);
-pointer stringToCptr(scheme* _sc, pointer args);
-pointer stringStrip(scheme* _sc, pointer args);
-pointer stringHash(scheme* _sc, pointer args);
-pointer stringJoin(scheme* _sc, pointer args);
-pointer getClosureEnv(scheme* _sc, pointer args);
-pointer getTime(scheme* _sc, pointer args);
-pointer sexprToString(scheme* _sc, pointer args);
-pointer print(scheme* _sc, pointer args);
-pointer print_no_new_line(scheme* _sc, pointer args);
-pointer printFull(scheme* _sc, pointer args);
-pointer printFullNoQuotes(scheme* _sc, pointer args);
-pointer printError(scheme* _sc, pointer args);
-pointer printNotification(scheme* _sc, pointer args);
-pointer callCPPAtTime(scheme* _sc, pointer args);
-
 // regex stuff
 pointer regex_match(scheme* _sc, pointer args);
 pointer regex_matched(scheme* _sc, pointer args);

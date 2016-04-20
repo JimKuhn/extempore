@@ -127,25 +127,6 @@ namespace extemp { namespace SchemeFFI {
 static llvm::Module* jitCompile(const std::string& String);
 }}
 
-char* cstrstrip (char* inputStr)
-{
-    char *start, *end;
-    size_t len;
-
-    /* Strip leading whitespace */
-    start = inputStr;
-    while(*start == ' ') start++;
-    len = strlen(start);
-    memmove(inputStr, start, len + 1);
-
-    /* Strip trailing whitespace */
-    end = inputStr + len - 1;
-    while(end >= inputStr && *end == ' ') end--;
-    *(end + 1) = '\0';
-
-    return inputStr;
-}
-
 static inline std::string xtm_ftostr(double V) {
   char Buffer[200];
   sprintf(Buffer, "%20.6e", V);
@@ -173,11 +154,12 @@ static std::unordered_map<std::string,std::string> LLVM_ALIAS_TABLE;
 
 #include "ffi/utility.inc"
 #include "ffi/ipc.inc"
-#include "ffi/misc.inc"
+#include "ffi/assoc.inc"
 #include "ffi/number.inc"
 #include "ffi/sys.inc"
 #include "ffi/sys_dsp.inc"
 #include "ffi/sys_zone.inc"
+#include "ffi/misc.inc"
 
 void initSchemeFFI(scheme* sc)
 {
@@ -199,39 +181,12 @@ void initSchemeFFI(scheme* sc)
     } funcTable[] = {
         UTILITY_DEFS,
         IPC_DEFS,
-        MISC_DEFS,
+        ASSOC_DEFS,
         NUMBER_DEFS,
         SYS_DEFS,
         SYS_DSP_DEFS,
         SYS_ZONE_DEFS,
-        // misc stuff
-        {     "cptr:get-i64",                   &dataGETi64                   },
-        {     "cptr:get-double",                &dataGETdouble                },
-        {     "cptr:get-float",                 &dataGETfloat                 },
-        {     "cptr:set-i64",                   &dataSETi64                   },
-        {     "cptr:set-double",                &dataSETdouble                },
-        {     "cptr:set-float",                 &dataSETfloat                 },
-        {     "cptr->string",                   &cptrToString                 },
-        {     "cptr:get-string",                &cptrToString                 },
-        {     "string->cptr",                   &stringToCptr                 },
-        {     "string-strip",                   &stringStrip                  },
-        {     "string-hash",                    &stringHash                   },
-        {     "base64-encode",                  &Base64Encode                 },
-        {     "base64-decode",                  &Base64Decode                 },
-        {     "cname-encode",                   &CNameEncode                  },
-        {     "cname-decode",                   &CNameDecode                  },
-        {     "string-join",                    &stringJoin                   },
-        {     "call-cpp-at-time",               &callCPPAtTime                },
-        {     "now",                            &getTime                      },
-        {     "sexpr->string",                  &sexprToString                },
-        {     "println",                        &print                        },
-        {     "print",                          &print_no_new_line            },
-        {     "print-full",                     &printFull                    },
-        {     "print-full-nq",                  &printFullNoQuotes            },
-        {     "pprint-error",                   &printError                   },    // pprint-error is pprint for a reason!
-        {     "print-notification",             &printNotification            },
-        {     "get-closure-env",                &getClosureEnv                },
-        {     "mk-ff",                          &scmAddForeignFunc            },
+        MISC_DEFS,
         // regex stuff
         {     "regex:match?",                   &regex_match                  },
         {     "regex:matched",                  &regex_matched                },
@@ -298,25 +253,18 @@ void initSchemeFFI(scheme* sc)
         scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), arg);
     }
 
-    void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func)
-    {
-        scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
-    }
-
     // pointer scmAddForeignFunc(scheme* sc, pointer Args) {
     //   //char* sym_name = string_value(pair_car(Args));
     //   foreign_func func = (foreign_func) cptr_value(pair_car(Args));
     //   //scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
     //   return mk_foreign_func(sc,func); //sc->T;
     // }
+void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func)
+{
+    scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
+}
 
-  pointer scmAddForeignFunc(scheme* sc, pointer Args) {
-    char* symbol_name = string_value(pair_car(Args));
-    foreign_func func = (foreign_func) cptr_value(pair_cadr(Args));
-    pointer ffunc = mk_foreign_func(sc,func);
-    scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), ffunc);
-    return ffunc;
-  }
+
 
     void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr)
     {
@@ -332,71 +280,7 @@ void initSchemeFFI(scheme* sc)
 
 
 
-    pointer dataGETi64(scheme* Scheme, pointer Args)
-    {
-        char* cptr = (char*) cptr_value(pair_car(Args));
-        int64_t offset = ivalue(pair_cadr(Args));
-        int64_t* ptr = (int64_t*) (cptr+offset);
-        return mk_integer(Scheme,ptr[0]);
-    }
 
-    pointer dataGETdouble(scheme* Scheme, pointer Args)
-    {
-        char* cptr = (char*) cptr_value(pair_car(Args));
-        int64_t offset = ivalue(pair_cadr(Args));
-        double* ptr = (double*) (cptr+offset);
-        return mk_real(Scheme,ptr[0]);
-    }
-
-    pointer dataGETfloat(scheme* Scheme, pointer Args)
-    {
-        char* cptr = (char*) cptr_value(pair_car(Args));
-        int64_t offset = ivalue(pair_cadr(Args));
-        float* ptr = (float*) (cptr+offset);
-        return mk_real(Scheme,ptr[0]);
-    }
-
-    pointer dataSETi64(scheme* Scheme, pointer Args)
-    {
-        char* cptr = (char*) cptr_value(pair_car(Args));
-        int64_t offset = ivalue(pair_cadr(Args));
-        int64_t* ptr = (int64_t*) (cptr+offset);
-        ptr[0] = (int64_t) ivalue(pair_caddr(Args));
-        return Scheme->T;
-    }
-
-    pointer dataSETdouble(scheme* Scheme, pointer Args)
-    {
-        char* cptr = (char*) cptr_value(pair_car(Args));
-        int64_t offset = ivalue(pair_cadr(Args));
-        double* ptr = (double*) (cptr+offset);
-        ptr[0] = (double) rvalue(pair_caddr(Args));
-        return Scheme->T;
-    }
-
-    pointer dataSETfloat(scheme* Scheme, pointer Args)
-    {
-        char* cptr = (char*) cptr_value(pair_car(Args));
-        int64_t offset = ivalue(pair_cadr(Args));
-        float* ptr = (float*) (cptr+offset);
-        ptr[0] = (float) rvalue(pair_caddr(Args));
-        return Scheme->T;
-    }
-
-    pointer cptrToString(scheme* Scheme, pointer Args)
-    {
-        char* cptr = (char*) cptr_value(pair_car(Args));
-        char* cstr = (char*) cptr;
-        return mk_string(Scheme, cstr);
-    }
-
-    pointer stringToCptr(scheme* Scheme, pointer Args)
-    {
-        char* cstr = (char*) cptr_value(pair_car(Args));
-        char* cptr = (char*) malloc(strlen(cstr) + 1);
-        strcpy(cptr, cstr);
-        return mk_cptr(Scheme, cptr);
-    }
 
 
 
@@ -434,221 +318,10 @@ void initSchemeFFI(scheme* sc)
 
 
 
-    // positions base64[62] = '+' and base64[63] == '/'
-    pointer Base64Encode(scheme* Scheme, pointer Args)
-    {
-      const unsigned char* dat = (const unsigned char*) cptr_value(pair_car(Args));
-      size_t datlength = ivalue(pair_cadr(Args));
-      size_t lth = 0;
-      char* res = base64_encode(dat,datlength,&lth);
-      return mk_string(Scheme,res);
-    }
-    // positions base64[62] = '+' and base64[63] == '/'
-    pointer Base64Decode(scheme* Scheme, pointer Args)
-    {
-      char* str = string_value(pair_car(Args));
-      size_t lth = 0;
-      unsigned char* res = base64_decode(str,strlen(str),&lth);
-      return mk_string(Scheme,(char*)res);
-    }
 
-    // positions base64[62] = '_' and base64[63] == '-'
-    pointer CNameEncode(scheme* Scheme, pointer Args)
-    {
-      char* str = string_value(pair_car(Args));
-      size_t lth = 0;
-      char* res = cname_encode(str,strlen(str),&lth);
-      return mk_string(Scheme,res);
-    }
 
-    // positions base64[62] = '_' and base64[63] == '-'
-    pointer CNameDecode(scheme* Scheme, pointer Args)
-    {
-      char* str = string_value(pair_car(Args));
-      size_t lth = 0;
-      char* res = (char*) cname_decode(str,strlen(str),&lth);
-      return mk_string(Scheme,res);
-    }
 
-    pointer stringHash(scheme* Scheme, pointer Args)
-    {
-      char* str = string_value(pair_car(Args));
-      // unsigned long hash = 0;
-      // int c;
 
-  //     while ((c = *str++))
-        // hash = c + (hash << 6) + (hash << 16) - hash;
-
-      return mk_integer(Scheme,string_hash((unsigned char*) str));
-    }
-
-    pointer stringStrip(scheme* Scheme, pointer Args)
-    {
-        return mk_string(Scheme,cstrstrip(string_value(pair_car(Args))));
-    }
-
-    pointer stringJoin(scheme* Scheme, pointer Args)
-    {
-        pointer array = pair_car(Args);
-        if(array == Scheme->NIL) return mk_string(Scheme,"");
-        char* joinstr = string_value(pair_cadr(Args));
-        int len = 0;
-        for(pointer x=pair_car(array);array != Scheme->NIL;array=pair_cdr(array))
-        {
-            x = pair_car(array);
-            len += strlen(string_value(x));
-        }
-        array = pair_car(Args); // reset array
-        len += (list_length(Scheme,array)-1)*(strlen(joinstr));
-
-        char* result = (char*) alloca(len+1);
-
-        result[0] = '\0';
-
-        for(pointer x=pair_car(array);array != Scheme->NIL;array=pair_cdr(array))
-        {
-            x=pair_car(array);
-            char* str = string_value(x);
-            strcat(result,str);
-            if(pair_cdr(array) != Scheme->NIL) strcat(result,joinstr);
-        }
-        return mk_string(Scheme,result);
-    }
-
-    pointer getClosureEnv(scheme* Scheme, pointer Args)
-    {
-        return closure_env(pair_car(Args));
-    }
-
-    pointer getTime(scheme* Scheme, pointer Args)
-    {
-        return mk_integer(Scheme, extemp::UNIV::TIME);
-    }
-
-    pointer sexprToString(scheme* Scheme, pointer Args)
-    {
-        std::stringstream ss;
-        UNIV::printSchemeCell(Scheme, ss, Args, true);
-        std::string s = ss.str();
-        s.erase(0,1);
-        s.erase(s.size()-1,1);
-        return mk_string(Scheme, s.c_str());
-    }
-
-    pointer print(scheme* Scheme, pointer Args)
-    {
-        if(Args == Scheme->NIL) {
-            printf("\r\n");
-            fflush(stdout);
-            return Scheme->T;
-        }
-        std::stringstream ss;
-        UNIV::printSchemeCell(Scheme, ss, Args);
-        std::string s = ss.str();
-        s.erase(0,1);
-        s.erase(s.size()-1,1);
-        printf("%s\r\n",s.c_str());
-        fflush(stdout);
-        return Scheme->T;
-    }
-
-    pointer print_no_new_line(scheme* Scheme, pointer Args)
-    {
-        if(Args == Scheme->NIL) {
-            printf("\r\n");
-            fflush(stdout);
-            return Scheme->T;
-        }
-        std::stringstream ss;
-        UNIV::printSchemeCell(Scheme, ss, Args, false, false);
-        std::string s = ss.str();
-        s.erase(0,1);
-        s.erase(s.size()-1,1);
-        printf("%s",s.c_str());
-        fflush(stdout);
-        return Scheme->T;
-    }
-
-    pointer printFull(scheme* Scheme, pointer Args)
-    {
-        std::stringstream ss;
-        UNIV::printSchemeCell(Scheme, ss, Args, true);
-        std::string s = ss.str();
-        s.erase(0,1);
-        s.erase(s.size()-1,1);
-        printf("%s\n",s.c_str());
-        return Scheme->T;
-    }
-
-    pointer printFullNoQuotes(scheme* Scheme, pointer Args)
-    {
-        std::stringstream ss;
-        UNIV::printSchemeCell(Scheme, ss, Args, true, false);
-        std::string s = ss.str();
-        s.erase(0,1);
-        s.erase(s.size()-1,1);
-        printf("%s\n",s.c_str());
-        return Scheme->T; //mk_string(Scheme, s.c_str());
-    }
-
-    pointer printError(scheme* Scheme, pointer Args)
-    {
-        std::stringstream ss;
-        UNIV::printSchemeCell(Scheme, ss, Args, true);
-        std::string s = ss.str();
-        s.erase(0,1);
-        s.erase(s.size()-1,1);
-        ascii_error();
-        printf("%s\n",s.c_str());
-        ascii_normal();
-        fflush(stdout);
-        return Scheme->T; //mk_string(Scheme, s.c_str());
-    }
-
-    pointer printNotification(scheme* Scheme, pointer Args)
-    {
-        std::stringstream ss;
-        UNIV::printSchemeCell(Scheme, ss, Args);
-        std::string s = ss.str();
-        s.erase(0,1);
-        s.erase(s.size()-1,1);
-        ascii_warning();
-        printf("%s\n",s.c_str());
-        ascii_normal();
-        fflush(stdout);
-        return Scheme->T; //mk_string(Scheme, s.c_str());
-    }
-
-    pointer callCPPAtTime(scheme* Scheme, pointer Args)
-    {
-        if(is_cptr(pair_caddr(Args)) == false) {
-            printf("Bad task needs valid CM ptr");
-            return Scheme->F;
-        }
-
-        int task_type = ivalue(pair_cadr(Args));
-
-        bool is_callback = (task_type == 2) ? true : false;
-
-        // is_render_thread_type are for tasks that must be called in the render thread
-        // primarily for midi calls to an AU that must occur on the audio thread
-        bool is_render_thread_type = (task_type == 1) ? true : false;
-
-        if(is_render_thread_type) {
-            if(is_pair(pair_car(Args))) { //check for tag based call
-                std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;
-            }else{
-                std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;
-            }
-        }else{
-            if(is_pair(pair_car(Args))) {
-                extemp::TaskScheduler::I()->addTask(ivalue(pair_caar(Args)), ivalue(pair_cdar(Args)), (extemp::CM*)(cptr_value(pair_caddr(Args))), new SchemeObj(Scheme, pair_cadddr(Args), pair_caddddr(Args)), 0, is_callback);
-            }else{
-                extemp::TaskScheduler::I()->addTask(ivalue(pair_car(Args)), ivalue(pair_car(Args))+Scheme->call_default_time, (extemp::CM*)(cptr_value(pair_caddr(Args))), new SchemeObj(Scheme, pair_cadddr(Args), pair_caddddr(Args)), 0, is_callback);
-            }
-        }
-        return Scheme->T;
-    }
 
 
     ///////////////////////////////////////////////////////
