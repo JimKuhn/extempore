@@ -151,9 +151,9 @@ typedef std::pair<std::string, std::string> entry_type;
 static entry_type sDictHistory[2];
 static std::unordered_map<std::string, entry_type> sImpCirDict;
 
-static char* tmp_str_a = reinterpret_cast<char*>(malloc(1024));
-static char* tmp_str_b = (char*) malloc(4096);
-static std::unordered_map<std::string,std::string> LLVM_ALIAS_TABLE;
+static char tmp_str_a[1024];
+static char tmp_str_b[4096];
+static std::unordered_map<std::string, std::string> LLVM_ALIAS_TABLE;
 
 #include "ffi/utility.inc"
 #include "ffi/ipc.inc"
@@ -411,7 +411,7 @@ std::cout << pa.getMessage().str() << std::endl;
             if (!gv) {
                 continue;
             }
-            auto func(extemp::EXTLLVM::I()->getFunction(sym));
+            auto func(llvm::dyn_cast<llvm::Function>(gv));
             if (func) {
                 dstream << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
                 bool first(true);

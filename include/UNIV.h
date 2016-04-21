@@ -82,7 +82,7 @@ extern "C" {
 
 bool rmatch(char* regex, char* str);
 int64_t rmatches(char* regex, char* str, char** results,int64_t maxnum); //struct regex_matched_buffer* result);
-bool rsplit(char* regex, char* str, char* a, char* b);
+bool rsplit(const char* regex, const char* str, char* a, char* b);
 char* rreplace(char* regex, char* str, char* replacement, char* result);
 char* base64_encode(const unsigned char *data,size_t input_length,size_t *output_length);
 unsigned char* base64_decode(const char *data,size_t input_length,size_t *output_length);

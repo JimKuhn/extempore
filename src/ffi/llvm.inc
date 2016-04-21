@@ -94,115 +94,82 @@ pointer get_named_struct_size(scheme* Scheme, pointer Args)
 
 pointer get_function_args(scheme* Scheme, pointer Args)
 {
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
-    if(func == 0)
-      {
+    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    if (!func) {
         return Scheme->F;
-      }
-
+    }
     std::string typestr;
     llvm::raw_string_ostream ss(typestr);
     func->getReturnType()->print(ss);
-
     const char* tmp_name = ss.str().c_str();
     const char* eq_type_string = " = type ";
-
-    if(func->getReturnType()->isStructTy()) {
-      rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
-      tmp_name = tmp_str_a;
+    if (func->getReturnType()->isStructTy()) {
+        rsplit(eq_type_string, tmp_name, tmp_str_a, tmp_str_b);
+        tmp_name = tmp_str_a;
     }
-
-    pointer str = mk_string(Scheme, tmp_name); //Scheme, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
+    pointer str = mk_string(Scheme, tmp_name);
     pointer p = cons(Scheme, str, Scheme->NIL);
-
-    llvm::Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
-    while(funcargs != func->getArgumentList().end())
-      {
-        llvm::Argument* a = &*funcargs;
+    for (const auto& arg : func->getArgumentList()) {
         {
             EnvInjector injector(Scheme, p);
-        std::string typestr2;
-        llvm::raw_string_ostream ss2(typestr2);
-        a->getType()->print(ss2);
-
-        tmp_name = ss2.str().c_str();
-
-        if(a->getType()->isStructTy()) {
-          rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
-          //printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
-          tmp_name = tmp_str_a;
-        }
-
-        pointer str = mk_string(Scheme, tmp_name); //Scheme, ss2.str().c_str()); //a->getType()->getDescription().c_str());
+            std::string typestr2;
+            llvm::raw_string_ostream ss2(typestr2);
+            arg.getType()->print(ss2);
+            tmp_name = ss2.str().c_str();
+            if (arg.getType()->isStructTy()) {
+                rsplit(eq_type_string, tmp_name, tmp_str_a, tmp_str_b);
+                tmp_name = tmp_str_a;
+            }
+            pointer str = mk_string(Scheme, tmp_name);
         }
         p = cons(Scheme, str, p);
-        funcargs++;
-      }
-    return reverse(Scheme, p);
-  }
+    }
+    return reverse_in_place(Scheme, Scheme->NIL, p);
+}
 
-  pointer get_function_varargs(scheme* Scheme, pointer Args)
-  {
-    using namespace llvm;
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
-    if(func == 0)
-      {
+pointer get_function_varargs(scheme* Scheme, pointer Args)
+{
+    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    return (func && func->isVarArg()) ? Scheme->T : Scheme->F;
+}
+
+pointer get_function_type(scheme* Scheme, pointer Args)
+{
+    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    if (!func) {
         return Scheme->F;
-      }
-    return func->isVarArg() ? Scheme->T : Scheme->F;
-  }
-
-  pointer get_function_type(scheme* Scheme, pointer Args)
-  {
-    using namespace llvm;
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
-    if(func == 0)
-      {
-        return Scheme->F;
-      }
-
+    }
     std::string typestr;
     llvm::raw_string_ostream ss(typestr);
     func->getFunctionType()->print(ss);
-    //printf("%s\n",ss.str().c_str());
-    pointer str = mk_string(Scheme, ss.str().c_str()); //func->getFunctionType()->getDescription().c_str());
-    return str;
-  }
+    return mk_string(Scheme, ss.str().c_str());
+}
 
-  pointer get_function_calling_conv(scheme* Scheme, pointer Args)
-  {
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
-    if(func == 0)
-      {
+pointer get_function_calling_conv(scheme* Scheme, pointer Args)
+{
+    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    if (!func) {
         return Scheme->F;
-      }
+    }
+    return mk_integer(Scheme, func->getCallingConv());
+}
 
-    int cc = func->getCallingConv();
-    return mk_integer(Scheme, cc);
-  }
-
-  pointer get_global_variable_type(scheme* Scheme, pointer Args)
-  {
+pointer get_global_variable_type(scheme* Scheme, pointer Args)
+{
     using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
-    //Module::global_iterator i = M->global_begin();
-    //GlobalVariable* var = M->getNamedGlobal(std::string(string_value(pair_car(Args))));
-    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(Args)));
-    if(var == 0)
-      {
+    auto var(extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(Args))));
+    if (!var) {
         return Scheme->F;
-      }
+    }
     std::string typestr;
     llvm::raw_string_ostream ss(typestr);
     var->getType()->print(ss);
-    return mk_string(Scheme, ss.str().c_str()); //var->getType()->getDescription().c_str());
-  }
+    return mk_string(Scheme, ss.str().c_str());
+}
 
-  pointer get_function_pointer(scheme* Scheme, pointer Args)
-  {
+pointer get_function_pointer(scheme* Scheme, pointer Args)
+{
     auto name(string_value(pair_car(Args)));
-    // llvm::Function* func = EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
     void* p = EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(name);
     if (!p) { // look for it as a JIT-compiled function
         p = reinterpret_cast<void*>(EXTLLVM::I()->EE->getFunctionAddress(name));
@@ -211,30 +178,27 @@ pointer get_function_args(scheme* Scheme, pointer Args)
         }
     }
     return mk_cptr(Scheme, p);
-  }
+}
 
 pointer remove_function(scheme* Scheme, pointer Args)
 {
     auto func(EXTLLVM::I()->EE->FindFunctionNamed(string_value(pair_car(Args))));
-    if (!func)
-    {
+    if (!func) {
         return Scheme->F;
     }
     if (func->mayBeOverridden()) {
         func->dropAllReferences();
         func->removeFromParent();
         return Scheme->T;
-    } else {
-        printf("Cannot remove function with dependencies\n");
-        return Scheme->F;
     }
+    printf("Cannot remove function with dependencies\n");
+    return Scheme->F;
 }
 
 pointer remove_global_var(scheme* Scheme, pointer Args)
 {
     auto var(EXTLLVM::I()->EE->FindGlobalVariableNamed(string_value(pair_car(Args))));
-    if (!var)
-    {
+    if (!var) {
         return Scheme->F;
     }
     var->dropAllReferences();
@@ -253,285 +217,148 @@ pointer erase_function(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-  pointer llvm_call_void_native(scheme* Scheme, pointer Args)
-  {
-    using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;
+pointer llvm_call_void_native(scheme* Scheme, pointer Args)
+{
     char name[1024];
-    sprintf(name,"%s_native",string_value(pair_car(Args)));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(name);
-    if(func == 0)
-      {
+    strcpy(name, string_value(pair_car(Args)));
+    strcat(name, "_native");
+    auto func(EXTLLVM::I()->EE->FindFunctionNamed(string_value(pair_car(Args))));
+    if (!func) {
         return Scheme->F;
-      }
-    // this should be safe without a lock
+    }
     void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
-
-    if(p==NULL) {
-            //[[LogView sharedInstance] error:@"LLVM: Bad Function Ptr\n"];
-            return Scheme->F;
+    if (!p) {
+        return Scheme->F;
     }
-
-    void(*f)(void) = (void(*)(void)) p;
-    f();
-
+    ((void(*)(void)) p)();
     return Scheme->T;
-  }
+}
 
-    pointer call_compiled(scheme* Scheme, pointer Args)
-    {
-        using namespace llvm;
-
-        ExecutionEngine* EE = EXTLLVM::I()->EE;
-
+pointer call_compiled(scheme* Scheme, pointer Args)
+{
+    llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
 #ifdef LLVM_EE_LOCK
-  llvm::MutexGuard locked(EE->lock);
+    llvm::MutexGuard locked(EE->lock);
 #endif
-
-        llvm::Function* func = (Function*) cptr_value(pair_car(Args));
-        if(func == 0)
-        {
-            printf("No such function\n");
-            return Scheme->F;
-        }
-        func->getArgumentList();
-        Args = pair_cdr(Args);
-        int lgth = list_length(Scheme, Args);
-        Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
-        if(lgth != func->getArgumentList().size())
-        {
-            printf("Wrong number of arguments for function!\n");
-            return Scheme->F;
-        }
-        std::vector<llvm::GenericValue> fargs(lgth);
-        //std::cout << "ARGS: " << lgth << std::endl;
-        for(int i=0;i<lgth;i++,++funcargs)
-        {
-            Argument* a = &*funcargs;
-            pointer p = list_ref(Scheme, i, Args);
-            if(is_integer(p)) {
-                if(a->getType()->getTypeID() != Type::IntegerTyID)
-                {
-                    printf("Bad argument type %i\n",i);
-                    return Scheme->F;
-                }
-                int width = a->getType()->getPrimitiveSizeInBits();
-                //std::cout << "TYPE: " << a->getType()->getTypeID() << std::endl;
-                fargs[i].IntVal = APInt(width,ivalue(p));
-            }
-            else if(is_real(p))
-            {
-
-                if(a->getType()->getTypeID() == Type::FloatTyID)
-                {
-                    fargs[i].FloatVal = (float) rvalue(p);
-                }
-                else if(a->getType()->getTypeID() == Type::DoubleTyID)
-                {
-                    fargs[i].DoubleVal = rvalue(p);
-                }
-                else
-                {
-                    printf("Bad argument type %i\n",i);
-                    return Scheme->F;
-                }
-            }
-            else if(is_string(p))
-            {
-                if(a->getType()->getTypeID() != Type::PointerTyID)
-                {
-                    printf("Bad argument type %i\n",i);
-                    return Scheme->F;
-                }
-                //std::cout << "PTRVALUE: " << cptr_value(p) << std::endl;
-                fargs[i].PointerVal = string_value(p);
-            }
-            else if(is_cptr(p))
-            {
-                if(a->getType()->getTypeID() != Type::PointerTyID)
-                {
-                    printf("Bad argument type %i\n",i);
-                    return Scheme->F;
-                }
-                fargs[i].PointerVal = cptr_value(p);
-                //fargs[i].PointerVal = (void*)p;
-            }
-            else if(is_closure(p))
-            {
-                //ascii_print_color(1,1,10); // error color
-                printf("Bad argument at index %i you can't pass in a scheme closure.\n",i);
-                //ascii_print_color(0,9,10);
+    auto func(reinterpret_cast<llvm::Function*>(cptr_value(pair_car(Args))));
+    if (unlikely(!func)) {
+        printf("No such function\n");
+        return Scheme->F;
+    }
+    func->getArgumentList();
+    Args = pair_cdr(Args);
+    int lgth = list_length(Scheme, Args);
+    if (unlikely(lgth != func->getArgumentList().size())) {
+        printf("Wrong number of arguments for function!\n");
+        return Scheme->F;
+    }
+    int i = 0;
+    std::vector<llvm::GenericValue> fargs(lgth);
+    for (const auto& arg : func->getArgumentList()) {
+        pointer p = list_ref(Scheme, i++, Args);
+        if (is_integer(p)) {
+            if (unlikely(arg.getType()->getTypeID() != llvm::Type::IntegerTyID)) {
+                printf("Bad argument type %i\n",i);
                 return Scheme->F;
             }
-            else {
-                //ascii_print_color(1,1,10); // error color
-                printf("Bad argument at index %i\n",i);
-                //ascii_print_color(0,9,10); // default
+            int width = arg.getType()->getPrimitiveSizeInBits();
+            fargs[i].IntVal = llvm::APInt(width, ivalue(p));
+        } else if (is_real(p)) {
+            if (arg.getType()->getTypeID() == llvm::Type::FloatTyID) {
+                fargs[i].FloatVal = rvalue(p);
+            } else if (arg.getType()->getTypeID() == llvm::Type::DoubleTyID) {
+                fargs[i].DoubleVal = rvalue(p);
+            } else {
+                printf("Bad argument type %i\n",i);
                 return Scheme->F;
             }
-
-        }
-  GenericValue gv = EE->runFunction(func,fargs);
-
-        //std::cout << "GV: " << gv.DoubleVal << " " << gv.FloatVal << " " << gv.IntVal.getZExtValue() << std::endl;
-        switch(func->getReturnType()->getTypeID())
-        {
-        case Type::FloatTyID:
-            return mk_real(Scheme, gv.FloatVal);
-        case Type::DoubleTyID:
-            return mk_real(Scheme, gv.DoubleVal);
-        case Type::IntegerTyID:
-            return mk_integer(Scheme, gv.IntVal.getZExtValue()); //  getRawData());
-        case Type::PointerTyID:
-            return mk_cptr(Scheme, gv.PointerVal);
-        case Type::VoidTyID:
-            return Scheme->T;
-        default:
+        } else if (is_string(p)) {
+            if (unlikely(arg.getType()->getTypeID() != llvm::Type::PointerTyID)) {
+                printf("Bad argument type %i\n",i);
+                return Scheme->F;
+            }
+            fargs[i].PointerVal = string_value(p);
+        } else if (is_cptr(p)) {
+            if (unlikely(arg.getType()->getTypeID() != llvm::Type::PointerTyID)) {
+                printf("Bad argument type %i\n",i);
+                return Scheme->F;
+            }
+            fargs[i].PointerVal = cptr_value(p);
+        } else if (unlikely(is_closure(p))) {
+            printf("Bad argument at index %i you can't pass in a scheme closure.\n",i);
+            return Scheme->F;
+        } else {
+            printf("Bad argument at index %i\n",i);
             return Scheme->F;
         }
     }
-
-    // this all here to conver 32bit floats (as a string) into llvms hex float 32 notation :(
-    pointer llvm_convert_float_constant(scheme* Scheme, pointer Args)
-    {
-        char* floatin = string_value(pair_car(Args));
-        char floatout[256];
-        // if already converted to hex value just return Hex String Unchanged
-        if(floatin[1]=='x') return pair_car(Args);
-#ifdef _WIN32
-        float f = (float) strtod(floatin, (char**) &floatout);
-#else
-        float f = strtof(floatin, (char**) &floatout);
-#endif
-        llvm::APFloat apf(f);
-
-        bool ignored;
-        bool isDouble = false; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
-        double Val = isDouble ? apf.convertToDouble() :
-        apf.convertToFloat();
-        // char hexstr[128];
-        // apf.convertToHexString(hexstr,0,false,llvm::APFloat::rmTowardZero);
-        // std::string StrVal(hexstr);
-        std::string StrVal = xtm_ftostr(apf);
-
-        // Check to make sure that the stringized number is not some string like
-        // "Inf" or NaN, that atof will accept, but the lexer will not.  Check
-        // that the string matches the "[-+]?[0-9]" regex.
-        //
-        if ((StrVal[0] >= '0' && StrVal[0] <= '9') ||
-            ((StrVal[0] == '-' || StrVal[0] == '+') &&
-             (StrVal[1] >= '0' && StrVal[1] <= '9'))) {
-            // Reparse stringized version!
-            if (atof(StrVal.c_str()) == Val) {
-              return mk_string(Scheme, StrVal.c_str());
-            }
-        }
-
-        // Otherwise we could not reparse it to exactly the same value, so we must
-        // output the string in hexadecimal format!  Note that loading and storing
-        // floating point types changes the bits of NaNs on some hosts, notably
-        // x86, so we must not use these types.
-        assert(sizeof(double) == sizeof(uint64_t) && "assuming that double is 64 bits!");
-        char Buffer[40];
-        //APFloat apf = CFP->getValueAPF();
-        // Floats are represented in ASCII IR as double, convert.
-        //if (!isDouble) apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
-        apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
-
-        char tmpstr[256];
-        tmpstr[0] = '0';
-        tmpstr[1] = 'x';
-        tmpstr[2] = 0;
-        char* v = llvm::utohex_buffer(uint64_t(apf.bitcastToAPInt().getZExtValue()), Buffer+40);
-        strcat(tmpstr, v);
-        //std::cout << "STR: " << tmpstr << "  v: " << v <<  std::endl;
-        return mk_string(Scheme, tmpstr);
+    llvm::GenericValue gv = EE->runFunction(func, fargs);
+    switch(func->getReturnType()->getTypeID()) {
+    case llvm::Type::FloatTyID:
+        return mk_real(Scheme, gv.FloatVal);
+    case llvm::Type::DoubleTyID:
+        return mk_real(Scheme, gv.DoubleVal);
+    case llvm::Type::IntegerTyID:
+        return mk_integer(Scheme, gv.IntVal.getZExtValue()); //  getRawData());
+    case llvm::Type::PointerTyID:
+        return mk_cptr(Scheme, gv.PointerVal);
+    case llvm::Type::VoidTyID:
+        return Scheme->T;
+    default:
+        return Scheme->F;
     }
+}
 
-
-     // this all here to conver 64bit floats (as a string) into llvms hex floating point notation :(
-     pointer llvm_convert_double_constant(scheme* Scheme, pointer Args)
-     {
-        char* floatin = string_value(pair_car(Args));
-        char floatout[256];
-        // if already converted to hex value just return Hex String Unchanged
-        if(floatin[1]=='x') return pair_car(Args);
- #ifdef _WIN32
-        double f = strtod(floatin, (char**) &floatout);
- #else
-        double f = strtod(floatin, (char**) &floatout);
- #endif
-        llvm::APFloat apf(f);
-
-        bool ignored;
-        bool isDouble = true; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
-        double Val = isDouble ? apf.convertToDouble() : apf.convertToFloat();
-
-        // char hexstr[128];
-        // apf.convertToHexString(hexstr,0,false,llvm::APFloat::rmTowardZero);
-        // std::string StrVal(hexstr);
-        std::string StrVal = xtm_ftostr(apf);
-
-        // Check to make sure that the stringized number is not some string like
-        // "Inf" or NaN, that atof will accept, but the lexer will not.  Check
-        // that the string matches the "[-+]?[0-9]" regex.
-        //
-        if ((StrVal[0] >= '0' && StrVal[0] <= '9') ||
-            ((StrVal[0] == '-' || StrVal[0] == '+') &&
-             (StrVal[1] >= '0' && StrVal[1] <= '9'))) {
-            // Reparse stringized version!
-            if (atof(StrVal.c_str()) == Val) {
-                return mk_string(Scheme, StrVal.c_str());
-            }
-        }
-
-        // Otherwise we could not reparse it to exactly the same value, so we must
-        // output the string in hexadecimal format!  Note that loading and storing
-        // floating point types changes the bits of NaNs on some hosts, notably
-        // x86, so we must not use these types.
-        assert(sizeof(double) == sizeof(uint64_t) && "assuming that double is 64 bits!");
-        char Buffer[40];
-        //APFloat apf = CFP->getValueAPF();
-        // Floats are represented in ASCII IR as double, convert.
-        //if (!isDouble) apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
-        //apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
-
-        char tmpstr[256];
-        tmpstr[0] = '0';
-        tmpstr[1] = 'x';
-        tmpstr[2] = 0;
-        char* v = llvm::utohex_buffer(uint64_t(apf.bitcastToAPInt().getZExtValue()), Buffer+40);
-        strcat(tmpstr, v);
-        //std::cout << "STR: " << tmpstr << "  v: " << v <<  std::endl;
-        return mk_string(Scheme, tmpstr);
-     }
-
-    pointer llvm_count(scheme* Scheme, pointer Args)
-    {
-        return mk_integer(Scheme, EXTLLVM::LLVM_COUNT);
+pointer llvm_convert_float_constant(scheme* Scheme, pointer Args)
+{
+    char* floatin = string_value(pair_car(Args));
+    if (floatin[1] == 'x') {
+        return pair_car(Args);
     }
+    llvm::APFloat apf(llvm::APFloat::IEEEsingle, llvm::StringRef(floatin));
+    // TODO: if necessary, checks for inf/nan can be done here
+    auto ival(llvm::APInt::doubleToBits(apf.convertToFloat()));
+    return mk_string(Scheme, (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
+}
 
-    pointer llvm_count_set(scheme* Scheme, pointer Args)
-    {
-        EXTLLVM::LLVM_COUNT = ivalue(pair_car(Args));
-        return mk_integer(Scheme, EXTLLVM::LLVM_COUNT);
+pointer llvm_convert_double_constant(scheme* Scheme, pointer Args)
+{
+    static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) must be 8 bytes");
+    char* floatin = string_value(pair_car(Args));
+    if (floatin[1] == 'x') {
+        return pair_car(Args);
     }
+    llvm::APFloat apf(llvm::APFloat::IEEEdouble, llvm::StringRef(floatin));
+    // TODO: if necessary, checks for inf/nan can be done here
+    auto ival(llvm::APInt::doubleToBits(apf.convertToFloat()));
+    return mk_string(Scheme, (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
+}
 
-    pointer llvm_count_inc(scheme* Scheme, pointer Args)
-    {
-        EXTLLVM::LLVM_COUNT++;
-        return mk_integer(Scheme, EXTLLVM::LLVM_COUNT);
-    }
+pointer llvm_count(scheme* Scheme, pointer Args)
+{
+    return mk_integer(Scheme, EXTLLVM::LLVM_COUNT);
+}
 
-    pointer callClosure(scheme* Scheme, pointer Args)
-    {
-        using namespace llvm;
-        uint32_t** closure = (uint32_t**) cptr_value(pair_car(Args));
-        void* eptr = (void*) *(closure+0);
-        int64_t (*fptr)(void*, int64_t) = (int64_t (*)(void*, int64_t)) *(closure+1);
-        return mk_integer(Scheme, (*fptr)(eptr,ivalue(pair_cadr(Args))));
-    }
+pointer llvm_count_set(scheme* Scheme, pointer Args)
+{
+    EXTLLVM::LLVM_COUNT = ivalue(pair_car(Args));
+    return llvm_count(Scheme, Args);
+}
+
+pointer llvm_count_inc(scheme* Scheme, pointer Args)
+{
+    ++EXTLLVM::LLVM_COUNT;
+    return llvm_count(Scheme, Args);
+}
+
+pointer callClosure(scheme* Scheme, pointer Args)
+{
+    using namespace llvm;
+    uint32_t** closure = (uint32_t**) cptr_value(pair_car(Args));
+    void* eptr = closure[0];
+    int64_t (*fptr)(void*, int64_t) = (int64_t (*)(void*, int64_t)) closure[0];
+    return mk_integer(Scheme, (*fptr)(eptr, ivalue(pair_cadr(Args))));
+}
 
     pointer printLLVMModule(scheme* Scheme, pointer Args)
     {

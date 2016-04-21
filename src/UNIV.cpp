@@ -402,17 +402,15 @@ int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
   return 0;
 }
 
-bool rsplit(char* regex, char* str, char* a, char* b)
-{
-  char* data = str;
-  int length = strlen(data);
-  char* pattern = regex;
+bool rsplit(const char* regex, const char* str, char* a, char* b)
+{ // TODO: harmonize with FFI
+  int length = strlen(str);
   pcre *re;
   const char *error;
   int erroffset;
-  //printf("dat: data\n");
+  //printf("dat: str\n");
   // should probably move this regex compile to global
-  re = pcre_compile(    pattern, /* the pattern */
+  re = pcre_compile(    regex, /* the regex */
                         0, /* default options */
                         &error, /* for error message */
                         &erroffset, /* for error offset */
@@ -420,9 +418,9 @@ bool rsplit(char* regex, char* str, char* a, char* b)
   int rc;
   int ovector[60];
   rc = pcre_exec(       re, /* result of pcre_compile() */
-                        NULL, /* we didn’t study the pattern */
-                        data, /* the subject string */
-                        strlen(data), /* the length of the subject string */
+                        NULL, /* we didn’t study the regex */
+                        str, /* the subject string */
+                        strlen(str), /* the length of the subject string */
                         0, /* start at offset 0 in the subject */
                         0, /* default options */
                         ovector, /* vector of integers for substring information */
@@ -433,9 +431,9 @@ bool rsplit(char* regex, char* str, char* a, char* b)
   int range2 = ovector[1];
   //printf("reg ranges %d:%d\n",range,range2);
   a[range] = '\0';;
-  memcpy(a, data, range);
+  memcpy(a, str, range);
   b[length - range2] = '\0';
-  memcpy(b, data + range2, length - range2);
+  memcpy(b, str + range2, length - range2);
   return true;
 }
 
