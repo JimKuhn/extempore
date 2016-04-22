@@ -82,8 +82,6 @@ extern __thread llvm_zone_t* tls_llvm_callback_zone;
 extern "C"
 {
 char* llvm_disassemble(const unsigned char*,int syntax);
-void* malloc16(size_t s);
-void free16(void* p);
 
 const unsigned LLVM_ZONE_ALIGN = 32; // MUST BE POWER OF 2!
 const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
@@ -307,54 +305,20 @@ public:
     void initLLVM();
 
     llvm::Module* activeModule();
-    llvm::Function* getFunction(const char* name) {
-        for (auto& m : Ms) {
-            auto f(m->getFunction(name));
-            if (f) {
-                return f;
-            }
-        }
-        return nullptr;
-    }
-    llvm::GlobalVariable* getGlobalVariable(const char* name) {
-        for (auto& m : Ms) {
-            auto gv(m->getGlobalVariable(name));
-            if (gv) {
-                return gv;
-            }
-        }
-        return nullptr;
-    }
-    const llvm::GlobalValue* getGlobalValue(const char* name) {
-        for (auto& m : Ms) {
-            auto gv(m->getNamedValue(name));
-            if (gv) {
-                return gv;
-            }
-        }
-        return nullptr;
-    }
+    const llvm::Function* getFunction(const char* name);
+    const llvm::GlobalVariable* getGlobalVariable(const char* name);
+    const llvm::GlobalValue* getGlobalValue(const char* name);
     llvm::StructType* getNamedType(const char* name) {
-        for (auto& m : Ms) {
-            auto t(m->getTypeByName(name));
-            if (t) {
-                return t;
-            }
-        }
-        return nullptr;
+        return M->getTypeByName(name);
     }
     uint64_t getSymbolAddress(const std::string&);
-    void addModule(llvm::Module* m) {
-        Ms.push_back(m);
-    }
+    void addModule(llvm::Module* m);
     std::vector<llvm::Module*>& getModules() { return Ms; } // not going to protect these!!!
 
     static int64_t LLVM_COUNT;
     static bool OPTIMIZE_COMPILES;
     static bool VERIFY_COMPILES;
-    static bool FAST_COMPILES;
     static bool BACKGROUND_COMPILES;
-
 
     llvm::Module* M;
     llvm::ModuleProvider* MP;

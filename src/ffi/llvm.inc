@@ -4,12 +4,6 @@ pointer optimizeCompiles(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-pointer fastCompiles(scheme* Scheme, pointer Args)
-{
-    EXTLLVM::FAST_COMPILES = (pair_car(Args) == Scheme->T);
-    return Scheme->T;
-}
-
 pointer jitCompileIRString(scheme* Scheme, pointer Args)
 {
     auto modulePtr(jitCompile(string_value(pair_car(Args))));
@@ -39,20 +33,20 @@ pointer ff_get_name(scheme* Scheme, pointer Args)
 
 pointer get_function(scheme* Scheme, pointer Args)
 {
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
+    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
     if (!func) {
         return Scheme->F;
     }
-    return mk_cptr(Scheme, func);
+    return mk_cptr(Scheme, const_cast<llvm::Function*>(func));
 }
 
 pointer get_globalvar(scheme* Scheme, pointer Args)
 {
-    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(Args)));
+    auto var(extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(Args))));
     if (!var) {
         return Scheme->F;
     }
-    return mk_cptr(Scheme, var);
+    return mk_cptr(Scheme, const_cast<llvm::GlobalVariable*>(var));
 }
 
 pointer get_struct_size(scheme* Scheme, pointer Args)
@@ -385,12 +379,12 @@ pointer callClosure(scheme* Scheme, pointer Args)
 
 pointer printLLVMFunction(scheme* Scheme, pointer Args)
 {
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args)));
-        std::string str;
-        llvm::raw_string_ostream ss(str);
-        ss << *func;
-        printf("%s",str.c_str());
-        return Scheme->T;
+    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    std::string str;
+    llvm::raw_string_ostream ss(str);
+    ss << *func;
+    puts(str.c_str());
+    return Scheme->T;
 }
 
 pointer llvm_print_all_closures(scheme* Scheme, pointer Args)
@@ -666,7 +660,6 @@ pointer get_named_type(scheme* Scheme, pointer Args)
 
 #define LLVM_DEFS \
         { "llvm:optimize", &optimizeCompiles }, \
-        { "llvm:fast-compile", &fastCompiles }, \
         { "llvm:jit-compile-ir-string", &jitCompileIRString}, \
         { "llvm:ffi-set-name", &ff_set_name }, \
         { "llvm:ffi-get-name", &ff_get_name }, \

@@ -120,71 +120,44 @@
 
 // llvm_scheme foreign function -> string name
 // also is not thread safe!
-std::map<foreign_func,std::string> LLVM_SCHEME_FF_MAP;
-
-// this must be global. we should therefore
-// make it thread safe but I'm not going to bother
-// while still testing.
-std::map<std::string,std::string> LLVM_STR_CONST_MAP;
+std::map<foreign_func, std::string> LLVM_SCHEME_FF_MAP;
 
 extemp::EXTMutex alloc_mutex("alloc mutex");
 
-//#ifdef _WIN32
-//double log2(double num) {
-//      return log(num)/log(2.0);
-//}
-//#endif
-
-// double (&cosd)(double) = cos;
-// double (&tand)(double) = tan;
-// double (&sind)(double) = sin;
-// double (&coshd)(double) = cosh;
-// double (&tanhd)(double) = tanh;
-// double (&sinhd)(double) = sinh;
-// double (&acosd)(double) = acos;
-// double (&asind)(double) = asin;
-// double (&atand)(double) = atan;
-// double (&atan2d)(double,double) = atan2;
-// double (&ceild)(double) = ceil;
-// double (&floord)(double) = floor;
-// double (&expd)(double) = exp;
-// double (&fmodd)(double,double) = fmod;
-// double (&powd)(double,double) = pow;
-// double (&logd)(double) = log;
-// double (&log2d)(double) = log2;
-// double (&log10d)(double) = log10;
-// double (&sqrtd)(double) = sqrt;
-// double (&fabsd)(double) = fabs;
-
-void* malloc16(size_t s)
+static void* malloc16(size_t Size)
 {
-  unsigned char *p;
-  unsigned char *porig = (unsigned char*) malloc (s + 0x10);   // allocate extra
-  if (porig == NULL) return NULL;                              // catch out of memory
-  p = (unsigned char*) (((uintptr_t) porig + 16) & (~0x0f));   // insert padding
-  *(p-1) = p - porig;                                          // store padding size
-  return p;
+#ifdef _WIN32
+    return _aligned_malloc(Size, 16);
+#else
+    void* result;
+    if (posix_memalign(&result, 16, Size)) {
+        return nullptr;
+    }
+    return result;
+#endif
 }
 
-void free16(void *p) {
-  unsigned char *porig = (unsigned char*) p;  // work out original
-  porig = porig - *(porig-1);                 // by subtracting padding
-  free (porig);                               // then free that
+static void free16(void* Ptr) {
+#ifdef _WIN32
+    _aligned_free(Ptr);
+#else
+    free(Ptr);
+#endif
 }
 
 const char* llvm_scheme_ff_get_name(foreign_func ff)
 {
-   return (LLVM_SCHEME_FF_MAP[ff]).c_str();
+    return LLVM_SCHEME_FF_MAP[ff].c_str();
 }
 
 void llvm_scheme_ff_set_name(foreign_func ff,const char* name)
 {
-  LLVM_SCHEME_FF_MAP[ff] = std::string(name);
-  return;
+    LLVM_SCHEME_FF_MAP[ff] = std::string(name);
+    return;
 }
 
 // LLVM RUNTIME ERROR
-void llvm_runtime_error(int error,void* arg)
+void llvm_runtime_error(int error, void* arg)
 {
   ascii_error();
   switch(error){
@@ -1116,7 +1089,6 @@ namespace extemp {
 EXTLLVM EXTLLVM::SINGLETON;
 int64_t EXTLLVM::LLVM_COUNT = 0l;
 bool EXTLLVM::OPTIMIZE_COMPILES = false;
-bool EXTLLVM::FAST_COMPILES = false;
 bool EXTLLVM::BACKGROUND_COMPILES = false;
 bool EXTLLVM::VERIFY_COMPILES = true;
 
@@ -1443,6 +1415,63 @@ llvm_zone_t* llvm_zone_reset_extern(llvm_zone_t* Zone)
 llvm_zone_t* llvm_zone_create_extern(uint64_t Size)
 {
     return llvm_zone_create(Size);
+}
+
+}
+
+#include <unordered_map>
+
+static std::unordered_map<std::string, const llvm::GlobalValue*> sGlobalMap;
+
+namespace extemp {
+
+void EXTLLVM::addModule(llvm::Module* Module)
+{
+    for (const auto& function : Module->getFunctionList()) {
+        std::string str;
+        llvm::raw_string_ostream stream(str);
+        function.printAsOperand(stream, false);
+        auto result(sGlobalMap.insert(std::make_pair(stream.str().substr(1), &function)));
+        if (!result.second) {
+            result.first->second = &function;
+        }
+    }
+    for (const auto& global : Module->getGlobalList()) {
+        std::string str;
+        llvm::raw_string_ostream stream(str);
+        global.printAsOperand(stream, false);
+        auto result(sGlobalMap.insert(std::make_pair(stream.str().substr(1), &global)));
+        if (!result.second) {
+            result.first->second = &global;
+        }
+    }
+    Ms.push_back(Module);
+}
+
+const llvm::GlobalValue* EXTLLVM::getGlobalValue(const char* Name)
+{
+    auto iter(sGlobalMap.find(Name));
+    if (likely(iter != sGlobalMap.end())) {
+        return iter->second;
+    }
+    return nullptr;
+}
+
+const llvm::GlobalVariable* EXTLLVM::getGlobalVariable(const char* Name)
+{
+    auto val(getGlobalValue(Name));
+    if (likely(val)) {
+        return llvm::dyn_cast<llvm::GlobalVariable>(val);
+    }
+    return nullptr;
+}
+
+const llvm::Function* EXTLLVM::getFunction(const char* Name) {
+    auto val(getGlobalValue(Name));
+    if (likely(val)) {
+        return llvm::dyn_cast<llvm::Function>(val);
+    }
+    return nullptr;
 }
 
 }

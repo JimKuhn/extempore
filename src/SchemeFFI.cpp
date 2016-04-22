@@ -214,12 +214,6 @@ void initSchemeFFI(scheme* sc)
         scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), arg);
     }
 
-    // pointer scmAddForeignFunc(scheme* sc, pointer Args) {
-    //   //char* sym_name = string_value(pair_car(Args));
-    //   foreign_func func = (foreign_func) cptr_value(pair_car(Args));
-    //   //scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
-    //   return mk_foreign_func(sc,func); //sc->T;
-    // }
 void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func)
 {
     scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
@@ -268,13 +262,6 @@ pointer impcirAdd(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-    ///////////////////////////////////////////////////////
-    //
-    // REGEX STUFF
-    //
-    //////////////////////////////////////////////////////
-
-
     void freeWithDelay(TaskI* task)
     {
         Task<char*>* t = static_cast<Task<char*>*>(task);
@@ -288,17 +275,6 @@ pointer impcirAdd(scheme* Scheme, pointer Args)
         llvm_zone_t* zone = t->getArg();
         llvm_zone_destroy(zone);
     }
-
-
-
-
-
-    ////////////////////////////////////////////
-    //
-    // LLVM STUFF
-    //
-    /////////////////////////////////////////////
-
 
 pointer verifyCompiles(scheme* Scheme, pointer Args)
 {
@@ -382,86 +358,68 @@ std::cout << pa.getMessage().str() << std::endl;
         }
     }
     std::unique_ptr<llvm::Module> newModule;
-    bool built(false);
-    if (!EXTLLVM::FAST_COMPILES) { // this might not be necessary any more (benchmark later)
-        auto context(LLVMContextCreate());
-        newModule = parseAssemblyString(asmcode, pa, *unwrap(context));
-        built = bool(newModule);
-        newModule.reset();
-        LLVMContextDispose(context);
-    }
-    if (likely(!built)) {
-        std::vector<std::string> symbols;
-        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sGlobalSymRegex, 1),
-                std::sregex_token_iterator(), std::inserter(symbols, symbols.begin()));
-        std::sort(symbols.begin(), symbols.end());
-        auto end(std::unique(symbols.begin(), symbols.end()));
-        std::unordered_set<std::string> ignoreSyms;
-        std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sDefineSymRegex, 1),
-                std::sregex_token_iterator(), std::inserter(ignoreSyms, ignoreSyms.begin()));
-        std::string declarations;
-        llvm::raw_string_ostream dstream(declarations);
-        for (auto iter = symbols.begin(); iter != end; ++iter) {
-            const char* sym(iter->c_str());
-            if ((!EXTLLVM::FAST_COMPILES && sInlineSyms.find(sym) != sInlineSyms.end()) ||
-                    ignoreSyms.find(sym) != ignoreSyms.end()) {
-                continue;
-            }
-            auto gv = extemp::EXTLLVM::I()->getGlobalValue(sym);
-            if (!gv) {
-                continue;
-            }
-            auto func(llvm::dyn_cast<llvm::Function>(gv));
-            if (func) {
-                dstream << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
-                bool first(true);
-                for (const auto& arg : func->getArgumentList()) {
-                    if (!first) {
-                        dstream << ", ";
-                    } else {
-                        first = false;
-                    }
-                    dstream << SanitizeType(arg.getType());
-                }
-                if (func->isVarArg()) {
-                    dstream << ", ...";
-                }
-                dstream << ")\n";
-            } else {
-                auto str(SanitizeType(gv->getType()));
-                dstream << '@' << sym << " = external global " << str.substr(0, str.length() - 1) << '\n';
-            }
+    std::vector<std::string> symbols;
+    std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sGlobalSymRegex, 1),
+            std::sregex_token_iterator(), std::inserter(symbols, symbols.begin()));
+    std::sort(symbols.begin(), symbols.end());
+    auto end(std::unique(symbols.begin(), symbols.end()));
+    std::unordered_set<std::string> ignoreSyms;
+    std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sDefineSymRegex, 1),
+            std::sregex_token_iterator(), std::inserter(ignoreSyms, ignoreSyms.begin()));
+    std::string declarations;
+    llvm::raw_string_ostream dstream(declarations);
+    for (auto iter = symbols.begin(); iter != end; ++iter) {
+        const char* sym(iter->c_str());
+        if (sInlineSyms.find(sym) != sInlineSyms.end() || ignoreSyms.find(sym) != ignoreSyms.end()) {
+            continue;
         }
-// std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
-        if (!EXTLLVM::FAST_COMPILES) {
-            auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), getGlobalContext()));
-            if (likely(modOrErr)) {
-                newModule = std::move(modOrErr.get());
-                asmcode = sInlineString + dstream.str() + asmcode;
-if (sEmitCode) {
-    std::cout << "EMITTING\n" << asmcode << "DONE EMITTING\n";
-}
-                if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
-std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
-                    newModule.reset();
+        auto gv = extemp::EXTLLVM::I()->getGlobalValue(sym);
+        if (!gv) {
+            continue;
+        }
+        auto func(llvm::dyn_cast<llvm::Function>(gv));
+        if (func) {
+            dstream << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
+            bool first(true);
+            for (const auto& arg : func->getArgumentList()) {
+                if (!first) {
+                    dstream << ", ";
+                } else {
+                    first = false;
                 }
+                dstream << SanitizeType(arg.getType());
             }
+            if (func->isVarArg()) {
+                dstream << ", ...";
+            }
+            dstream << ")\n";
         } else {
-            newModule = parseAssemblyString(dstream.str() + asmcode, pa, getGlobalContext());
+            auto str(SanitizeType(gv->getType()));
+            dstream << '@' << sym << " = external global " << str.substr(0, str.length() - 1) << '\n';
+        }
+    }
+// std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
+    if (!sInlineBitcode.empty()) {
+        auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), getGlobalContext()));
+        if (likely(modOrErr)) {
+            newModule = std::move(modOrErr.get());
+            asmcode = sInlineString + dstream.str() + asmcode;
+            if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
+std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
+                newModule.reset();
+            }
         }
     } else {
-        newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
+       newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
     }
     if (newModule) {
         if (unlikely(!extemp::UNIV::ARCH.empty())) {
             newModule->setTargetTriple(extemp::UNIV::ARCH);
         }
-        if (!EXTLLVM::FAST_COMPILES) {
-            if (EXTLLVM::OPTIMIZE_COMPILES) {
-                PM->run(*newModule);
-            } else {
-                PM_NO->run(*newModule);
-            }
+        if (EXTLLVM::OPTIMIZE_COMPILES) {
+            PM->run(*newModule);
+        } else {
+            PM_NO->run(*newModule);
         }
     }
     //std::stringstream ss;
@@ -478,6 +436,7 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
         std::cout << "\nInvalid LLVM IR\n";
         return nullptr;
     }
+
     llvm::Module *modulePtr = newModule.get();
     extemp::EXTLLVM::I()->EE->addModule(std::move(newModule));
     extemp::EXTLLVM::I()->EE->finalizeObject();
