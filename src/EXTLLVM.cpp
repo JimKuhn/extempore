@@ -1229,11 +1229,11 @@ void initLLVM()
     static struct {
         const char* name;
         uintptr_t   address;
-    } functionTable[] = {
+    } mappingTable[] = {
         { "llvm_disassemble", uintptr_t(&llvm_disassemble) }
     };
 
-    for (auto& elem : funcTable) {
+    for (auto& elem : mappingTable) {
         EE->updateGlobalMapping(elem.name, elem.address);
     }
 
