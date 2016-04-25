@@ -64,7 +64,13 @@ static const char TERMINATION_CHAR = 23;
 #define FD_COPY(f, t) static_cast<void>(*(t) = *(f))
 #endif
 
-extern llvm_zone_t* llvm_zone_create(uint64_t);
+namespace extemp {
+namespace EXTLLVM {
+
+llvm_zone_t* llvm_zone_create(uint64_t);
+
+}
+}
 
 namespace extemp {
 
@@ -95,7 +101,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
     }
     m_scheme = scheme_init_new();
     m_scheme->m_process = this;
-    m_defaultZone = llvm_zone_create(50 * 1024 * 1024); // allocate default zone of 50M
+    m_defaultZone = extemp::EXTLLVM::llvm_zone_create(50 * 1024 * 1024); // allocate default zone of 50M
     strcpy(m_scheme->name, m_name.c_str());
     m_maxDuration = m_scheme->call_default_time;
     memset(m_schemeOutportString, 0, SCHEME_OUTPORT_STRING_LENGTH);

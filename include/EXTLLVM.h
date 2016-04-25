@@ -77,116 +77,21 @@ struct llvm_zone_stack
 
 extern __thread llvm_zone_stack* tls_llvm_zone_stack;
 extern __thread uint64_t tls_llvm_zone_stacksize;
-extern __thread llvm_zone_t* tls_llvm_callback_zone;
 
 extern "C"
 {
-char* llvm_disassemble(const unsigned char*,int syntax);
 
-const unsigned LLVM_ZONE_ALIGN = 32; // MUST BE POWER OF 2!
-const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
-
-inline llvm_zone_t* llvm_zone_create(uint64_t size)
-{
-    llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
-    if (unlikely(!zone)) {
-        printf("Catastrophic memory failure!\n");
-        fflush(stdout);
-        abort();
-    }
-#ifdef _WIN32
-    zone->memory = malloc(size_t(size));
-#else
-    posix_memalign(&zone->memory, LLVM_ZONE_ALIGN, size_t(size));
-#endif
-    zone->mark = 0;
-    zone->offset = 0;
-    if (unlikely(!zone->memory)) {
-        size = 0;
-    }
-    zone->size = size;
-    zone->cleanup_hooks = nullptr;
-    zone->memories = nullptr;
-    return zone;
-}
-
-inline llvm_zone_t* llvm_threads_get_callback_zone()
-{
-    if (unlikely(!tls_llvm_callback_zone)) {
-        tls_llvm_callback_zone = llvm_zone_create(1024 * 1024); // default callback zone 1M
-    }
-  return tls_llvm_callback_zone;
-}
-inline llvm_zone_stack* llvm_threads_get_zone_stack()
-{
-  return tls_llvm_zone_stack;
-}
-inline void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
-{
-  tls_llvm_zone_stack = llvm_zone_stack;
-}
-inline void llvm_threads_inc_zone_stacksize() {
-  ++tls_llvm_zone_stacksize;
-}
-inline void llvm_threads_dec_zone_stacksize() {
-  --tls_llvm_zone_stacksize;
-}
-inline uint64_t llvm_threads_get_zone_stacksize() {
-  return tls_llvm_zone_stacksize;
-}
-
-const char*  llvm_scheme_ff_get_name(foreign_func ff);
+const char* llvm_scheme_ff_get_name(foreign_func ff);
 void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
 void llvm_runtime_error(int error, void* arg);
-
-inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
-{
-    Zone->offset = 0;
-    return Zone;
-}
 
 bool llvm_zone_copy_ptr(void* ptr1, void* ptr2);
 void llvm_zone_mark(llvm_zone_t* zone);
 uint64_t llvm_zone_mark_size(llvm_zone_t* zone);
 void llvm_zone_ptr_set_size(void* ptr, uint64_t size);
 uint64_t llvm_zone_ptr_size(void* ptr);
-void llvm_zone_destroy(llvm_zone_t* zone);
 void llvm_zone_print(llvm_zone_t* zone);
 void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay);
-void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
-llvm_zone_t* llvm_pop_zone_stack();
-
-inline void llvm_push_zone_stack(llvm_zone_t* z)
-{
-    llvm_zone_stack* stack = (llvm_zone_stack*) malloc(sizeof(llvm_zone_stack));
-    stack->head = z;
-    stack->tail = llvm_threads_get_zone_stack();
-    llvm_threads_set_zone_stack(stack);
-    return;
-}
-
-inline llvm_zone_t* llvm_peek_zone_stack()
-{
-    llvm_zone_t* z = 0;
-    llvm_zone_stack* stack = llvm_threads_get_zone_stack();
-    if (unlikely(!stack)) {  // for the moment create a "DEFAULT" zone if stack is NULL
-#if DEBUG_ZONE_STACK
-        printf("TRYING TO PEEK AT A NULL ZONE STACK\n");
-#endif
-        llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1); // default root zone is 1M
-        llvm_push_zone_stack(z);
-        stack = llvm_threads_get_zone_stack();
-#if DEBUG_ZONE_STACK
-        printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
-#endif
-        return z;
-    }
-    z = stack->head;
-#if DEBUG_ZONE_STACK
-    printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
-#endif
-    return z;
-}
 
 bool llvm_ptr_in_zone(llvm_zone_t*, void*);
 bool llvm_ptr_in_current_zone(void*);
@@ -301,6 +206,97 @@ namespace extemp
 namespace EXTLLVM
 {
 
+const unsigned LLVM_ZONE_ALIGN = 32; // MUST BE POWER OF 2!
+const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
+
+inline llvm_zone_t* llvm_zone_create(uint64_t size)
+{
+    auto zone(reinterpret_cast<llvm_zone_t*>(malloc(sizeof(llvm_zone_t))));
+    if (unlikely(!zone)) {
+        abort(); // in case a leak can be analyzed post-mortem
+    }
+#ifdef _WIN32
+    zone->memory = malloc(size_t(size)); // TODO: what about alignment for Windows???
+#else
+    posix_memalign(&zone->memory, LLVM_ZONE_ALIGN, size_t(size));
+#endif
+    zone->mark = 0;
+    zone->offset = 0;
+    if (unlikely(!zone->memory)) {
+        size = 0;
+    }
+    zone->size = size;
+    zone->cleanup_hooks = nullptr;
+    zone->memories = nullptr;
+    return zone;
+}
+
+void llvm_zone_destroy(llvm_zone_t* Zone);
+
+inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
+{
+    Zone->offset = 0;
+    return Zone;
+}
+
+extern "C" void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
+
+inline llvm_zone_stack* llvm_threads_get_zone_stack()
+{
+    return tls_llvm_zone_stack;
+}
+
+inline void llvm_threads_set_zone_stack(llvm_zone_stack* Stack)
+{
+    tls_llvm_zone_stack = Stack;
+}
+
+inline void llvm_push_zone_stack(llvm_zone_t* Zone)
+{
+    auto stack(reinterpret_cast<llvm_zone_stack*>(malloc(sizeof(llvm_zone_stack))));
+    stack->head = Zone;
+    stack->tail = llvm_threads_get_zone_stack();
+    llvm_threads_set_zone_stack(stack);
+    return;
+}
+
+inline llvm_zone_t* llvm_peek_zone_stack()
+{
+    llvm_zone_t* z = 0;
+    llvm_zone_stack* stack = llvm_threads_get_zone_stack();
+    if (unlikely(!stack)) {  // for the moment create a "DEFAULT" zone if stack is NULL
+#if DEBUG_ZONE_STACK
+        printf("TRYING TO PEEK AT A NULL ZONE STACK\n");
+#endif
+        llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1); // default root zone is 1M
+        llvm_push_zone_stack(z);
+        stack = llvm_threads_get_zone_stack();
+#if DEBUG_ZONE_STACK
+        printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
+#endif
+        return z;
+    }
+    z = stack->head;
+#if DEBUG_ZONE_STACK
+    printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
+#endif
+    return z;
+}
+
+llvm_zone_t* llvm_pop_zone_stack();
+
+inline void llvm_threads_inc_zone_stacksize() {
+    ++tls_llvm_zone_stacksize;
+}
+
+inline void llvm_threads_dec_zone_stacksize() {
+    --tls_llvm_zone_stacksize;
+}
+
+inline uint64_t llvm_threads_get_zone_stacksize() {
+    return tls_llvm_zone_stacksize;
+}
+
 uint64_t getSymbolAddress(const std::string&);
 void addModule(llvm::Module* m);
 
@@ -322,6 +318,7 @@ inline llvm::StructType* getNamedType(const char* name) {
     return M->getTypeByName(name);
 }
 inline std::vector<llvm::Module*>& getModules() { return Ms; } // not going to protect these!!!
+extern "C" const char* llvm_disassemble(const unsigned char*  Code, int Syntax);
 
 }
 

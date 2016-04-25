@@ -453,7 +453,7 @@ static pointer llvm_disasm(scheme* Scheme, pointer Args)
     auto name(llvm_closure_last_name(Scheme, Args));
     auto fptr(reinterpret_cast<unsigned char*>(cptr_value(get_function_pointer(Scheme,
             cons(Scheme, name, pair_cdr(Args))))));
-    return mk_string(Scheme, llvm_disassemble(fptr, syntax));
+    return mk_string(Scheme, extemp::EXTLLVM::llvm_disassemble(fptr, syntax));
 }
 
 static pointer bind_symbol(scheme* Scheme, pointer Args)
