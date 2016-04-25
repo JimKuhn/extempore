@@ -271,11 +271,11 @@ unsigned char* base64_decode(const char *data,
 }
 
 
-bool rmatch(char* regex, char* str)
+bool rmatch(char* regex, const char* str)
 {
   //  char* data = char* strstring_value(pair_car(args));
   // char* pattern = string_value(pair_cadr(args));
-  char* data = str;
+  const char* data = str;
   char* pattern = regex;
 
   pcre *re;

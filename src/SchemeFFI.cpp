@@ -131,8 +131,6 @@ namespace extemp {
 
 namespace SchemeFFI {
 
-static std::unordered_map<std::string, std::string> LLVM_ALIAS_TABLE;
-
 #include "ffi/utility.inc"
 #include "ffi/ipc.inc"
 #include "ffi/assoc.inc"

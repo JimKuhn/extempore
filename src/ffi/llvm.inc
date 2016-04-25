@@ -350,35 +350,29 @@ pointer llvm_count_inc(scheme* Scheme, pointer Args)
 
 pointer callClosure(scheme* Scheme, pointer Args)
 {
-    using namespace llvm;
-    uint32_t** closure = (uint32_t**) cptr_value(pair_car(Args));
-    void* eptr = closure[0];
-    int64_t (*fptr)(void*, int64_t) = (int64_t (*)(void*, int64_t)) closure[0];
-    return mk_integer(Scheme, (*fptr)(eptr, ivalue(pair_cadr(Args))));
+    uint32_t** closure = reinterpret_cast<uint32_t**>(cptr_value(pair_car(Args)));
+    auto fptr(reinterpret_cast<int64_t (*)(void*, int64_t)>(closure[0]));
+    return mk_integer(Scheme, (*fptr)(closure[0], ivalue(pair_cadr(Args))));
 }
 
-    pointer printLLVMModule(scheme* Scheme, pointer Args)
-    {
-        llvm::Module* M = EXTLLVM::I()->M;
-        std::string str;
-        llvm::raw_string_ostream ss(str);
-
-        if(list_length(Scheme, Args) > 0) {
-            const llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(Args)));
-    //llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(Args))));
-            if(val == NULL) {
-                std::cerr << "No such value found in LLVM Module" << std::endl;
-                return Scheme->F;
-            }
-            ss << *val;
-            printf("At address: %p\n%s\n",val,str.c_str());
-        } else {
-            ss << *M;
+pointer printLLVMModule(scheme* Scheme, pointer Args) // TODO: This isn't used?
+{
+    std::string str;
+    llvm::raw_string_ostream ss(str);
+    if (list_length(Scheme, Args) > 0) {
+        const llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(Args)));
+        if (!val) {
+            std::cerr << "No such value found in LLVM Module" << std::endl;
+            return Scheme->F;
         }
-
-        printf("%s",str.c_str());
-        return Scheme->T;
+        ss << *val;
+        printf("At address: %p\n%s\n",val, ss.str().c_str());
+    } else {
+        ss << *extemp::EXTLLVM::I()->M;
     }
+    printf("%s", ss.str().c_str());
+    return Scheme->T;
+}
 
 pointer printLLVMFunction(scheme* Scheme, pointer Args)
 {
@@ -386,149 +380,114 @@ pointer printLLVMFunction(scheme* Scheme, pointer Args)
     std::string str;
     llvm::raw_string_ostream ss(str);
     ss << *func;
-    puts(str.c_str());
+    puts(ss.str().c_str());
     return Scheme->T;
 }
 
-pointer llvm_print_all_closures(scheme* Scheme, pointer Args)
-  {
-    using namespace llvm;
+pointer llvm_print_all_closures(scheme* Scheme, pointer Args) // TODO
+{
     char* x = string_value(pair_car(Args));
     char rgx[1024];
     strcpy(rgx, x);
     strcat(rgx, "_.*");
-    // printf("check regex: %s\n",(char*)&rgx[0]);
-
-    Module* M = NULL;
-    std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
-    for (int i=0;i<Ms.size();i++) {
-      M = Ms[i];
-      for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
-        const llvm::Function* func = &*GI;
-        if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
-          //printf("HIT %s\n",func->getName().data());
-          std::string str;
-          llvm::raw_string_ostream ss(str);
-          ss << *func;
-          printf("\n---------------------------------------------------\n%s",str.c_str());
+    for (auto module : EXTLLVM::I()->getModules()) {
+        for (const auto& func : module->getFunctionList()) {
+            if (func.hasName() && rmatch(rgx, func.getName().data())) {
+                std::string str;
+                llvm::raw_string_ostream ss(str);
+                ss << func;
+                printf("\n---------------------------------------------------\n%s", ss.str().c_str());
+            }
         }
-      }
     }
     return Scheme->T;
-  }
+}
 
-    pointer llvm_print_closure(scheme* Scheme, pointer Args)
-  {
-    using namespace llvm;
-    char* fname = string_value(pair_car(Args));
-
-    Module* M = NULL;
-    std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
-    for (int i=0;i<Ms.size();i++) {
-      M = Ms[i];
-      for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
-        const llvm::Function* func = &*GI;
-        if (func->hasName() && strcmp(func->getName().data(),fname)==0) {
-          std::string str;
-          llvm::raw_string_ostream ss(str);
-          ss << *func;
-          if(str.find_first_of("{") != std::string::npos) {
-            std::cout << str << std::endl;
-          }
-          //printf("\n---------------------------------------------------\n%s",str.c_str());
+pointer llvm_print_closure(scheme* Scheme, pointer Args) // TODO
+{
+    auto fname(string_value(pair_car(Args)));
+    for (auto module : EXTLLVM::I()->getModules()) {
+        for (const auto& func : module->getFunctionList()) {
+            if (func.hasName() && !strcmp(func.getName().data(), fname)) {
+                std::string str;
+                llvm::raw_string_ostream ss(str);
+                ss << func;
+                if (ss.str().find_first_of("{") != std::string::npos) {
+                    std::cout << str << std::endl;
+                }
+            }
         }
-      }
     }
     return Scheme->T;
-  }
+}
 
 pointer llvm_closure_last_name(scheme* Scheme, pointer Args)
-  {
-    using namespace llvm;
-    char* x = string_value(pair_car(Args));
+{
+    auto x(string_value(pair_car(Args)));
     char rgx[1024];
     strcpy(rgx, x);
     strcat(rgx, "__[0-9]*");
-    // printf("check regex: %s\n",(char*)&rgx[0]);
-    char* last_name = NULL;
-
-    Module* M = NULL;
-    std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
-    for (int i=0;i<Ms.size();i++) {
-      M = Ms[i];
-      for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
-        const llvm::Function* func = &*GI;
-        if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
-          last_name = (char*)func->getName().data();
+    const char* last_name(nullptr);
+    for (auto module : EXTLLVM::I()->getModules()) {
+        for (const auto& func : module->getFunctionList()) {
+            if (func.hasName() && rmatch(rgx, func.getName().data())) {
+                last_name = func.getName().data();
+            }
         }
-      }
     }
-    //std::cout << "fullname:" << last_name << std::endl;
-    if(last_name) return mk_string(Scheme,last_name);
-    else return Scheme->F;
-  }
+    if (last_name) {
+        return mk_string(Scheme, last_name);
+    }
+    return Scheme->F;
+}
 
 pointer llvm_disasm(scheme* Scheme, pointer Args)
-  {
-    //using namespace llvm;
-    //long bytes = ivalue(pair_cadr(Args));
-    //int x64 = (pair_caddr(Args) == Scheme->T) ? 1 : 0;
+{
     int lgth = list_length(Scheme, Args);
-    int syntax = 1;
-    if(lgth > 1) {
-      syntax = ivalue(pair_cadr(Args));
-    }
+    int syntax = (lgth > 1) ? ivalue(pair_cadr(Args)) : 1;
     if (syntax > 1) {
       std::cout << "Syntax argument must be either 0: at&t or 1: intel" << std::endl;
       std::cout << "The default is 1: intel" << std::endl;
       syntax = 1;
     }
-    pointer name = llvm_closure_last_name(Scheme, Args);
-    unsigned char* fptr = (unsigned char*) cptr_value(get_function_pointer(Scheme,cons(Scheme,name,pair_cdr(Args))));
-    char* dasm = llvm_disassemble(fptr,syntax); //,bytes,x64);
-    return mk_string(Scheme,dasm);
-  }
+    auto name(llvm_closure_last_name(Scheme, Args));
+    auto fptr(reinterpret_cast<unsigned char*>(cptr_value(get_function_pointer(Scheme,
+            cons(Scheme, name, pair_cdr(Args))))));
+    return mk_string(Scheme, llvm_disassemble(fptr, syntax));
+}
 
-  pointer bind_symbol(scheme* Scheme, pointer Args)
-  {
-    void* library = cptr_value(pair_car(Args));
-    char* symname = string_value(pair_cadr(Args));
+pointer bind_symbol(scheme* Scheme, pointer Args)
+{
+    auto library(cptr_value(pair_car(Args)));
+    auto sym(string_value(pair_cadr(Args)));
 
-    llvm::Module* M = EXTLLVM::I()->M;
     llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
-
     llvm::MutexGuard locked(EE->lock);
-
 #ifdef _WIN32
-    void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
+    auto ptr(reintepret_cat<void*>(GetProcAddress(reinterpret_cast<HMODULE>(library), sym));
 #else
-    void* ptr = dlsym(library, symname);
+    auto ptr(dlsym(library, sym));
 #endif
-    if(ptr) {
-      EE->updateGlobalMapping(symname, (uint64_t)ptr);
-      return Scheme->T;
-    }else{
-      // printf("Could not find symbol named %s\n",symname);
-      return Scheme->F;
+    if (likely(ptr)) {
+        EE->updateGlobalMapping(sym, reinterpret_cast<uint64_t>(ptr));
+        return Scheme->T;
     }
-  }
+    return Scheme->F;
+}
 
-  pointer update_mapping(scheme* Scheme, pointer Args)
-  {
-    char* symname = string_value(pair_car(Args));
-    void* ptr = cptr_value(pair_cadr(Args));
-
-    llvm::Module* M = EXTLLVM::I()->M;
+pointer update_mapping(scheme* Scheme, pointer Args)
+{
+    auto sym(string_value(pair_car(Args)));
+    auto ptr(cptr_value(pair_cadr(Args)));
     llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
-
     llvm::MutexGuard locked(EE->lock);
-
     // returns previous value of the mapping, or NULL if not set
-    uint64_t oldval = EE->updateGlobalMapping(symname, (uint64_t)ptr);
-    return mk_cptr(Scheme, (void*)oldval);
-  }
+    auto oldval(EE->updateGlobalMapping(sym, reinterpret_cast<uint64_t>(ptr)));
+    return mk_cptr(Scheme, reinterpret_cast<void*>(oldval));
+}
 
-    // For simple preprocessor alias's
+static std::unordered_map<std::string, std::string> LLVM_ALIAS_TABLE;
+
 pointer add_llvm_alias(scheme* Scheme, pointer Args)
 {
     LLVM_ALIAS_TABLE[string_value(pair_car(Args))] = string_value(pair_cadr(Args));
@@ -547,119 +506,81 @@ pointer get_llvm_alias(scheme* Scheme, pointer Args)
 
 pointer get_named_type(scheme* Scheme, pointer Args)
 {
-        char* n = string_value(pair_car(Args));
-        char nk[256];
-        char* name = nk;
-        strcpy(name,n);
-        if (name[0] == '%') name = name+1;
-
-        int ptrdepth = 0;
-        while(name[strlen(name)-1] == '*') {
-          name[strlen(name)-1]='\0';
-    ptrdepth++;
-        }
-
-        //llvm::Module* M = EXTLLVM::I()->M;
-        //const llvm::Type* tt = M->getTypeByName(name);
-  const llvm::Type* tt = extemp::EXTLLVM::I()->getNamedType(name);
-
-        if(tt) {
-          //return mk_string(Scheme,M->getTypeName(tt).c_str());
-          std::string typestr;
-          llvm::raw_string_ostream ss(typestr);
-          tt->print(ss);
-
-
-          const char* tmp_name = ss.str().c_str();
-          if(tt->isStructTy()) {
-            const char* eq_type_string = " = type ";
-            rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
+    const char* name = string_value(pair_car(Args));
+    if (name[0] == '%') {
+        ++name;
+    }
+    int ptrDepth = 0;
+    auto len(strlen(name) - 1);
+    while (len >= 0 && name[len] == '*') {
+        ++ptrDepth;
+    }
+    auto tt(extemp::EXTLLVM::I()->getNamedType(std::string(name, len).c_str()));
+    if (tt) {
+        std::string typestr;
+        llvm::raw_string_ostream ss(typestr);
+        tt->print(ss);
+        auto tmp_name = ss.str().c_str();
+        if (tt->isStructTy()) {
+            rsplit(" = type ", tmp_name, tmp_str_a, tmp_str_b);
             tmp_name = tmp_str_b;
-          }
-
-          //add back any requried '*'s
-          if(ptrdepth>0) {
-            char tmpstr[256];
-            strcpy(tmpstr,tmp_name);
-            auto len(strlen(tmpstr));
-            for( ;ptrdepth>0;ptrdepth--, ++len) {
-              tmpstr[len]='*';
-            }
-            tmpstr[len] = '\0';
-            tmp_name = tmpstr;
-          }
-          return mk_string(Scheme,tmp_name);
-        } else {
-          return Scheme->NIL;
         }
+        return mk_string(Scheme, (std::string(tmp_str_b) + std::string(ptrDepth, '*')).c_str());
+    }
+    return Scheme->NIL;
 }
 
-  pointer get_global_module(scheme* Scheme, pointer Args)
-  {
-    using namespace llvm;
-
-    Module* M = EXTLLVM::I()->M;
-    if(M == NULL)
-      {
+pointer get_global_module(scheme* Scheme, pointer Args)
+{
+    auto m(EXTLLVM::I()->M);
+    if (!m) {
         return Scheme->F;
-      }
-    return mk_cptr(Scheme, M);
-  }
+    }
+    return mk_cptr(Scheme, m);
+}
 
-  pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args)
-  {
-    using namespace llvm;
-
-    Module* m = (Module *)cptr_value(pair_car(Args));
-
-    if(m == 0)
-      {
+pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args)
+{
+    auto m(reinterpret_cast<llvm::Module*>(cptr_value(pair_car(Args))));
+    if (!m) {
         return Scheme->F;
-      }
-
-    char* filename = string_value(pair_cadr(Args));
+    }
+    auto filename(string_value(pair_cadr(Args)));
 #ifdef _WIN32
     std::string str;
     std::ofstream fout(filename);
     llvm::raw_string_ostream ss(str);
     ss << *m;
     std::string irStr = ss.str();
-
     // add dllimport (otherwise global variables won't work)
     std::string oldStr(" external global ");
     std::string newStr(" external dllimport global ");
     size_t pos = 0;
-
-    while((pos = irStr.find(oldStr, pos)) != std::string::npos)
-      {
+    while ((pos = irStr.find(oldStr, pos)) != std::string::npos) {
         irStr.replace(pos, oldStr.length(), newStr);
         pos += newStr.length();
-      }
-
+    }
     // LLVM can't handle guaranteed tail call under win64 yet
     oldStr = std::string(" tail call ");
     newStr = std::string(" call ");
     pos = 0;
-
-    while((pos = irStr.find(oldStr, pos)) != std::string::npos)
-      {
+    while ((pos = irStr.find(oldStr, pos)) != std::string::npos) {
         irStr.replace(pos, oldStr.length(), newStr);
         pos += newStr.length();
-      }
-
+    }
     fout << irStr; //ss.str();
     fout.close();
 #else
     std::error_code errcode;
     llvm::raw_fd_ostream ss(filename, errcode, llvm::sys::fs::F_RW);
-    if(errcode) {
+    if (errcode) {
       std::cout << errcode.message() << std::endl;
       return Scheme->F;
     }
     llvm::WriteBitcodeToFile(m,ss);
 #endif
     return Scheme->T;
-  }
+}
 
 #define LLVM_DEFS \
         { "llvm:optimize", &optimizeCompiles }, \

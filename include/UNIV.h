@@ -80,7 +80,7 @@ typedef struct cell* pointer;
 
 extern "C" {
 
-bool rmatch(char* regex, char* str);
+bool rmatch(char* regex, const char* str);
 int64_t rmatches(char* regex, char* str, char** results,int64_t maxnum); //struct regex_matched_buffer* result);
 bool rsplit(const char* regex, const char* str, char* a, char* b);
 char* rreplace(char* regex, char* str, char* replacement, char* result);
