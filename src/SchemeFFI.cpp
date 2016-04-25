@@ -200,8 +200,8 @@ static llvm::Module* jitCompile(const std::string& String)
 {
     // Create some module to put our function into it.
     using namespace llvm;
-    legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
-    legacy::PassManager* PM_NO = extemp::EXTLLVM::I()->PM_NO;
+    legacy::PassManager* PM = extemp::EXTLLVM::PM;
+    legacy::PassManager* PM_NO = extemp::EXTLLVM::PM_NO;
 
     char modname[256];
     sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
@@ -268,7 +268,7 @@ std::cout << pa.getMessage().str() << std::endl;
         if (sInlineSyms.find(sym) != sInlineSyms.end() || ignoreSyms.find(sym) != ignoreSyms.end()) {
             continue;
         }
-        auto gv = extemp::EXTLLVM::I()->getGlobalValue(sym);
+        auto gv = extemp::EXTLLVM::getGlobalValue(sym);
         if (!gv) {
             continue;
         }
@@ -333,8 +333,8 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     }
 
     llvm::Module *modulePtr = newModule.get();
-    extemp::EXTLLVM::I()->EE->addModule(std::move(newModule));
-    extemp::EXTLLVM::I()->EE->finalizeObject();
+    extemp::EXTLLVM::EE->addModule(std::move(newModule));
+    extemp::EXTLLVM::EE->finalizeObject();
     return modulePtr;
 }
 

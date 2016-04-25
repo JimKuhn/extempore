@@ -1,20 +1,20 @@
-pointer optimizeCompiles(scheme* Scheme, pointer Args)
+static pointer optimizeCompiles(scheme* Scheme, pointer Args)
 {
     EXTLLVM::OPTIMIZE_COMPILES = (pair_car(Args) == Scheme->T);
     return Scheme->T;
 }
 
-pointer jitCompileIRString(scheme* Scheme, pointer Args)
+static pointer jitCompileIRString(scheme* Scheme, pointer Args)
 {
     auto modulePtr(jitCompile(string_value(pair_car(Args))));
     if (!modulePtr) {
         return Scheme->F;
     }
-    extemp::EXTLLVM::I()->addModule(modulePtr);
+    extemp::EXTLLVM::addModule(modulePtr);
     return mk_cptr(Scheme, modulePtr);
 }
 
-pointer ff_set_name(scheme* Scheme, pointer Args)
+static pointer ff_set_name(scheme* Scheme, pointer Args)
 {
    pointer x = pair_car(Args);
    foreign_func ff = x->_object._ff;
@@ -23,7 +23,7 @@ pointer ff_set_name(scheme* Scheme, pointer Args)
    return Scheme->T;
 }
 
-pointer ff_get_name(scheme* Scheme, pointer Args)
+static pointer ff_get_name(scheme* Scheme, pointer Args)
 {
    pointer x = pair_car(Args);
    foreign_func ff = x->_object._ff;
@@ -31,25 +31,25 @@ pointer ff_get_name(scheme* Scheme, pointer Args)
    return mk_string(Scheme,name);
 }
 
-pointer get_function(scheme* Scheme, pointer Args)
+static pointer get_function(scheme* Scheme, pointer Args)
 {
-    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    auto func(extemp::EXTLLVM::getFunction(string_value(pair_car(Args))));
     if (!func) {
         return Scheme->F;
     }
     return mk_cptr(Scheme, const_cast<llvm::Function*>(func));
 }
 
-pointer get_globalvar(scheme* Scheme, pointer Args)
+static pointer get_globalvar(scheme* Scheme, pointer Args)
 {
-    auto var(extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(Args))));
+    auto var(extemp::EXTLLVM::getGlobalVariable(string_value(pair_car(Args))));
     if (!var) {
         return Scheme->F;
     }
     return mk_cptr(Scheme, const_cast<llvm::GlobalVariable*>(var));
 }
 
-pointer get_struct_size(scheme* Scheme, pointer Args)
+static pointer get_struct_size(scheme* Scheme, pointer Args)
 {
     char* struct_type_str = string_value(pair_car(Args));
     unsigned long long hash = string_hash(reinterpret_cast<unsigned char*>(struct_type_str));
@@ -73,10 +73,10 @@ pointer get_struct_size(scheme* Scheme, pointer Args)
     return mk_integer(Scheme, size);
 }
 
-pointer get_named_struct_size(scheme* Scheme, pointer Args)
+static pointer get_named_struct_size(scheme* Scheme, pointer Args)
 {
-    llvm::Module* M = EXTLLVM::I()->M;
-    auto type(extemp::EXTLLVM::I()->getNamedType(string_value(pair_car(Args))));
+    llvm::Module* M = EXTLLVM::M;
+    auto type(extemp::EXTLLVM::getNamedType(string_value(pair_car(Args))));
     if (!type) {
         return Scheme->F;
     }
@@ -89,9 +89,9 @@ pointer get_named_struct_size(scheme* Scheme, pointer Args)
 static char tmp_str_a[1024];
 static char tmp_str_b[4096];
 
-pointer get_function_args(scheme* Scheme, pointer Args)
+static pointer get_function_args(scheme* Scheme, pointer Args)
 {
-    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    auto func(extemp::EXTLLVM::getFunction(string_value(pair_car(Args))));
     if (!func) {
         return Scheme->F;
     }
@@ -124,15 +124,15 @@ pointer get_function_args(scheme* Scheme, pointer Args)
     return reverse_in_place(Scheme, Scheme->NIL, p);
 }
 
-pointer get_function_varargs(scheme* Scheme, pointer Args)
+static pointer get_function_varargs(scheme* Scheme, pointer Args)
 {
-    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    auto func(extemp::EXTLLVM::getFunction(string_value(pair_car(Args))));
     return (func && func->isVarArg()) ? Scheme->T : Scheme->F;
 }
 
-pointer get_function_type(scheme* Scheme, pointer Args)
+static pointer get_function_type(scheme* Scheme, pointer Args)
 {
-    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    auto func(extemp::EXTLLVM::getFunction(string_value(pair_car(Args))));
     if (!func) {
         return Scheme->F;
     }
@@ -142,19 +142,19 @@ pointer get_function_type(scheme* Scheme, pointer Args)
     return mk_string(Scheme, ss.str().c_str());
 }
 
-pointer get_function_calling_conv(scheme* Scheme, pointer Args)
+static pointer get_function_calling_conv(scheme* Scheme, pointer Args)
 {
-    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    auto func(extemp::EXTLLVM::getFunction(string_value(pair_car(Args))));
     if (!func) {
         return Scheme->F;
     }
     return mk_integer(Scheme, func->getCallingConv());
 }
 
-pointer get_global_variable_type(scheme* Scheme, pointer Args)
+static pointer get_global_variable_type(scheme* Scheme, pointer Args)
 {
     using namespace llvm;
-    auto var(extemp::EXTLLVM::I()->getGlobalVariable(string_value(pair_car(Args))));
+    auto var(extemp::EXTLLVM::getGlobalVariable(string_value(pair_car(Args))));
     if (!var) {
         return Scheme->F;
     }
@@ -164,12 +164,12 @@ pointer get_global_variable_type(scheme* Scheme, pointer Args)
     return mk_string(Scheme, ss.str().c_str());
 }
 
-pointer get_function_pointer(scheme* Scheme, pointer Args)
+static pointer get_function_pointer(scheme* Scheme, pointer Args)
 {
     auto name(string_value(pair_car(Args)));
-    void* p = EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(name);
+    void* p = EXTLLVM::EE->getPointerToGlobalIfAvailable(name);
     if (!p) { // look for it as a JIT-compiled function
-        p = reinterpret_cast<void*>(EXTLLVM::I()->EE->getFunctionAddress(name));
+        p = reinterpret_cast<void*>(EXTLLVM::EE->getFunctionAddress(name));
         if (!p) {
             return Scheme->F;
         }
@@ -177,9 +177,9 @@ pointer get_function_pointer(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, p);
 }
 
-pointer remove_function(scheme* Scheme, pointer Args)
+static pointer remove_function(scheme* Scheme, pointer Args)
 {
-    auto func(EXTLLVM::I()->EE->FindFunctionNamed(string_value(pair_car(Args))));
+    auto func(EXTLLVM::EE->FindFunctionNamed(string_value(pair_car(Args))));
     if (!func) {
         return Scheme->F;
     }
@@ -192,9 +192,9 @@ pointer remove_function(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-pointer remove_global_var(scheme* Scheme, pointer Args)
+static pointer remove_global_var(scheme* Scheme, pointer Args)
 {
-    auto var(EXTLLVM::I()->EE->FindGlobalVariableNamed(string_value(pair_car(Args))));
+    auto var(EXTLLVM::EE->FindGlobalVariableNamed(string_value(pair_car(Args))));
     if (!var) {
         return Scheme->F;
     }
@@ -203,9 +203,9 @@ pointer remove_global_var(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-pointer erase_function(scheme* Scheme, pointer Args)
+static pointer erase_function(scheme* Scheme, pointer Args)
 {
-    auto func(EXTLLVM::I()->EE->FindFunctionNamed(string_value(pair_car(Args))));
+    auto func(EXTLLVM::EE->FindFunctionNamed(string_value(pair_car(Args))));
     if (!func) {
         return Scheme->F;
     }
@@ -214,16 +214,16 @@ pointer erase_function(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-pointer llvm_call_void_native(scheme* Scheme, pointer Args)
+static pointer llvm_call_void_native(scheme* Scheme, pointer Args)
 {
     char name[1024];
     strcpy(name, string_value(pair_car(Args)));
     strcat(name, "_native");
-    auto func(EXTLLVM::I()->EE->FindFunctionNamed(string_value(pair_car(Args))));
+    auto func(EXTLLVM::EE->FindFunctionNamed(string_value(pair_car(Args))));
     if (!func) {
         return Scheme->F;
     }
-    void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
+    void* p = EXTLLVM::EE->getPointerToFunction(func);
     if (!p) {
         return Scheme->F;
     }
@@ -231,9 +231,9 @@ pointer llvm_call_void_native(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-pointer call_compiled(scheme* Scheme, pointer Args)
+static pointer call_compiled(scheme* Scheme, pointer Args)
 {
-    llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
+    llvm::ExecutionEngine* EE = EXTLLVM::EE;
 #ifdef LLVM_EE_LOCK
     llvm::MutexGuard locked(EE->lock);
 #endif
@@ -306,7 +306,7 @@ pointer call_compiled(scheme* Scheme, pointer Args)
     }
 }
 
-pointer llvm_convert_float_constant(scheme* Scheme, pointer Args)
+static pointer llvm_convert_float_constant(scheme* Scheme, pointer Args)
 {
     char* floatin = string_value(pair_car(Args));
     if (floatin[1] == 'x') {
@@ -318,7 +318,7 @@ pointer llvm_convert_float_constant(scheme* Scheme, pointer Args)
     return mk_string(Scheme, (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
 }
 
-pointer llvm_convert_double_constant(scheme* Scheme, pointer Args)
+static pointer llvm_convert_double_constant(scheme* Scheme, pointer Args)
 {
     static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) must be 8 bytes");
     char* floatin = string_value(pair_car(Args));
@@ -331,36 +331,36 @@ pointer llvm_convert_double_constant(scheme* Scheme, pointer Args)
     return mk_string(Scheme, (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
 }
 
-pointer llvm_count(scheme* Scheme, pointer Args)
+static pointer llvm_count(scheme* Scheme, pointer Args)
 {
     return mk_integer(Scheme, EXTLLVM::LLVM_COUNT);
 }
 
-pointer llvm_count_set(scheme* Scheme, pointer Args)
+static pointer llvm_count_set(scheme* Scheme, pointer Args)
 {
     EXTLLVM::LLVM_COUNT = ivalue(pair_car(Args));
     return llvm_count(Scheme, Args);
 }
 
-pointer llvm_count_inc(scheme* Scheme, pointer Args)
+static pointer llvm_count_inc(scheme* Scheme, pointer Args)
 {
     ++EXTLLVM::LLVM_COUNT;
     return llvm_count(Scheme, Args);
 }
 
-pointer callClosure(scheme* Scheme, pointer Args)
+static pointer callClosure(scheme* Scheme, pointer Args)
 {
     uint32_t** closure = reinterpret_cast<uint32_t**>(cptr_value(pair_car(Args)));
     auto fptr(reinterpret_cast<int64_t (*)(void*, int64_t)>(closure[0]));
     return mk_integer(Scheme, (*fptr)(closure[0], ivalue(pair_cadr(Args))));
 }
 
-pointer printLLVMModule(scheme* Scheme, pointer Args) // TODO: This isn't used?
+static pointer printLLVMModule(scheme* Scheme, pointer Args) // TODO: This isn't used?
 {
     std::string str;
     llvm::raw_string_ostream ss(str);
     if (list_length(Scheme, Args) > 0) {
-        const llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(string_value(pair_car(Args)));
+        const llvm::GlobalValue* val = extemp::EXTLLVM::getGlobalValue(string_value(pair_car(Args)));
         if (!val) {
             std::cerr << "No such value found in LLVM Module" << std::endl;
             return Scheme->F;
@@ -368,15 +368,15 @@ pointer printLLVMModule(scheme* Scheme, pointer Args) // TODO: This isn't used?
         ss << *val;
         printf("At address: %p\n%s\n",val, ss.str().c_str());
     } else {
-        ss << *extemp::EXTLLVM::I()->M;
+        ss << *extemp::EXTLLVM::M;
     }
     printf("%s", ss.str().c_str());
     return Scheme->T;
 }
 
-pointer printLLVMFunction(scheme* Scheme, pointer Args)
+static pointer printLLVMFunction(scheme* Scheme, pointer Args)
 {
-    auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
+    auto func(extemp::EXTLLVM::getFunction(string_value(pair_car(Args))));
     std::string str;
     llvm::raw_string_ostream ss(str);
     ss << *func;
@@ -384,13 +384,13 @@ pointer printLLVMFunction(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-pointer llvm_print_all_closures(scheme* Scheme, pointer Args) // TODO
+static pointer llvm_print_all_closures(scheme* Scheme, pointer Args) // TODO
 {
     char* x = string_value(pair_car(Args));
     char rgx[1024];
     strcpy(rgx, x);
     strcat(rgx, "_.*");
-    for (auto module : EXTLLVM::I()->getModules()) {
+    for (auto module : EXTLLVM::getModules()) {
         for (const auto& func : module->getFunctionList()) {
             if (func.hasName() && rmatch(rgx, func.getName().data())) {
                 std::string str;
@@ -403,10 +403,10 @@ pointer llvm_print_all_closures(scheme* Scheme, pointer Args) // TODO
     return Scheme->T;
 }
 
-pointer llvm_print_closure(scheme* Scheme, pointer Args) // TODO
+static pointer llvm_print_closure(scheme* Scheme, pointer Args) // TODO
 {
     auto fname(string_value(pair_car(Args)));
-    for (auto module : EXTLLVM::I()->getModules()) {
+    for (auto module : EXTLLVM::getModules()) {
         for (const auto& func : module->getFunctionList()) {
             if (func.hasName() && !strcmp(func.getName().data(), fname)) {
                 std::string str;
@@ -421,14 +421,14 @@ pointer llvm_print_closure(scheme* Scheme, pointer Args) // TODO
     return Scheme->T;
 }
 
-pointer llvm_closure_last_name(scheme* Scheme, pointer Args)
+static pointer llvm_closure_last_name(scheme* Scheme, pointer Args)
 {
     auto x(string_value(pair_car(Args)));
     char rgx[1024];
     strcpy(rgx, x);
     strcat(rgx, "__[0-9]*");
     const char* last_name(nullptr);
-    for (auto module : EXTLLVM::I()->getModules()) {
+    for (auto module : EXTLLVM::getModules()) {
         for (const auto& func : module->getFunctionList()) {
             if (func.hasName() && rmatch(rgx, func.getName().data())) {
                 last_name = func.getName().data();
@@ -441,7 +441,7 @@ pointer llvm_closure_last_name(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-pointer llvm_disasm(scheme* Scheme, pointer Args)
+static pointer llvm_disasm(scheme* Scheme, pointer Args)
 {
     int lgth = list_length(Scheme, Args);
     int syntax = (lgth > 1) ? ivalue(pair_cadr(Args)) : 1;
@@ -456,12 +456,12 @@ pointer llvm_disasm(scheme* Scheme, pointer Args)
     return mk_string(Scheme, llvm_disassemble(fptr, syntax));
 }
 
-pointer bind_symbol(scheme* Scheme, pointer Args)
+static pointer bind_symbol(scheme* Scheme, pointer Args)
 {
     auto library(cptr_value(pair_car(Args)));
     auto sym(string_value(pair_cadr(Args)));
 
-    llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
+    llvm::ExecutionEngine* EE = EXTLLVM::EE;
     llvm::MutexGuard locked(EE->lock);
 #ifdef _WIN32
     auto ptr(reintepret_cat<void*>(GetProcAddress(reinterpret_cast<HMODULE>(library), sym));
@@ -475,11 +475,11 @@ pointer bind_symbol(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-pointer update_mapping(scheme* Scheme, pointer Args)
+static pointer update_mapping(scheme* Scheme, pointer Args)
 {
     auto sym(string_value(pair_car(Args)));
     auto ptr(cptr_value(pair_cadr(Args)));
-    llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
+    llvm::ExecutionEngine* EE = EXTLLVM::EE;
     llvm::MutexGuard locked(EE->lock);
     // returns previous value of the mapping, or NULL if not set
     auto oldval(EE->updateGlobalMapping(sym, reinterpret_cast<uint64_t>(ptr)));
@@ -488,13 +488,13 @@ pointer update_mapping(scheme* Scheme, pointer Args)
 
 static std::unordered_map<std::string, std::string> LLVM_ALIAS_TABLE;
 
-pointer add_llvm_alias(scheme* Scheme, pointer Args)
+static pointer add_llvm_alias(scheme* Scheme, pointer Args)
 {
     LLVM_ALIAS_TABLE[string_value(pair_car(Args))] = string_value(pair_cadr(Args));
     return Scheme->T;
 }
 
-pointer get_llvm_alias(scheme* Scheme, pointer Args)
+static pointer get_llvm_alias(scheme* Scheme, pointer Args)
 {
     char* name = string_value(pair_car(Args));
     auto iter(LLVM_ALIAS_TABLE.find(std::string(string_value(pair_car(Args)))));
@@ -504,7 +504,7 @@ pointer get_llvm_alias(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-pointer get_named_type(scheme* Scheme, pointer Args)
+static pointer get_named_type(scheme* Scheme, pointer Args)
 {
     const char* name = string_value(pair_car(Args));
     if (name[0] == '%') {
@@ -515,7 +515,7 @@ pointer get_named_type(scheme* Scheme, pointer Args)
     while (len >= 0 && name[len] == '*') {
         ++ptrDepth;
     }
-    auto tt(extemp::EXTLLVM::I()->getNamedType(std::string(name, len).c_str()));
+    auto tt(extemp::EXTLLVM::getNamedType(std::string(name, len).c_str()));
     if (tt) {
         std::string typestr;
         llvm::raw_string_ostream ss(typestr);
@@ -530,16 +530,16 @@ pointer get_named_type(scheme* Scheme, pointer Args)
     return Scheme->NIL;
 }
 
-pointer get_global_module(scheme* Scheme, pointer Args)
+static pointer get_global_module(scheme* Scheme, pointer Args)
 {
-    auto m(EXTLLVM::I()->M);
+    auto m(EXTLLVM::M);
     if (!m) {
         return Scheme->F;
     }
     return mk_cptr(Scheme, m);
 }
 
-pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args)
+static pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args)
 {
     auto m(reinterpret_cast<llvm::Module*>(cptr_value(pair_car(Args))));
     if (!m) {

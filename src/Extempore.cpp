@@ -289,7 +289,7 @@ int main(int argc, char** argv)
 #endif
 
     extemp::TaskScheduler::I()->start();
-    extemp::EXTLLVM::I()->initLLVM();
+    extemp::EXTLLVM::initLLVM();
     extemp::SchemeProcess* primary = 0;
 #ifdef __APPLE__
     // we need to instantiate NSApp before potentially

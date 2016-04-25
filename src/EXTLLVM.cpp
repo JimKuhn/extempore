@@ -171,12 +171,6 @@ void llvm_runtime_error(int error, void* arg)
   return;
 }
 
-//////////////////////////////////////////////////////////////////
-// this whole zone section should
-// all be thread safe of course
-// but currently isn't!
-// FIX ME!!
-
 __thread llvm_zone_stack* tls_llvm_zone_stack = 0;
 __thread uint64_t tls_llvm_zone_stacksize = 0;
 __thread llvm_zone_t* tls_llvm_callback_zone = 0;
@@ -379,7 +373,7 @@ void llvm_schedule_callback(long long time, void* dat)
 
 void* llvm_get_function_ptr(char* fname)
 {
-  return reinterpret_cast<void*>(extemp::EXTLLVM::I()->EE->getFunctionAddress(fname));
+  return reinterpret_cast<void*>(extemp::EXTLLVM::EE->getFunctionAddress(fname));
 }
 
 char* extitoa(int64_t val) {
@@ -942,10 +936,10 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   char* xtlang_name = strvalue(pair_cdr(xtlang_f_name));
   //printf("in llvm scheme env set %s.%s:%s  xtlang:%s\n",fname,vname,tname,xtlang_name);
   uint64_t id = string_hash((unsigned char*)vname);
-  // Module* M = extemp::EXTLLVM::I()->M;
+  // Module* M = extemp::EXTLLVM::M;
   std::string funcname(xtlang_name);
   std::string getter("_getter");
-  void*(*p)() = (void*(*)()) extemp::EXTLLVM::I()->EE->getFunctionAddress(funcname + getter);
+  void*(*p)() = (void*(*)()) extemp::EXTLLVM::EE->getFunctionAddress(funcname + getter);
   if (!p) {
     printf("Error attempting to set environment variable in closure %s.%s\n",fname,vname);
     return _sc->F;
@@ -1029,30 +1023,26 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
 }
 
 
-char* llvm_disassemble(const unsigned char* code,int syntax)
+char* llvm_disassemble(const unsigned char* code, int syntax)
 {
-        int x64 = 1;
-        size_t code_size = 1024 * 100;
-        //std::string ArchName = (x64 > 0) ? "x86-64" : "x86";
-        //std::string TripleName = llvm::Triple::normalize(ArchName);
-        //llvm::Triple Triple(TripleName);
-        std::string Error;
-        llvm::TargetMachine *TM = extemp::EXTLLVM::I()->EE->getTargetMachine();
-        llvm::Triple Triple = TM->getTargetTriple();
-        const llvm::Target TheTarget = TM->getTarget();
-        std::string TripleName = Triple.getTriple();
-
-        //const llvm::Target* TheTarget = llvm::TargetRegistry::lookupTarget(ArchName,Triple,Error);
-        const llvm::MCRegisterInfo* MRI(TheTarget.createMCRegInfo(TripleName));
-        const llvm::MCAsmInfo* AsmInfo(TheTarget.createMCAsmInfo(*MRI,TripleName));
-        const llvm::MCSubtargetInfo* STI(TheTarget.createMCSubtargetInfo(TripleName,"",""));
-        const llvm::MCInstrInfo* MII(TheTarget.createMCInstrInfo());
-        //const llvm::MCInstrAnalysis* MIA(TheTarget->createMCInstrAnalysis(MII->get()));
-        llvm::MCContext Ctx(AsmInfo, MRI, nullptr);
-        llvm::MCDisassembler* DisAsm(TheTarget.createMCDisassembler(*STI,Ctx));
-        llvm::MCInstPrinter* IP(TheTarget.createMCInstPrinter(Triple,syntax,*AsmInfo,*MII,*MRI)); //,*STI));
-        IP->setPrintImmHex(true);
-        IP->setUseMarkup(true);
+    int x64 = 1;
+    size_t code_size = 1024 * 100;
+    std::string Error;
+    llvm::TargetMachine *TM = extemp::EXTLLVM::EE->getTargetMachine();
+    llvm::Triple Triple = TM->getTargetTriple();
+    const llvm::Target TheTarget = TM->getTarget();
+    std::string TripleName = Triple.getTriple();
+    //const llvm::Target* TheTarget = llvm::TargetRegistry::lookupTarget(ArchName,Triple,Error);
+    const llvm::MCRegisterInfo* MRI(TheTarget.createMCRegInfo(TripleName));
+    const llvm::MCAsmInfo* AsmInfo(TheTarget.createMCAsmInfo(*MRI,TripleName));
+    const llvm::MCSubtargetInfo* STI(TheTarget.createMCSubtargetInfo(TripleName,"",""));
+    const llvm::MCInstrInfo* MII(TheTarget.createMCInstrInfo());
+    //const llvm::MCInstrAnalysis* MIA(TheTarget->createMCInstrAnalysis(MII->get()));
+    llvm::MCContext Ctx(AsmInfo, MRI, nullptr);
+    llvm::MCDisassembler* DisAsm(TheTarget.createMCDisassembler(*STI, Ctx));
+    llvm::MCInstPrinter* IP(TheTarget.createMCInstPrinter(Triple,syntax,*AsmInfo,*MII,*MRI)); //,*STI));
+    IP->setPrintImmHex(true);
+    IP->setUseMarkup(true);
         uint64_t MemoryAddr = 0;
         uint64_t Size = code_size;
         uint64_t Start = 0;
@@ -1092,198 +1082,165 @@ char* llvm_disassemble(const unsigned char* code,int syntax)
         return tmpstr;
 }
 
-
-
 namespace extemp {
 
-EXTLLVM EXTLLVM::SINGLETON;
-int64_t EXTLLVM::LLVM_COUNT = 0l;
-bool EXTLLVM::OPTIMIZE_COMPILES = false;
-bool EXTLLVM::BACKGROUND_COMPILES = false;
-bool EXTLLVM::VERIFY_COMPILES = true;
+namespace EXTLLVM {
 
-EXTLLVM::EXTLLVM()
-{
-    alloc_mutex.init();
-    M = 0;
-    MP = 0;
-    EE = 0;
-    MM = 0;
-}
+llvm::ExecutionEngine* EE = nullptr;
+llvm::legacy::PassManager* PM;
+llvm::legacy::PassManager* PM_NO;
+llvm::Module* M = nullptr; // TODO: obsolete?
+std::vector<llvm::Module*> Ms;
+int64_t LLVM_COUNT = 0l;
+bool OPTIMIZE_COMPILES = false;
+bool BACKGROUND_COMPILES = false;
+bool VERIFY_COMPILES = true;
 
-uint64_t EXTLLVM::getSymbolAddress(const std::string& name) {
+static llvm::SectionMemoryManager* MM = nullptr;
+
+uint64_t getSymbolAddress(const std::string& name) {
     return MM->getSymbolAddress(name);
 }
 
-  void EXTLLVM::initLLVM()
-  {
-    if(M == 0) { // Initalize Once Only (not per scheme process)
-
-      llvm::TargetOptions Opts;
-      Opts.GuaranteedTailCallOpt = true;
-      Opts.UnsafeFPMath = false;
-
-      llvm::InitializeNativeTarget();
-      llvm::InitializeNativeTargetAsmPrinter();
-      LLVMInitializeX86Disassembler();
-
-      llvm::LLVMContext &context = llvm::getGlobalContext();
-      //llvm::IRBuilder<> theBuilder(context);
-
-      // Make the module, which holds all the code.
-      std::unique_ptr<llvm::Module> module = llvm::make_unique<llvm::Module>("xtmmodule_0", context);
-
-      M = module.get();
-      addModule(M);
-
-      if (!extemp::UNIV::ARCH.empty()) M->setTargetTriple(extemp::UNIV::ARCH);
-
-      // Build engine with JIT
-      llvm::EngineBuilder factory(std::move(module));
-      factory.setEngineKind(llvm::EngineKind::JIT);
-      // factory.setAllocateGVsWithCode(false);
-      factory.setTargetOptions(Opts);
-      std::unique_ptr<llvm::SectionMemoryManager> MM = llvm::make_unique<llvm::SectionMemoryManager>();
-      factory.setMCJITMemoryManager(std::move(MM));
+void initLLVM()
+{
+    if (unlikely(EE)) {
+        return;
+    }
+    alloc_mutex.init();
+    llvm::TargetOptions Opts;
+    Opts.GuaranteedTailCallOpt = true;
+    Opts.UnsafeFPMath = false;
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    LLVMInitializeX86Disassembler();
+    auto& context(llvm::getGlobalContext());
+    auto module(llvm::make_unique<llvm::Module>("xtmmodule_0", context));
+    M = module.get();
+    addModule(M);
+    if (!extemp::UNIV::ARCH.empty()) {
+        M->setTargetTriple(extemp::UNIV::ARCH);
+    }
+    // Build engine with JIT
+    llvm::EngineBuilder factory(std::move(module));
+    factory.setEngineKind(llvm::EngineKind::JIT);
+    factory.setTargetOptions(Opts);
+    auto mm(llvm::make_unique<llvm::SectionMemoryManager>());
+    MM = mm.get();
+    factory.setMCJITMemoryManager(std::move(mm));
 #ifdef _WIN32
-      if(!extemp::UNIV::ATTRS.empty()) factory.setMAttrs(extemp::UNIV::ATTRS);
-      if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
-      llvm::TargetMachine* tm = factory.selectTarget();
+    if (!extemp::UNIV::ATTRS.empty()) {
+        factory.setMAttrs(extemp::UNIV::ATTRS);
+    }
+    if (!extemp::UNIV::CPU.empty()) {
+        factory.setMCPU(extemp::UNIV::CPU.front());
+    }
+    llvm::TargetMachine* tm = factory.selectTarget();
 #else
-      factory.setOptLevel(llvm::CodeGenOpt::Aggressive);
-      llvm::Triple triple(llvm::sys::getProcessTriple());
-      std::string cpu = llvm::sys::getHostCPUName();
-      if(!extemp::UNIV::CPU.empty()) cpu = extemp::UNIV::CPU.front();
-      llvm::StringMap<bool> HostFeatures;
-      llvm::sys::getHostCPUFeatures(HostFeatures);
-      llvm::SmallVector<std::string,10> lattrs;
-      for( llvm::StringMap<bool>::const_iterator it = HostFeatures.begin(); it != HostFeatures.end(); it++  )
-        {
-          std::string att = it->getValue() ? it->getKey().str() :
-            std::string("-") + it->getKey().str();
-          lattrs.append( 1, att );
+    factory.setOptLevel(llvm::CodeGenOpt::Aggressive);
+    llvm::Triple triple(llvm::sys::getProcessTriple());
+    std::string cpu;
+    if (!extemp::UNIV::CPU.empty()) {
+        cpu = extemp::UNIV::CPU.front();
+    } else {
+        cpu = llvm::sys::getHostCPUName();
+    }
+    llvm::SmallVector<std::string, 10> lattrs;
+    if (!extemp::UNIV::ATTRS.empty()) {
+        for (const auto& attr : extemp::UNIV::ATTRS) {
+            lattrs.append(1, attr);
         }
-      if(!extemp::UNIV::ATTRS.empty()) {
-        lattrs.clear();
-        for(int i=0;i<extemp::UNIV::ATTRS.size();i++) {
-          lattrs.append(1, extemp::UNIV::ATTRS[i]);
+    } else {
+        llvm::StringMap<bool> HostFeatures;
+        llvm::sys::getHostCPUFeatures(HostFeatures);
+        for (auto& feature : HostFeatures) {
+            std::string att = feature.getValue() ? feature.getKey().str() : std::string("-") + feature.getKey().str();
+            lattrs.append(1, att);
         }
-      }
-
-      llvm::TargetMachine* tm = factory.selectTarget(triple,"",cpu,lattrs);
+    }
+    llvm::TargetMachine* tm = factory.selectTarget(triple, "", cpu, lattrs);
 #endif // _WIN32
-      EE = factory.create(tm);
-      EE->DisableLazyCompilation(true);
-
-      ascii_normal();
-      std::cout << "ARCH           : " << std::flush;
-      ascii_info();
-      std::cout << std::string(tm->getTargetTriple().normalize()) << std::endl;
+    EE = factory.create(tm);
+    EE->DisableLazyCompilation(true);
+    ascii_normal();
+    std::cout << "ARCH           : " << std::flush;
+    ascii_info();
+    std::cout << std::string(tm->getTargetTriple().normalize()) << std::endl;
 #ifdef _WIN32
-      if(!std::string(tm->getTargetFeatureString()).empty())
+    if (!std::string(tm->getTargetFeatureString()).empty()) {
 #else
-      if(!std::string(tm->getTargetCPU()).empty())
+    if (!std::string(tm->getTargetCPU()).empty()) {
 #endif
-        {
-          ascii_normal();
-          std::cout << "CPU            : " << std::flush;
-          ascii_info();
-          std::cout << std::string(tm->getTargetCPU()) << std::endl;
+        ascii_normal();
+        std::cout << "CPU            : " << std::flush;
+        ascii_info();
+        std::cout << std::string(tm->getTargetCPU()) << std::endl;
+    }
+    if (!std::string(tm->getTargetFeatureString()).empty()) {
+        ascii_normal();
+        std::cout << "ATTRS          : " << std::flush;
+        auto data(tm->getTargetFeatureString().data());
+        for (; *data; ++data) {
+            switch (*data) {
+            case '+':
+                ascii_info();
+                break;
+            case '-':
+                ascii_error();
+                break;
+            case ',':
+                ascii_normal();
+                break;
+            }
+            putchar(*data);
         }
-      if(!std::string(tm->getTargetFeatureString()).empty())
-        {
-          ascii_normal();
-          std::cout << "ATTRS          : " << std::flush;
+        putchar('\n');
+    }
+    ascii_normal();
+    std::cout << "LLVM           : " << std::flush;
+    ascii_info();
+    std::cout << LLVM_VERSION_STRING;
+    std::cout << " MCJIT" << std::endl;
+    ascii_normal();
+    PM_NO = new llvm::legacy::PassManager();
+    PM_NO->add(llvm::createAlwaysInlinerPass());
+    PM = new llvm::legacy::PassManager();
+    PM->add(llvm::createAggressiveDCEPass());
+    PM->add(llvm::createAlwaysInlinerPass());
+    PM->add(llvm::createArgumentPromotionPass());
+    PM->add(llvm::createCFGSimplificationPass());
+    PM->add(llvm::createDeadStoreEliminationPass());
+    PM->add(llvm::createFunctionInliningPass());
+    PM->add(llvm::createGVNPass(true));
+    PM->add(llvm::createIndVarSimplifyPass());
+    PM->add(llvm::createInstructionCombiningPass());
+    PM->add(llvm::createJumpThreadingPass());
+    PM->add(llvm::createLICMPass());
+    PM->add(llvm::createLoopDeletionPass());
+    PM->add(llvm::createLoopRotatePass());
+    PM->add(llvm::createLoopUnrollPass());
+    PM->add(llvm::createMemCpyOptPass());
+    PM->add(llvm::createPromoteMemoryToRegisterPass());
+    PM->add(llvm::createReassociatePass());
+    PM->add(llvm::createScalarReplAggregatesPass());
+    PM->add(llvm::createSCCPPass());
+    PM->add(llvm::createTailCallEliminationPass());
 
-          const char* data = tm->getTargetFeatureString().data();
+    static struct {
+        const char* name;
+        uintptr_t   address;
+    } functionTable[] = {
+        { "llvm_disassemble", uintptr_t(&llvm_disassemble) }
+    };
 
-          for (int i = 0; i < strlen(data); i++) {
-            switch (data[i]) {
-            case '+': {
-              ascii_info();
-              break;
-            }
-            case '-': {
-              ascii_error();
-              break;
-            }
-            case ',': {
-              ascii_normal();
-              break;
-            }
-            }
-            printf("%c", data[i]);
-          }
-          std::cout << std::endl;
-        }
-      ascii_normal();
-      std::cout << "LLVM           : " << std::flush;
-      ascii_info();
-      std::cout << LLVM_VERSION_STRING;
-      std::cout << " MCJIT" << std::endl;
-      ascii_normal();
+    for (auto& elem : funcTable) {
+        EE->updateGlobalMapping(elem.name, elem.address);
+    }
 
-            //EE = llvm::EngineBuilder(M).create();
-            PM_NO = new llvm::legacy::PassManager();
-            PM_NO->add(llvm::createAlwaysInlinerPass());
-            PM = new llvm::legacy::PassManager();
-#if 1
-            PM->add(llvm::createAggressiveDCEPass());
-            PM->add(llvm::createAlwaysInlinerPass());
-            PM->add(llvm::createArgumentPromotionPass());
-            PM->add(llvm::createCFGSimplificationPass());
-            PM->add(llvm::createDeadStoreEliminationPass());
-            // PM->add(llvm::createFunctionAttrsPass());
-            PM->add(llvm::createFunctionInliningPass());\
-            PM->add(llvm::createGVNPass(true));
-            PM->add(llvm::createIndVarSimplifyPass());
-            PM->add(llvm::createInstructionCombiningPass());
-            PM->add(llvm::createJumpThreadingPass());
-            PM->add(llvm::createLICMPass());
-            PM->add(llvm::createLoopDeletionPass());
-            PM->add(llvm::createLoopRotatePass());
-            PM->add(llvm::createLoopUnrollPass());
-            PM->add(llvm::createMemCpyOptPass());
-            PM->add(llvm::createPromoteMemoryToRegisterPass());
-            PM->add(llvm::createReassociatePass());
-            PM->add(llvm::createScalarReplAggregatesPass());
-            PM->add(llvm::createSCCPPass());
-            PM->add(llvm::createTailCallEliminationPass());
-#else
-            //PM->add(new llvm::TargetData(*EE->getTargetData()));
-      // PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
-
-      PM->add(llvm::createBasicAliasAnalysisPass());   //new
-      // promote allocs to register
-      PM->add(llvm::createPromoteMemoryToRegisterPass());
-            // Do simple "peephole" optimizations and bit-twiddling optzns.
-            PM->add(llvm::createInstructionCombiningPass());
-            // Reassociate expressions.
-            PM->add(llvm::createReassociatePass());
-            // Eliminate Common SubExpressions.
-            PM->add(llvm::createGVNPass());
-            // Function inlining
-            PM->add(llvm::createFunctionInliningPass());
-            PM->add(llvm::createAlwaysInlinerPass());
-            // loop invariants
-            PM->add(llvm::createLICMPass());
-            // vars
-            PM->add(llvm::createIndVarSimplifyPass());
-            // Simplify the control flow graph (deleting unreachable blocks, etc).
-            PM->add(llvm::createCFGSimplificationPass());
-      //
-            PM->add(llvm::createPromoteMemoryToRegisterPass());
-#endif
       // tell LLVM about some built-in functions
-            EE->updateGlobalMapping("llvm_disassemble", (uint64_t)&llvm_disassemble);
             EE->updateGlobalMapping("llvm_destroy_zone_after_delay", (uint64_t)&llvm_destroy_zone_after_delay);
             EE->updateGlobalMapping("free_after_delay", (uint64_t)&free_after_delay);
             EE->updateGlobalMapping("llvm_get_next_prime", (uint64_t)&llvm_get_next_prime);
-            EE->updateGlobalMapping("llvm_printf", uintptr_t(&printf));
-            EE->updateGlobalMapping("llvm_fprintf", uintptr_t(&fprintf));
-            EE->updateGlobalMapping("llvm_sprintf", uintptr_t(&sprintf));
-            EE->updateGlobalMapping("llvm_sscanf", uintptr_t(&sscanf));
-            EE->updateGlobalMapping("llvm_fscanf", uintptr_t(&fscanf));
             EE->updateGlobalMapping("llvm_zone_create_extern", (uint64_t)&llvm_zone_create);
             EE->updateGlobalMapping("llvm_zone_destroy", (uint64_t)&llvm_zone_destroy);
             EE->updateGlobalMapping("llvm_zone_print", (uint64_t)&llvm_zone_print);
@@ -1399,7 +1356,7 @@ uint64_t EXTLLVM::getSymbolAddress(const std::string& name) {
       EE->updateGlobalMapping("llvm_atan2", (uint64_t)&llvm_atan2);
       EE->updateGlobalMapping("sys_sharedir", (uint64_t)&sys_sharedir);
       EE->updateGlobalMapping("sys_slurp_file", (uint64_t)&sys_slurp_file);
-      extemp::EXTLLVM::I()->EE->finalizeObject();
+      extemp::EXTLLVM::EE->finalizeObject();
       return;
     }
   }

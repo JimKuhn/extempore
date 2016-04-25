@@ -286,7 +286,8 @@ class ModuleProvider;
 class SectionMemoryManager;
 class ExecutionEngine;
 
-namespace legacy {
+namespace legacy
+{
 
 class PassManager;
 
@@ -294,43 +295,36 @@ class PassManager;
 
 } // end llvm namespace
 
-namespace extemp {
+namespace extemp
+{
 
-class EXTLLVM {
-public:
-    EXTLLVM();
+namespace EXTLLVM
+{
 
-    static EXTLLVM* I() { return &SINGLETON; }
+uint64_t getSymbolAddress(const std::string&);
+void addModule(llvm::Module* m);
 
-    void initLLVM();
+extern llvm::ExecutionEngine* EE; // TODO: nobody should need this (?)
+extern llvm::Module* M;
+extern int64_t LLVM_COUNT;
+extern bool OPTIMIZE_COMPILES;
+extern bool VERIFY_COMPILES;
+extern bool BACKGROUND_COMPILES;
+extern llvm::legacy::PassManager* PM;
+extern llvm::legacy::PassManager* PM_NO;
+extern std::vector<llvm::Module*> Ms;
 
-    llvm::Module* activeModule();
-    const llvm::Function* getFunction(const char* name);
-    const llvm::GlobalVariable* getGlobalVariable(const char* name);
-    const llvm::GlobalValue* getGlobalValue(const char* name);
-    llvm::StructType* getNamedType(const char* name) {
-        return M->getTypeByName(name);
-    }
-    uint64_t getSymbolAddress(const std::string&);
-    void addModule(llvm::Module* m);
-    std::vector<llvm::Module*>& getModules() { return Ms; } // not going to protect these!!!
+void initLLVM();
+const llvm::Function* getFunction(const char* name);
+const llvm::GlobalVariable* getGlobalVariable(const char* name);
+const llvm::GlobalValue* getGlobalValue(const char* name);
+inline llvm::StructType* getNamedType(const char* name) {
+    return M->getTypeByName(name);
+}
+inline std::vector<llvm::Module*>& getModules() { return Ms; } // not going to protect these!!!
 
-    static int64_t LLVM_COUNT;
-    static bool OPTIMIZE_COMPILES;
-    static bool VERIFY_COMPILES;
-    static bool BACKGROUND_COMPILES;
+}
 
-    llvm::Module* M;
-    llvm::ModuleProvider* MP;
-    llvm::ExecutionEngine* EE;
-    llvm::legacy::PassManager* PM;
-    llvm::legacy::PassManager* PM_NO;
-    std::unique_ptr<llvm::SectionMemoryManager> MM;
-private:
-    std::vector<llvm::Module*> Ms;
-    static EXTLLVM SINGLETON;
-};
-
-} // end extemp namespace
+}
 
 #endif
