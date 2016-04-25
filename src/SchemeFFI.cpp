@@ -127,32 +127,10 @@ namespace extemp { namespace SchemeFFI {
 static llvm::Module* jitCompile(const std::string& String);
 }}
 
-static inline std::string xtm_ftostr(double V) {
-  char Buffer[200];
-  sprintf(Buffer, "%20.6e", V);
-  char *B = Buffer;
-  while (*B == ' ') ++B;
-  return B;
-}
-
-static inline std::string xtm_ftostr(const llvm::APFloat& V) {
-  if (&V.getSemantics() == &llvm::APFloat::IEEEdouble)
-    return xtm_ftostr(V.convertToDouble());
-  else if (&V.getSemantics() == &llvm::APFloat::IEEEsingle)
-    return xtm_ftostr((double)V.convertToFloat());
-  return "<unknown format in ftostr>"; // error
-}
-
 namespace extemp {
 
 namespace SchemeFFI {
 
-typedef std::pair<std::string, std::string> entry_type;
-static entry_type sDictHistory[2];
-static std::unordered_map<std::string, entry_type> sImpCirDict;
-
-static char tmp_str_a[1024];
-static char tmp_str_b[4096];
 static std::unordered_map<std::string, std::string> LLVM_ALIAS_TABLE;
 
 #include "ffi/utility.inc"
@@ -165,6 +143,7 @@ static std::unordered_map<std::string, std::string> LLVM_ALIAS_TABLE;
 #include "ffi/misc.inc"
 #include "ffi/regex.inc"
 #include "ffi/llvm.inc"
+#include "ffi/clock.inc"
 
 void initSchemeFFI(scheme* sc)
 {
@@ -194,95 +173,14 @@ void initSchemeFFI(scheme* sc)
         MISC_DEFS,
         REGEX_DEFS,
         LLVM_DEFS,
-        {     "impc:ir:getname",                &impcirGetName                },
-        {     "impc:ir:gettype",                &impcirGetType                },
-        {     "impc:ir:addtodict",              &impcirAdd                    },
-        {     "clock:set-offset",               &setClockOffset               },
-        {     "clock:get-offset",               &getClockOffset               },
-        {     "clock:adjust-offset",            &adjustClockOffset            },
-        {     "clock:clock",                    &getClockTime                 },
-        {     "clock:ad:clock",                 &lastSampleBlockClock         },
+        CLOCK_DEFS
     };
     for (auto& elem : funcTable) {
         scheme_define(sc, sc->global_env, mk_symbol(sc, elem.name), mk_foreign_func(sc, elem.func));
     }
 }
 
-    //////////////////// helper functions ////////////////////////
-    void addGlobal(scheme* sc, char* symbol_name, pointer arg)
-    {
-        scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), arg);
-    }
-
-void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func)
-{
-    scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
-}
-
-
-
-    void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr)
-    {
-        scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_cptr(sc, ptr));
-    }
-
-static entry_type* getEntry(const char* Key)
-{
-    if (!strcmp(Key, "current")) {
-        return &sDictHistory[0];
-    }
-    if (!strcmp(Key, "previous")) {
-        return &sDictHistory[1];
-    }
-    return &(sImpCirDict.insert(std::make_pair(Key, entry_type())).first)->second;
-}
-
-pointer impcirGetType(scheme* Scheme, pointer Args)
-{
-    return mk_string(Scheme, getEntry(string_value(pair_car(Args)))->second.c_str());
-}
-
-pointer impcirGetName(scheme* Scheme, pointer Args)
-{
-    return mk_string(Scheme, getEntry(string_value(pair_car(Args)))->first.c_str());
-}
-
-pointer impcirAdd(scheme* Scheme, pointer Args)
-{
-    std::string key(string_value(pair_car(Args)));
-    std::string name(string_value(pair_cadr(Args)));
-    std::string type(string_value(pair_caddr(Args)));
-    auto entry(std::make_pair(name, type));
-    auto res(sImpCirDict.insert(std::make_pair(key, entry)));
-    if (!res.second) {
-        res.first->second = std::move(entry);
-    }
-    sDictHistory[1] = std::move(sDictHistory[0]);
-    sDictHistory[0] = res.first->second;
-    return Scheme->T;
-}
-
-    void freeWithDelay(TaskI* task)
-    {
-        Task<char*>* t = static_cast<Task<char*>*>(task);
-        char* dat = t->getArg();
-        free(dat);
-    }
-
-    void destroyMallocZoneWithDelay(TaskI* task)
-    {
-        Task<llvm_zone_t*>* t = static_cast<Task<llvm_zone_t*>*>(task);
-        llvm_zone_t* zone = t->getArg();
-        llvm_zone_destroy(zone);
-    }
-
-pointer verifyCompiles(scheme* Scheme, pointer Args)
-{
-    EXTLLVM::VERIFY_COMPILES = (pair_car(Args) == Scheme->T);
-    return Scheme->T;
-}
-
-  static long long llvm_emitcounter = 0;
+static long long llvm_emitcounter = 0;
 
 static std::string SanitizeType(llvm::Type* Type)
 {
@@ -297,7 +195,6 @@ static std::string SanitizeType(llvm::Type* Type)
     return str;
 }
 
-static bool sEmitCode = false;
 static std::regex sGlobalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize);
 static std::regex sDefineSymRegex("define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize | std::regex::ECMAScript);
 
@@ -442,38 +339,6 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
     extemp::EXTLLVM::I()->EE->finalizeObject();
     return modulePtr;
 }
-
-  pointer getClockTime(scheme* Scheme, pointer Args)
-  {
-    return mk_real(Scheme, getRealTime()+UNIV::CLOCK_OFFSET);
-  }
-
-  pointer adjustClockOffset(scheme* Scheme, pointer Args)
-  {
-    UNIV::CLOCK_OFFSET = rvalue(pair_car(Args)) + UNIV::CLOCK_OFFSET;
-    return mk_real(Scheme,UNIV::CLOCK_OFFSET);
-  }
-
-  pointer setClockOffset(scheme* Scheme, pointer Args)
-  {
-    UNIV::CLOCK_OFFSET = rvalue(pair_car(Args));
-    return pair_car(Args);
-  }
-
-  pointer getClockOffset(scheme* Scheme, pointer Args)
-  {
-    return mk_real(Scheme, UNIV::CLOCK_OFFSET);
-  }
-
-  pointer lastSampleBlockClock(scheme* Scheme, pointer Args)
-  {
-    pointer p1 = mk_integer(Scheme,UNIV::TIME);
-    EnvInjector(Scheme, p1);
-    pointer p2 = mk_real(Scheme,AudioDevice::REALTIME + UNIV::CLOCK_OFFSET);
-    EnvInjector(Scheme, p2);
-    pointer p3 = cons(Scheme, p1, p2);
-    return p3;
-  }
 
 }
 

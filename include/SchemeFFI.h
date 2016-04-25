@@ -44,25 +44,7 @@ namespace extemp {
 
 namespace SchemeFFI {
 
-void initSchemeFFI(scheme* _sc);
-void addGlobal(scheme* sc, char* symbol_name, pointer arg);
-void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func);
-void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);
-
-// memory zone stuff
-void freeWithDelay(TaskI* task);
-void destroyMallocZoneWithDelay(TaskI* task);
-
-pointer impcirGetName(scheme* _sc, pointer args);
-pointer impcirGetType(scheme* _sc, pointer args);
-pointer impcirAdd(scheme* _sc, pointer args);
-
-// clock
-pointer getClockTime(scheme* _sc, pointer args);
-pointer adjustClockOffset(scheme* _sc, pointer args);
-pointer setClockOffset(scheme* _sc, pointer args);
-pointer getClockOffset(scheme* _sc, pointer args);
-pointer lastSampleBlockClock(scheme* _sc, pointer args);
+void initSchemeFFI(scheme* Scheme);
 
 }
 

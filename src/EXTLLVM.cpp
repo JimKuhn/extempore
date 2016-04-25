@@ -341,7 +341,17 @@ extern "C" llvm_zone_t* llvm_zone_callback_setup()
     return llvm_zone_reset(zone);
 }
 
-extemp::CM* FreeWithDelayCM = new extemp::CMG(extemp::SchemeFFI::freeWithDelay);
+static void freeWithDelay(extemp::TaskI* Task)
+{
+    free(static_cast<extemp::Task<char*>*>(Task)->getArg());
+}
+
+static void destroyMallocZoneWithDelay(extemp::TaskI* task)
+{
+    llvm_zone_destroy(static_cast<extemp::Task<llvm_zone_t*>*>(task)->getArg());
+}
+
+extemp::CM* FreeWithDelayCM = new extemp::CMG(freeWithDelay);
 
 void free_after_delay(char* Data, double Delay)
 {
@@ -349,7 +359,7 @@ void free_after_delay(char* Data, double Delay)
             FreeWithDelayCM, Data));
 }
 
-extemp::CM* DestroyMallocZoneWithDelayCM = new extemp::CMG(extemp::SchemeFFI::destroyMallocZoneWithDelay);
+extemp::CM* DestroyMallocZoneWithDelayCM = new extemp::CMG(destroyMallocZoneWithDelay);
 void llvm_destroy_zone_after_delay(llvm_zone_t* Zone, uint64_t Delay)
 {
     extemp::TaskScheduler::I()->add(new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME + Delay, extemp::UNIV::SECOND(),

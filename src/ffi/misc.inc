@@ -237,6 +237,46 @@ static pointer scmAddForeignFunc(scheme* sc, pointer Args) {
     return ffunc;
 }
 
+typedef std::pair<std::string, std::string> entry_type;
+static entry_type sDictHistory[2];
+static std::unordered_map<std::string, entry_type> sImpCirDict;
+
+static entry_type* getEntry(const char* Key)
+{
+    if (!strcmp(Key, "current")) {
+        return &sDictHistory[0];
+    }
+    if (!strcmp(Key, "previous")) {
+        return &sDictHistory[1];
+    }
+    return &(sImpCirDict.insert(std::make_pair(Key, entry_type())).first)->second;
+}
+
+static pointer impcirGetName(scheme* Scheme, pointer Args)
+{
+    return mk_string(Scheme, getEntry(string_value(pair_car(Args)))->first.c_str());
+}
+
+static pointer impcirGetType(scheme* Scheme, pointer Args)
+{
+    return mk_string(Scheme, getEntry(string_value(pair_car(Args)))->second.c_str());
+}
+
+static pointer impcirAdd(scheme* Scheme, pointer Args)
+{
+    std::string key(string_value(pair_car(Args)));
+    std::string name(string_value(pair_cadr(Args)));
+    std::string type(string_value(pair_caddr(Args)));
+    auto entry(std::make_pair(name, type));
+    auto res(sImpCirDict.insert(std::make_pair(key, entry)));
+    if (!res.second) {
+        res.first->second = std::move(entry);
+    }
+    sDictHistory[1] = std::move(sDictHistory[0]);
+    sDictHistory[0] = res.first->second;
+    return Scheme->T;
+}
+
 #define MISC_DEFS \
         { "cptr:get-i64", &dataGETi64 }, \
         { "cptr:get-double", &dataGETdouble }, \
@@ -264,4 +304,7 @@ static pointer scmAddForeignFunc(scheme* sc, pointer Args) {
         { "pprint-error", &printError }, \
         { "print-notification", &printNotification }, \
         { "get-closure-env", &getClosureEnv }, \
-        { "mk-ff", &scmAddForeignFunc }
+        { "mk-ff", &scmAddForeignFunc }, \
+        { "impc:ir:getname", &impcirGetName }, \
+        { "impc:ir:gettype", &impcirGetType }, \
+        { "impc:ir:addtodict", &impcirAdd }

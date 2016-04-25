@@ -86,6 +86,9 @@ pointer get_named_struct_size(scheme* Scheme, pointer Args)
     return mk_integer(Scheme, size);
 }
 
+static char tmp_str_a[1024];
+static char tmp_str_b[4096];
+
 pointer get_function_args(scheme* Scheme, pointer Args)
 {
     auto func(extemp::EXTLLVM::I()->getFunction(string_value(pair_car(Args))));
