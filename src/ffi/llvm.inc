@@ -511,8 +511,8 @@ static pointer get_named_type(scheme* Scheme, pointer Args)
         ++name;
     }
     int ptrDepth = 0;
-    auto len(strlen(name) - 1);
-    while (len >= 0 && name[len] == '*') {
+    int len(strlen(name) - 1);
+    while (len >= 0 && name[len--] == '*') {
         ++ptrDepth;
     }
     auto tt(extemp::EXTLLVM::getNamedType(std::string(name, len).c_str()));
