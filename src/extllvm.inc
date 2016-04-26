@@ -50,7 +50,7 @@ extern "C" const char* llvm_disassemble(const unsigned char* Code, int syntax)
 }
 
 static extemp::CMG DestroyMallocZoneWithDelayCM(
-        [=](extemp::TaskI* Task)->void {
+        [](extemp::TaskI* Task)->void {
             llvm_zone_destroy(static_cast<extemp::Task<llvm_zone_t*>*>(Task)->getArg());
         });
 
@@ -61,7 +61,7 @@ extern "C" void llvm_destroy_zone_after_delay(llvm_zone_t* Zone, uint64_t Delay)
 }
 
 static extemp::CMG FreeWithDelayCM(
-        [=](extemp::TaskI* Task)->void {
+        [](extemp::TaskI* Task)->void {
             free(static_cast<extemp::Task<char*>*>(Task)->getArg());
         });
 
