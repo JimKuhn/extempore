@@ -231,7 +231,7 @@ inline llvm_zone_t* llvm_zone_create(uint64_t size)
     return zone;
 }
 
-void llvm_zone_destroy(llvm_zone_t* Zone);
+extern "C" void llvm_zone_destroy(llvm_zone_t* Zone);
 
 inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
 {

@@ -105,7 +105,7 @@ static long long llvm_get_next_prime(long long start)
 }
 #endif
 
-void llvm_zone_destroy(llvm_zone_t* Zone)
+extern "C" void llvm_zone_destroy(llvm_zone_t* Zone)
 {
 #if DEBUG_ZONE_ALLOC
     printf("DestroyZone: %p:%p:%lld:%lld\n", Zone, Zone->memory, Zone->offset, Zone->size);
