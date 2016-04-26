@@ -283,7 +283,7 @@ inline llvm_zone_t* llvm_peek_zone_stack()
     return z;
 }
 
-llvm_zone_t* llvm_pop_zone_stack();
+extern "C" llvm_zone_t* llvm_pop_zone_stack();
 
 inline void llvm_threads_inc_zone_stacksize() {
     ++tls_llvm_zone_stacksize;

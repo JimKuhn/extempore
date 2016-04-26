@@ -117,7 +117,7 @@ extern "C" void llvm_zone_destroy(llvm_zone_t* Zone)
     free(Zone);
 }
 
-llvm_zone_t* llvm_pop_zone_stack()
+extern "C" llvm_zone_t* llvm_pop_zone_stack()
 {
     auto stack(llvm_threads_get_zone_stack());
     if (unlikely(!stack)) {
@@ -208,7 +208,7 @@ static inline llvm_zone_t* llvm_threads_get_callback_zone()
     return tls_llvm_callback_zone;
 }
 
-llvm_zone_t* llvm_zone_callback_setup()
+extern "C" llvm_zone_t* llvm_zone_callback_setup()
 {
     auto zone(llvm_threads_get_callback_zone());
     llvm_push_zone_stack(zone);
