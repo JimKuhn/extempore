@@ -188,16 +188,6 @@ void llvm_zone_print(llvm_zone_t* zone)
   return;
 }
 
-void llvm_zone_mark(llvm_zone_t* zone)
-{
-    zone->mark = zone->offset;
-}
-
-uint64_t llvm_zone_mark_size(llvm_zone_t* zone)
-{
-    return zone->offset - zone->mark;
-}
-
 void llvm_zone_ptr_set_size(void* ptr, uint64_t size)
 {
     *(reinterpret_cast<uint64_t*>(ptr) - 1) = size;
@@ -1057,8 +1047,6 @@ void initLLVM()
             EE->updateGlobalMapping("llvm_now", (uint64_t)&llvm_now);
             EE->updateGlobalMapping("llvm_zone_reset_extern", (uint64_t)&llvm_zone_reset);
             EE->updateGlobalMapping("llvm_zone_copy_ptr", (uint64_t)&llvm_zone_copy_ptr);
-            EE->updateGlobalMapping("llvm_zone_mark", (uint64_t)&llvm_zone_mark);
-            EE->updateGlobalMapping("llvm_zone_mark_size", (uint64_t)&llvm_zone_mark_size);
             EE->updateGlobalMapping("llvm_zone_ptr_set_size", (uint64_t)&llvm_zone_ptr_set_size);
             EE->updateGlobalMapping("llvm_zone_ptr_size", (uint64_t)&llvm_zone_ptr_size);
             EE->updateGlobalMapping("llvm_ptr_in_zone", (uint64_t)&llvm_ptr_in_zone);

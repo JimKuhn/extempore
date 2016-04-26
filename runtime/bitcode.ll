@@ -610,3 +610,4 @@ define private i32 @is_cptr_or_str(i8* %ptr) alwaysinline
   %res = or i32 %v1, %v2
   ret i32 %res
 }
+
