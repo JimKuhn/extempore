@@ -584,23 +584,6 @@ uint32_t EXT_TERM = 1;
 uint32_t EXT_TERM = 0;
 #endif
 bool EXT_LOADBASE = true;
-void initRand() {
-#ifdef _WIN32
-    srand((int)DEVICE_TIME); ///SECOND));
-#elif __linux__
-    srand(DEVICE_TIME / SECOND());
-#else
-    sranddev();
-#endif
-}
-
-int random(int range) {
-    return (int)((double)rand() / (double)RAND_MAX * (double) range);
-}
-
-double random() {
-    return (double)rand() / (double)RAND_MAX;
-}
 
 double midi2frq(double pitch)
 {
