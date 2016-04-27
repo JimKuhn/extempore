@@ -188,14 +188,8 @@ void llvm_zone_print(llvm_zone_t* zone)
   return;
 }
 
-void llvm_zone_ptr_set_size(void* ptr, uint64_t size)
-{
-    *(reinterpret_cast<uint64_t*>(ptr) - 1) = size;
-}
-
 uint64_t llvm_zone_ptr_size(void* ptr)
 {
-    // return ptr size from alloc map
     return *(reinterpret_cast<uint64_t*>(ptr) - 1);
 }
 
@@ -1045,9 +1039,7 @@ void initLLVM()
             EE->updateGlobalMapping("llvm_channels", (uint64_t)&llvm_channels);
             EE->updateGlobalMapping("llvm_in_channels", (uint64_t)&llvm_in_channels);
             EE->updateGlobalMapping("llvm_now", (uint64_t)&llvm_now);
-            EE->updateGlobalMapping("llvm_zone_reset_extern", (uint64_t)&llvm_zone_reset);
             EE->updateGlobalMapping("llvm_zone_copy_ptr", (uint64_t)&llvm_zone_copy_ptr);
-            EE->updateGlobalMapping("llvm_zone_ptr_set_size", (uint64_t)&llvm_zone_ptr_set_size);
             EE->updateGlobalMapping("llvm_zone_ptr_size", (uint64_t)&llvm_zone_ptr_size);
             EE->updateGlobalMapping("llvm_ptr_in_zone", (uint64_t)&llvm_ptr_in_zone);
             EE->updateGlobalMapping("llvm_ptr_in_current_zone", (uint64_t)&llvm_ptr_in_current_zone);
@@ -1146,11 +1138,6 @@ llvm_zone_t* llvm_peek_zone_stack_extern()
 void llvm_push_zone_stack_extern(llvm_zone_t* Zone)
 {
     extemp::EXTLLVM::llvm_push_zone_stack(Zone);
-}
-
-llvm_zone_t* llvm_zone_reset_extern(llvm_zone_t* Zone)
-{
-    return extemp::EXTLLVM::llvm_zone_reset(Zone);
 }
 
 llvm_zone_t* llvm_zone_create_extern(uint64_t Size)

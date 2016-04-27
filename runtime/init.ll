@@ -85,7 +85,6 @@ declare i32 @mutex_trylock(i8*)
 
 declare void @llvm_runtime_error(i64,i8*) nounwind
 declare i1 @llvm_zone_copy_ptr(i8*, i8*) nounwind
-declare void @llvm_zone_ptr_set_size(i8*, i64) nounwind
 declare i64 @llvm_zone_ptr_size(i8*) nounwind
 declare i8* @llvm_stack_alloc(i64) nounwind
 declare i1 @llvm_ptr_in_current_zone(i8*) nounwind

@@ -611,3 +611,10 @@ define private i32 @is_cptr_or_str(i8* %ptr) alwaysinline
   ret i32 %res
 }
 
+define private void @llvm_zone_ptr_set_size(i8* %zone, i64 %size) nounwind alwaysinline
+{
+  %ptr = bitcast i8* %zone to i64*
+  %size_ptr = getelementptr i64, i64* %ptr, i32 -1
+  store i64 %size, i64* %size_ptr
+  ret void
+}
