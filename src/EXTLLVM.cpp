@@ -483,11 +483,6 @@ void llvm_print_f64(double num)
     return;
 }
 
-int64_t llvm_now()
-{
-    return extemp::UNIV::TIME;
-}
-
 // double llvm_cos(double x) { return cos(x); }
 // double llvm_sin(double x) { return sin(x); }
 double llvm_tan(double x) { return tan(x); }
@@ -512,14 +507,11 @@ double llvm_atan2(double x,double y) { return atan2(x,y); }
 // these shouldn't ever be large, so it should be ok to cast to signed
 // int for returning into xtlang (which prefers signed ints). I hope
 // this doesn't come back to bite me one day.
-int32_t llvm_samplerate() { return (int32_t)extemp::UNIV::SAMPLERATE; }
 int32_t llvm_frames() { return (int32_t)extemp::UNIV::FRAMES; }
 int32_t llvm_channels() { return (int32_t)extemp::UNIV::CHANNELS; }
 int32_t llvm_in_channels() { return (int32_t)extemp::UNIV::IN_CHANNELS; }
 
-#include <random>
-
-static thread_local std::minstd_rand sRandGen(time(nullptr)); // take the C++11 TLS dynamic init hit (for now)
+static thread_local std::minstd_rand sRandGen(time(nullptr)); // no dynamic-init hit here (due to scope)
 
 double imp_randd()
 {
@@ -529,7 +521,7 @@ double imp_randd()
 
 float imp_randf()
 {
-    return std::uniform_real_distribution<float>()(sRandGen);
+    return imp_randd();
 }
 
 int64_t imp_rand1_i64(int64_t Limit)
@@ -659,18 +651,12 @@ bool check_address_type(uint64_t id, closure_address_table* table, const char* t
 struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table)
 {
   struct closure_address_table* t = NULL;
-  if(alloctype == 1) {
+  if (alloctype == 1) {
     t = (struct closure_address_table*) malloc(sizeof(struct closure_address_table));
-  /* }  else if(alloctype == 2) {
-#ifdef _WIN32
-    t = (struct closure_address_table*) _alloca(sizeof(struct closure_address_table));
-#else
-    t = (struct closure_address_table*) alloca(sizeof(struct closure_address_table));
-#endif */
   } else {
     t = (struct closure_address_table*) extemp::EXTLLVM::llvm_zone_malloc(zone,sizeof(struct closure_address_table));
   }
-    t->id = string_hash((unsigned char*) name);
+  t->id = string_hash((unsigned char*) name);
   t->name = name;
   t->offset = offset;
   t->type = type;
@@ -992,11 +978,9 @@ void initLLVM()
             EE->updateGlobalMapping("llvm_print_i64", (uint64_t)&llvm_print_i64);
             EE->updateGlobalMapping("llvm_print_f32", (uint64_t)&llvm_print_f32);
             EE->updateGlobalMapping("llvm_print_f64", (uint64_t)&llvm_print_f64);
-            EE->updateGlobalMapping("llvm_samplerate", (uint64_t)&llvm_samplerate);
             EE->updateGlobalMapping("llvm_frames", (uint64_t)&llvm_frames);
             EE->updateGlobalMapping("llvm_channels", (uint64_t)&llvm_channels);
             EE->updateGlobalMapping("llvm_in_channels", (uint64_t)&llvm_in_channels);
-            EE->updateGlobalMapping("llvm_now", (uint64_t)&llvm_now);
             EE->updateGlobalMapping("llvm_zone_copy_ptr", (uint64_t)&llvm_zone_copy_ptr);
             EE->updateGlobalMapping("llvm_zone_ptr_size", (uint64_t)&llvm_zone_ptr_size);
             EE->updateGlobalMapping("llvm_ptr_in_zone", (uint64_t)&llvm_ptr_in_zone);

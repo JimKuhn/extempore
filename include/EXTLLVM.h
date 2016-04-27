@@ -115,10 +115,10 @@ static inline uint64_t string_hash(unsigned char* str)
 }
 
   void llvm_send_udp(char* host, int port, void* message, int message_length);
-  int32_t llvm_samplerate();
   int32_t llvm_frames();
   int32_t llvm_channels();
   int32_t llvm_in_channels();
+
   double imp_randd();
   float imp_randf();
   int64_t imp_rand1_i64(int64_t a);
@@ -129,7 +129,6 @@ static inline uint64_t string_hash(unsigned char* str)
   double imp_rand2_d(double a, double b);
   float imp_rand1_f(float a);
   float imp_rand2_f(float a, float b);
-  int64_t llvm_now();
 
   void* thread_fork(void*(*start_routine)(void*),void* args);
   void thread_destroy(void* thread);
