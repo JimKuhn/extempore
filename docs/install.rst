@@ -21,65 +21,15 @@ something different.
 Download a pre-built binary
 ---------------------------
 
-.. note:: Coming real soon!
+Download a `binary release`_, unzip it and run ``extempore.exe``
+from inside the ``extempore`` folder.
 
-..
-   Download a `precompiled binary`_, unzip it and run ``extempore.exe``
-   from inside the ``extempore`` folder.
-
-   .. warning:: The Windows binary is currently a little out-of-date, so
-                some of the docs may be wrong. If you've got experience
-                doing packaging/distribution on Windows and want to help
-                out (please!) `get in touch`_.
-
-   .. _precompiled binary: http://extempore.moso.com.au/extras/Extempore-0.6.0-win64.zip
-   .. _get in touch: mailto:extemporelang@googlegroups.com
-
-Install through homebrew (OSX-only)
------------------------------------
-
-.. note:: The CMake "build from source" approach is probably just as
-          quick, especially on OSX/Linux if you're familiar with that
-          sort of thing.
-
-`Homebrew`_ makes the process pretty simple, although since it's
-building everything (including LLVM) from source it may still take up to
-15mins depending on your machine.
-
-.. _Homebrew: http://brew.sh/
-
-To install Extempore through homebrew, first::
-
-    brew tap benswift/extempore && brew tap homebrew/versions
-
-then::
-
-    brew install extempore --with-extended
-
-or, if you want just the core::
-
-    brew install extempore
-
-**Caveats**
-
-If you've installed Extempore through homebrew previously (i.e. if
-``brew info extempore`` shows a version <= 0.59) then you'll need to
-remove a couple of things first::
-
-    brew rm extempore kissfft libnanovg
-
-If you're on OSX 10.9 or earlier, there's an incompatibility with your
-version of clang and the LLVM 3.7.0 which Extempore uses. For the
-moment the easiest way around this is to download the old 0.5.9
-release of Extempore with::
-
-    brew tap benswift/extempore
-    brew install extempore059 --with-extended
+.. _binary release: https://github.com/digego/extempore/releases
 
 .. _build-from-source-doc:
 
-Build from source (all platforms)
----------------------------------
+Build from source
+-----------------
 
 The build-from-source workflow will download and build all the
 dependencies you need (including LLVM). So, if you've got a C++
@@ -113,17 +63,6 @@ BUILD_DEPS:BOOL (default ON)
   get those things through another package manager (or not use them at
   all) then set this to ``OFF``.
 
-IN_TREE:BOOL (default ON)
-  when true, use the main Extempore source tree for libs/examples -
-  don't move those things into e.g. ``/usr/local``. If you're not
-  going to edit the built-in libraries, this makes no difference, but
-  if you're going to be working on them it avoids the problem that you
-  make a change to e.g. ``libs/core/math.xtm`` in your
-  version-controlled ``extempore`` directory, but ``(sys:load
-  "libs/core/math.xtm)`` in Extempore code loads the ``math.xtm`` in
-  ``/usr/local/share/extempore/libs/core``. This doesn't do anything
-  on Windows.
-
 PACKAGE:BOOL (default ON)
   when true, build Extempore (including all extended deps and
   AOT-compilation) for binary distribution, e.g.::
@@ -138,17 +77,6 @@ PACKAGE:BOOL (default ON)
 
 Variables
 """""""""
-
-EXT_SHARE_DIR
-  the location of the Extempore "share directory", which containse a
-  bunch of files Extempore needs at runtime, including ``runtime/``,
-  ``libs/``, ``examples/`` and ``assets/``. When ``IN_TREE`` is on,
-  this will just point to your Extempore source directory, otherwise
-  it defaults to ``/usr/local/share/extempore`` on unix-y platforms.
-  If you want to put that stuff somewhere else, you can specify it
-  with this CMake variable. You can also specify the location of the
-  sharedir at Extempore startup with the ``--sharedir`` command line
-  argument. Does nothing on Windows.
 
 EXT_LLVM_DIR (environment variable)
   in the bad old days, the Extempore build process relied on this
@@ -356,3 +284,46 @@ If you **do** build your own patched version of LLVM for Extempore,
 then make sure you set the ``EXT_LLVM_DIR`` environment variable to
 point to that directory (where you installed LLVM) so that the
 Extempore build process knows where to find it.
+
+Install through homebrew (OSX-only)
+-----------------------------------
+
+.. note:: As of v0.7.0, the homebrew install process is
+          deprecated---since it's caught in a weird no-man's land
+          between the easy "binary download" and the flexible "build
+          from source" approach. Still, the formula is currently still
+          in my tap, so these instructions are here for the moment.
+
+`Homebrew`_ makes the process pretty simple, although since it's
+building everything (including LLVM) from source it may still take up to
+15mins depending on your machine.
+
+.. _Homebrew: http://brew.sh/
+
+To install Extempore through homebrew, first::
+
+    brew tap benswift/extempore && brew tap homebrew/versions
+
+then::
+
+    brew install extempore --with-extended
+
+or, if you want just the core::
+
+    brew install extempore
+
+**Caveats**
+
+If you've installed Extempore through homebrew previously (i.e. if
+``brew info extempore`` shows a version <= 0.59) then you'll need to
+remove a couple of things first::
+
+    brew rm extempore kissfft libnanovg
+
+If you're on OSX 10.9 or earlier, there's an incompatibility with your
+version of clang and the LLVM 3.7.0 which Extempore uses. For the
+moment the easiest way around this is to download the old 0.5.9
+release of Extempore with::
+
+    brew tap benswift/extempore
+    brew install extempore059 --with-extended

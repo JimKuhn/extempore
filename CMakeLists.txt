@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
 
 option(BOOST "use boost library" OFF)
-option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
@@ -16,22 +15,6 @@ option(BUILD_DEPS "download & build deps for aot_extended" ON)
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
 
-if(WIN32)
-  # Windows doesn't really do "installation", so we'll assume that
-  # extempore.exe's always going to be run from the Extempore
-  # directory
-  set(EXT_SHARE_DIR "." CACHE PATH
-    "path to Extempore's shared runtime files")
-else()
-  if(IN_TREE)
-    set(EXT_SHARE_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH
-      "path to Extempore's shared runtime files")
-  else()
-    set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
-      "path to Extempore's shared runtime files")
-  endif()
-endif()
-
 # packaging (binary distribution)
 
 if(PACKAGE)
@@ -41,9 +24,6 @@ if(PACKAGE)
   message(STATUS "Building Extempore for binary distribution")
   # need deps if we're packaging
   set(BUILD_DEPS ON CACHE BOOL "" FORCE)
-  if(IN_TREE)
-    set(IN_TREE OFF CACHE BOOL "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" FORCE)
-  endif()
 endif()
 
 # LLVM
@@ -52,11 +32,8 @@ if(DEFINED ENV{EXT_LLVM_DIR})
   # if there's an EXT_LLVM_DIR environment variable, use that
   set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
   set(BUILD_LLVM OFF)
-elseif(WIN32)
-  set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
-  set(BUILD_LLVM ON)
 else()
-  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+  set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
   set(BUILD_LLVM ON)
 endif()
 
@@ -64,11 +41,7 @@ endif()
 
 if(BUILD_DEPS)
   set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
-  if(WIN32)
-    set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
-  else()
-    set(EXT_PLATFORM_SHLIBS_DIR ${EXT_SHARE_DIR}/libs/platform-shlibs)
-  endif()
+  set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
   if(PACKAGE)
     set(EXT_DEPS_C_FLAGS "${CMAKE_C_FLAGS_RELEASE} -mtune=generic")
     set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
@@ -465,9 +438,12 @@ if(PACKAGE)
     PRIVATE -DEXT_SHARE_DIR=".")
   target_compile_options(extempore
     PRIVATE -mtune=generic)
-else()
+elseif(${EXT_SHARE_DIR})
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
+else()
+  target_compile_definitions(extempore
+    PRIVATE -DEXT_SHARE_DIR="${CMAKE_SOURCE_DIR}")
 endif()
 
 # platform-specific config
@@ -557,36 +533,21 @@ add_custom_target(assets
 # install #
 ###########
 
-if(IN_TREE)
-  # if we're developing in-tree, installation just involves moving the
+if(NOT PACKAGE)
+  # if we're not packaging, installation just involves moving the
   # binary into the toplevel source directory
   install(TARGETS extempore
     RUNTIME
     DESTINATION bin)
 else()
-  # otherwise, install all the things
-  if(PACKAGE)
-    set(EXT_INSTALL_PREFIX extempore)
-    install(TARGETS extempore
-      RUNTIME
-      DESTINATION ${EXT_INSTALL_PREFIX})
-  else()
-    set(EXT_INSTALL_PREFIX share/extempore)
-    install(TARGETS extempore
-      RUNTIME
-      DESTINATION bin)
-  endif()
-  # install the rest of the necessary files into the "share" directory
-  install(DIRECTORY runtime libs examples tests extras
-    DESTINATION ${EXT_INSTALL_PREFIX}
-    PATTERN ".DS_Store" EXCLUDE
-    PATTERN "extras/cmake" EXCLUDE
-    PATTERN "extras/extempore-emacs-mode" EXCLUDE)
-  # assets are optional
-  install(DIRECTORY assets
-    OPTIONAL
-    DESTINATION ${EXT_INSTALL_PREFIX}
+  install(TARGETS extempore
+    RUNTIME
+    DESTINATION extempore)
+  install(DIRECTORY assets runtime libs examples tests
+    DESTINATION extempore
     PATTERN ".DS_Store" EXCLUDE)
+  install(FILES extras/.emacs extras/extempore.el extras/extempore.vim
+    DESTINATION extempore/extras)
 endif()
 
 ###################
@@ -628,13 +589,13 @@ else(WIN32)
       add_custom_target(${targetname}
         COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${EXTEMPORE_AOT_COMPILE_PORT}
         --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
-        WORKING_DIRECTORY ${EXT_SHARE_DIR}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     else(PACKAGE)
       add_custom_target(${targetname}
         COMMAND extempore --nobase --noaudio --port=${EXTEMPORE_AOT_COMPILE_PORT}
         --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
-        WORKING_DIRECTORY ${EXT_SHARE_DIR}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     endif(PACKAGE)
     add_dependencies(${targetname} extempore)
@@ -686,7 +647,7 @@ add_dependencies(aot_extended extempore)
 
 # uninstall only AOT-compiled libs
 add_custom_target(clean_aot
-  COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}/libs/aot-cache
+  COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/libs/aot-cache
   COMMENT "Removing AOT-compiled libs")
 
 #########################
@@ -701,8 +662,6 @@ if(BUILD_DEPS)
     PREFIX portmidi
     URL https://github.com/extemporelang/portmidi/archive/217.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -712,8 +671,6 @@ if(BUILD_DEPS)
     PREFIX nanovg
     URL https://github.com/extemporelang/nanovg/archive/master.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -723,8 +680,6 @@ if(BUILD_DEPS)
     PREFIX kiss_fft
     URL https://github.com/extemporelang/kiss_fft/archive/master.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -734,8 +689,6 @@ if(BUILD_DEPS)
     PREFIX stb_image
     URL https://github.com/extemporelang/stb/archive/master.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -745,8 +698,6 @@ if(BUILD_DEPS)
     PREFIX glfw3
     URL https://github.com/glfw/glfw/archive/3.1.2.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -759,8 +710,6 @@ if(BUILD_DEPS)
     PREFIX assimp
     URL https://github.com/assimp/assimp/archive/v3.2.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -778,8 +727,6 @@ if(BUILD_DEPS)
       -DBUILD_tools=OFF
       -DBUILD_examples=OFF
       -DBUILD_tests=OFF
-      -DCMAKE_OSX_SYSROOT=macosx
-      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
       -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -793,8 +740,6 @@ if(BUILD_DEPS)
       CMAKE_ARGS
       -DAPR_HAVE_ODBC=OFF
       -DINSTALL_PDB=OFF
-      -DCMAKE_OSX_SYSROOT=macosx
-      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
       -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -810,8 +755,6 @@ if(BUILD_DEPS)
     #   URL https://github.com/erikd/libsndfile/archive/master.zip
     #   CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/libsndfile/src/sndfile/autogen.sh cmake && ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR}
     #   CMAKE_ARGS
-    #   -DCMAKE_OSX_SYSROOT=macosx
-    #   -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
     #   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     #   -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
   else()
@@ -880,72 +823,81 @@ add_dependencies(aot_extended extended_deps)
 # tests #
 #########
 
-include(CTest)
+option(BUILD_TESTS "build test targets (including examples)" ON)
 
-if(BUILD_TESTING)
+if(BUILD_TESTS)
+
+  include(CTest)
 
   set(EXTEMPORE_TEST_PORT 17099)
 
-  macro(extempore_add_test testfile)
+  macro(extempore_add_test testfile label)
     add_test(NAME ${testfile}
-      COMMAND extempore --noaudio --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)"
-      WORKING_DIRECTORY ${EXT_SHARE_DIR})
+      COMMAND extempore --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
+    set_tests_properties(${testfile}
+      PROPERTIES
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      LABELS ${label})
     # decrement port number by 2
     math(EXPR EXTEMPORE_TEST_PORT "${EXTEMPORE_TEST_PORT} - 2")
   endmacro()
 
-  macro(extempore_add_example_as_test examplefile timeout)
+  macro(extempore_add_example_as_test examplefile timeout label)
     add_test(NAME ${examplefile}
-      COMMAND extempore --port=${EXTEMPORE_TEST_PORT} --eval "(sys:load-then-quit \"${examplefile}\" ${timeout})"
-      WORKING_DIRECTORY ${EXT_SHARE_DIR})
+      COMMAND extempore --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(sys:load-then-quit \"${examplefile}\" ${timeout})")
+    set_tests_properties(${examplefile}
+      PROPERTIES
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      LABELS ${label})
     # decrement port number by 2
     math(EXPR EXTEMPORE_TEST_PORT "${EXTEMPORE_TEST_PORT} - 2")
   endmacro()
 
   # tests - core
-  extempore_add_test(tests/core/system.xtm)
-  extempore_add_test(tests/core/adt.xtm)
-  extempore_add_test(tests/core/math.xtm)
-  extempore_add_test(tests/core/std.xtm)
-  extempore_add_test(tests/core/xtlang.xtm)
-  extempore_add_test(tests/core/generics.xtm)
+  extempore_add_test(tests/core/system.xtm libs-core)
+  extempore_add_test(tests/core/adt.xtm libs-core)
+  extempore_add_test(tests/core/math.xtm libs-core)
+  extempore_add_test(tests/core/std.xtm libs-core)
+  extempore_add_test(tests/core/xtlang.xtm libs-core)
+  extempore_add_test(tests/core/generics.xtm libs-core)
   # tests - external
-  extempore_add_test(tests/external/fft.xtm)
+  extempore_add_test(tests/external/fft.xtm libs-external)
   # examples - core
-  extempore_add_example_as_test(examples/core/audio_101.xtm 10)
-  extempore_add_example_as_test(examples/core/extempore_lang.xtm 10)
-  extempore_add_example_as_test(examples/core/fasta_lang_shootout.xtm 10)
-  extempore_add_example_as_test(examples/core/fmsynth.xtm 10)
-  extempore_add_example_as_test(examples/core/midi_synth.xtm 10)
-  extempore_add_example_as_test(examples/core/mtaudio.xtm 10)
-  extempore_add_example_as_test(examples/core/nbody_lang_shootout.xtm 10)
-  extempore_add_example_as_test(examples/core/osc_101.xtm 10)
-  extempore_add_example_as_test(examples/core/polysynth.xtm 10)
-  extempore_add_example_as_test(examples/core/scheduler.xtm 10)
-  extempore_add_example_as_test(examples/core/topclock_metro.xtm 10)
-  extempore_add_example_as_test(examples/core/typeclasses.xtm 10)
-  extempore_add_example_as_test(examples/core/xthread.xtm 10)
+  extempore_add_example_as_test(examples/core/audio_101.xtm 10 examples-core)
+  # extempore_add_example_as_test(examples/core/extempore_lang.xtm 10 examples-core) # doesn't terminate
+  extempore_add_example_as_test(examples/core/fasta_lang_shootout.xtm 10 examples-core)
+  extempore_add_example_as_test(examples/core/fmsynth.xtm 10 examples-core)
+  extempore_add_example_as_test(examples/core/midi_synth.xtm 10 examples-core)
+  extempore_add_example_as_test(examples/core/mtaudio.xtm 10 examples-core)
+  extempore_add_example_as_test(examples/core/nbody_lang_shootout.xtm 10 examples-core)
+  extempore_add_example_as_test(examples/core/osc_101.xtm 10 examples-core)
+  extempore_add_example_as_test(examples/core/polysynth.xtm 10 examples-core)
+  extempore_add_example_as_test(examples/core/scheduler.xtm 10 examples-core)
+  extempore_add_example_as_test(examples/core/topclock_metro.xtm 10 examples-core)
+  extempore_add_example_as_test(examples/core/typeclasses.xtm 10 examples-core)
+  extempore_add_example_as_test(examples/core/xthread.xtm 10 examples-core)
   # examples - external
-  extempore_add_example_as_test(examples/external/audio_player.xtm 10)
-  extempore_add_example_as_test(examples/external/convolution_reverb.xtm 10)
-  extempore_add_example_as_test(examples/external/electrofunk.xtm 10)
-  extempore_add_example_as_test(examples/external/gl-compatibility.xtm 10)
-  extempore_add_example_as_test(examples/external/going-native.xtm 60)
-  extempore_add_example_as_test(examples/external/granulator.xtm 10)
-  extempore_add_example_as_test(examples/external/gui.xtm 10)
-  extempore_add_example_as_test(examples/external/openvg.xtm 10)
-  extempore_add_example_as_test(examples/external/portmidi-output.xtm 10)
-  extempore_add_example_as_test(examples/external/portmidi.xtm 10)
-  extempore_add_example_as_test(examples/external/raymarcher.xtm 10)
-  extempore_add_example_as_test(examples/external/sampler.xtm 10)
-  extempore_add_example_as_test(examples/external/shader-tutorials 10)
-  extempore_add_example_as_test(examples/external/sing_a_song.xtm 10)
-  extempore_add_example_as_test(examples/external/spectrogram.xtm 10)
-  extempore_add_example_as_test(examples/external/xtmrender1.xtm 10)
-  extempore_add_example_as_test(examples/external/xtmrender2.xtm 10)
-  extempore_add_example_as_test(examples/external/xtmrender3.xtm 10)
-  extempore_add_example_as_test(examples/external/xtmrender4.xtm 10)
-endif()
+  extempore_add_example_as_test(examples/external/audio_player.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/convolution_reverb.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/electrofunk.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/gl-compatibility.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/going-native.xtm 60 examples-external)
+  extempore_add_example_as_test(examples/external/granulator.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/gui.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/openvg.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/portmidi-output.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/portmidi.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/raymarcher.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/sampler.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/shader-tutorials 10 examples-external)
+  extempore_add_example_as_test(examples/external/sing_a_song.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/spectrogram.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/xtmrender1.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/xtmrender2.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/xtmrender3.xtm 10 examples-external)
+  extempore_add_example_as_test(examples/external/xtmrender4.xtm 10 examples-external)
+
+endif(BUILD_TESTS)
 
 ##########
 # xtmdoc #
