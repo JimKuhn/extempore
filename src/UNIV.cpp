@@ -573,7 +573,7 @@ uint32_t AUDIO_DEVICE = -1;
 uint32_t AUDIO_IN_DEVICE = -1;
 double AUDIO_OUTPUT_LATENCY = 0.0;
 double CLOCK_OFFSET = 0.0;
-std::map<std::string, std::string> CMDPARAMS;
+std::unordered_map<std::string, std::string> CMDPARAMS;
 std::string ARCH;
 std::string CPU;
 std::vector<std::string> ATTRS;

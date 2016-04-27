@@ -41,7 +41,7 @@
 
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
 
 #ifdef _WIN32
 #include <SDKDDKVer.h>
@@ -120,7 +120,7 @@ extern uint32_t AUDIO_DEVICE;
 extern uint32_t AUDIO_IN_DEVICE;
 extern double AUDIO_OUTPUT_LATENCY;
 extern double CLOCK_OFFSET;
-extern std::map<std::string, std::string> CMDPARAMS;
+extern std::unordered_map<std::string, std::string> CMDPARAMS;
 extern std::string ARCH;
 extern std::string CPU;
 extern std::vector<std::string> ATTRS;
