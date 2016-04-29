@@ -168,36 +168,21 @@ inline double getRealTime()
 
 #endif
 
-<<<<<<< HEAD
-inline double clock_clock()
-=======
 extern "C" inline double clock_clock()
->>>>>>> upstream/master
 {
     return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
 }
 
-<<<<<<< HEAD
-inline double audio_clock_base()
-=======
 extern "C" inline double audio_clock_base()
->>>>>>> upstream/master
 {
     return extemp::UNIV::AUDIO_CLOCK_BASE;
 }
 
-<<<<<<< HEAD
-inline double audio_clock_now()
-{
-    return extemp::UNIV::AUDIO_CLOCK_NOW;
-}
-=======
 extern "C" inline double audio_clock_now()
 {
     return extemp::UNIV::AUDIO_CLOCK_NOW;
 }
 
->>>>>>> upstream/master
 }
 
 } //End Namespace

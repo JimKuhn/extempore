@@ -783,12 +783,9 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
 }
 
 }
-<<<<<<< HEAD
-=======
 
 extern "C" void ascii_text_color_extern(int32_t Bold, int32_t Foreground, int32_t Background) {
-  ascii_text_color(Bold, Foreground, Background);
+	ascii_text_color(Bold, Foreground, Background);
 }
->>>>>>> upstream/master
 
 } //End Namespace
