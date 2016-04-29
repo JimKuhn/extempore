@@ -110,7 +110,6 @@ void base64_codesafe_build_decoding_table() {
         base64_codesafe_decoding_table[(unsigned char) base64_codesafe_encoding_table[i]] = i;
 }
 
-
 void base64_std_cleanup() {
     free(base64_std_decoding_table);
 }
@@ -118,7 +117,6 @@ void base64_std_cleanup() {
 void base64_codesafe_cleanup() {
     free(base64_codesafe_decoding_table);
 }
-
 
 char* cname_encode(char *data,
                     size_t input_length,
@@ -268,6 +266,21 @@ unsigned char* base64_decode(const char *data,
     }
 
     return decoded_data;
+}
+
+double clock_clock()
+{
+  return extemp::getRealTime() + extemp::UNIV::CLOCK_OFFSET;
+}
+
+double audio_clock_base()
+{
+    return extemp::UNIV::AUDIO_CLOCK_BASE;
+}
+
+double audio_clock_now()
+{
+    return extemp::UNIV::AUDIO_CLOCK_NOW;
 }
 
 
@@ -577,6 +590,7 @@ std::unordered_map<std::string, std::string> CMDPARAMS;
 std::string ARCH;
 std::string CPU;
 std::vector<std::string> ATTRS;
+
 // 0 is for ansi, 1 is for MSDos CMD shell
 #ifdef _WIN32
 uint32_t EXT_TERM = 1;
@@ -769,5 +783,12 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
 }
 
 }
+<<<<<<< HEAD
+=======
+
+extern "C" void ascii_text_color_extern(int32_t Bold, int32_t Foreground, int32_t Background) {
+  ascii_text_color(Bold, Foreground, Background);
+}
+>>>>>>> upstream/master
 
 } //End Namespace

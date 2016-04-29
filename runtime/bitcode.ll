@@ -633,3 +633,10 @@ define private i32 @llvm_samplerate() nounwind alwaysinline
   %res32 = trunc i64 %res to i32
   ret i32 %res32
 }
+
+declare void @ascii_text_color_extern(i32 %bold, i32 %fg, i32 %bg)
+define private void @ascii_text_color(i32 %bold, i32 %fg, i32 %bg) nounwind alwaysinline "thunk"
+{
+  call void @ascii_text_color_extern(i32 %bold, i32 %fg, i32 %bg)
+  ret void
+}

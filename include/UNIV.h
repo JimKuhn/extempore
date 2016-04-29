@@ -48,6 +48,11 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#if __APPLE__
+#include <CoreAudio/HostTime.h>
+#include <CoreFoundation/CFDate.h>
+#endif
+
 #if _WIN32 || _WIN64
 #if _WIN64
 #define TARGET_64BIT
@@ -127,8 +132,6 @@ extern std::vector<std::string> ATTRS;
 extern double midi2frq(double pitch);
 extern double frqRatio(double semitones);
 extern void initRand();
-extern int random(int range);
-extern double random();
 extern bool file_check(const std::string& filename);
 extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
 
@@ -165,20 +168,36 @@ inline double getRealTime()
 
 #endif
 
+<<<<<<< HEAD
 inline double clock_clock()
+=======
+extern "C" inline double clock_clock()
+>>>>>>> upstream/master
 {
     return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
 }
 
+<<<<<<< HEAD
 inline double audio_clock_base()
+=======
+extern "C" inline double audio_clock_base()
+>>>>>>> upstream/master
 {
     return extemp::UNIV::AUDIO_CLOCK_BASE;
 }
 
+<<<<<<< HEAD
 inline double audio_clock_now()
 {
     return extemp::UNIV::AUDIO_CLOCK_NOW;
 }
+=======
+extern "C" inline double audio_clock_now()
+{
+    return extemp::UNIV::AUDIO_CLOCK_NOW;
+}
+
+>>>>>>> upstream/master
 }
 
 } //End Namespace
