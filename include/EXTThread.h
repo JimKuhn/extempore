@@ -45,6 +45,7 @@
 
 #include <string>
 
+#include "UNIV.h"
 
 namespace extemp
 {
@@ -66,12 +67,7 @@ private:
     std::thread   m_thread;
 #endif
 
-
-#ifdef _WIN32
-    static __declspec(thread) EXTThread* sm_current;
-#else
-    static __thread EXTThread* sm_current;
-#endif
+    static THREAD_LOCAL EXTThread* sm_current;
 public:
     EXTThread(function_type EntryPoint, void* Arg, const std::string& Name = std::string()): m_function(EntryPoint),
             m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false), m_joined(false) {
@@ -94,7 +90,7 @@ public:
 #endif
 
     static void* Trampoline(void* Arg) {
-      auto thread(reinterpret_cast<EXTThread*>(Arg));
+        auto thread(reinterpret_cast<EXTThread*>(Arg));
 #ifdef __APPLE__ // unforunately apple requires pthread_setname_np in current thread
         if (!thread->m_name.empty()) {
             pthread_setname_np(thread->m_name.c_str());

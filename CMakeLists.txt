@@ -848,6 +848,7 @@ if(BUILD_TESTS)
     set_tests_properties(${examplefile}
       PROPERTIES
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      TIMEOUT 300 # nothing should take longer than 5mins
       LABELS ${label})
     # decrement port number by 2
     math(EXPR EXTEMPORE_TEST_PORT "${EXTEMPORE_TEST_PORT} - 2")
@@ -889,7 +890,15 @@ if(BUILD_TESTS)
   extempore_add_example_as_test(examples/external/portmidi.xtm 10 examples-external)
   extempore_add_example_as_test(examples/external/raymarcher.xtm 10 examples-external)
   extempore_add_example_as_test(examples/external/sampler.xtm 10 examples-external)
-  extempore_add_example_as_test(examples/external/shader-tutorials 10 examples-external)
+  extempore_add_example_as_test(examples/external/shader-tutorials/arrows.xtm 10 examples-external-shader)
+  extempore_add_example_as_test(examples/external/shader-tutorials/framebuffer.xtm 10 examples-external-shader)
+  extempore_add_example_as_test(examples/external/shader-tutorials/heatmap.xtm 10 examples-external-shader)
+  extempore_add_example_as_test(examples/external/shader-tutorials/particles.xtm 10 examples-external-shader)
+  extempore_add_example_as_test(examples/external/shader-tutorials/points.xtm 10 examples-external-shader)
+  extempore_add_example_as_test(examples/external/shader-tutorials/shadertoy.xtm 10 examples-external-shader)
+  extempore_add_example_as_test(examples/external/shader-tutorials/simple-triangle.xtm 10 examples-external-shader)
+  extempore_add_example_as_test(examples/external/shader-tutorials/texture.xtm 10 examples-external-shader)
+  extempore_add_example_as_test(examples/external/shader-tutorials/triangle.xtm 10 examples-external-shader)
   extempore_add_example_as_test(examples/external/sing_a_song.xtm 10 examples-external)
   extempore_add_example_as_test(examples/external/spectrogram.xtm 10 examples-external)
   extempore_add_example_as_test(examples/external/xtmrender1.xtm 10 examples-external)
