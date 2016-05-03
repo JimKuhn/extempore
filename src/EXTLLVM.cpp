@@ -252,10 +252,8 @@ char* extitoa(int64_t val) {
 void llvm_send_udp(char* host, int port, void* message, int message_length)
 {
   int length = message_length;
-  int ret = 0;
-  char* ptr;
 
-#ifdef EXT_BOOST
+#ifdef EXT_BOOST // TODO: This should use WinSock on Windows
   boost::asio::io_service io_service;
   boost::asio::ip::udp::resolver::iterator end;
   boost::asio::ip::udp::resolver resolver(io_service);
@@ -324,13 +322,15 @@ void llvm_send_udp(char* host, int port, void* message, int message_length)
 
 void* thread_fork(void*(*start_routine)(void*), void* args) {
         auto thread = new extemp::EXTThread(start_routine, args, "fork");
-        int result = thread->start();
 
 #ifdef _EXTTHREAD_DEBUG_
+        int result = thread->start();
         if (result)
         {
                 std::cerr << "Error creating thread: " << result << std::endl;
         }
+#else
+        thread->start(); // TODO: portable attribute unused (???)
 #endif
 
         return static_cast<void*>(thread);
@@ -954,11 +954,8 @@ void initLLVM()
         { "llvm_destroy_zone_after_delay", uintptr_t(&llvm_destroy_zone_after_delay) },
         { "free_after_delay", uintptr_t(&free_after_delay) },
         // { "llvm_get_next_prime", uintptr_t(&llvm_get_next_prime) },
-        { "llvm_zone_create_extern", uintptr_t(&llvm_zone_create) },
         { "llvm_zone_destroy", uintptr_t(&llvm_zone_destroy) },
-        { "llvm_peek_zone_stack_extern", uintptr_t(&llvm_peek_zone_stack) },
         { "llvm_pop_zone_stack", uintptr_t(&llvm_pop_zone_stack) },
-        { "llvm_push_zone_stack_extern", uintptr_t(&llvm_push_zone_stack) },
     };
     for (auto& elem : mappingTable) {
         EE->updateGlobalMapping(elem.name, elem.address);
@@ -1068,25 +1065,6 @@ void initLLVM()
       return;
     }
   }
-}
-
-extern "C" {
-
-llvm_zone_t* llvm_peek_zone_stack_extern()
-{
-    return extemp::EXTLLVM::llvm_peek_zone_stack();
-}
-
-void llvm_push_zone_stack_extern(llvm_zone_t* Zone)
-{
-    extemp::EXTLLVM::llvm_push_zone_stack(Zone);
-}
-
-llvm_zone_t* llvm_zone_create_extern(uint64_t Size)
-{
-    return extemp::EXTLLVM::llvm_zone_create(Size);
-}
-
 }
 
 #include <unordered_map>

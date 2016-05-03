@@ -1,6 +1,5 @@
 extern "C" const char* llvm_disassemble(const unsigned char* Code, int syntax)
 {
-    int x64 = 1;
     size_t code_size = 1024 * 100;
     std::string Error;
     llvm::TargetMachine *TM = extemp::EXTLLVM::EE->getTargetMachine();
@@ -18,10 +17,6 @@ extern "C" const char* llvm_disassemble(const unsigned char* Code, int syntax)
     llvm::MCInstPrinter* IP(TheTarget.createMCInstPrinter(Triple,syntax,*AsmInfo,*MII,*MRI)); //,*STI));
     IP->setPrintImmHex(true);
     IP->setUseMarkup(true);
-    uint64_t MemoryAddr = 0;
-    uint64_t Size = code_size;
-    uint64_t Start = 0;
-    uint64_t End = code_size;
     std::string out_str;
     llvm::raw_string_ostream OS(out_str);
     llvm::ArrayRef<uint8_t> mem(Code, code_size);
@@ -196,6 +191,21 @@ extern "C" void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 static bool llvm_ptr_in_current_zone(void* ptr)
 {
     return llvm_ptr_in_zone(llvm_peek_zone_stack(), ptr);
+}
+
+EXPORT llvm_zone_t* llvm_peek_zone_stack_extern()
+{
+    return extemp::EXTLLVM::llvm_peek_zone_stack();
+}
+
+EXPORT void llvm_push_zone_stack_extern(llvm_zone_t* Zone)
+{
+    extemp::EXTLLVM::llvm_push_zone_stack(Zone);
+}
+
+EXPORT llvm_zone_t* llvm_zone_create_extern(uint64_t Size)
+{
+    return extemp::EXTLLVM::llvm_zone_create(Size);
 }
 
 static THREAD_LOCAL llvm_zone_t* tls_llvm_callback_zone = 0;

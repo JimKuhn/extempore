@@ -129,7 +129,7 @@ char* cname_encode(char *data,
     encoded_data[*output_length] = 0;
     if (encoded_data == NULL) return NULL;
 
-    for (int i = 0, j = 0; i < input_length;) {
+    for (unsigned i = 0, j = 0; i < input_length;) {
 
         uint32_t octet_a = i < input_length ? data[i++] : 0;
         uint32_t octet_b = i < input_length ? data[i++] : 0;
@@ -180,12 +180,12 @@ char* cname_decode(char *data,
     decoded_data[*output_length] = 0;
     if (decoded_data == NULL) return NULL;
 
-    for (int i = 0, j = 0; i < input_length;) {
+    for (unsigned i = 0, j = 0; i < input_length;) {
 
-        uint32_t sextet_a = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[data[i++]];
-        uint32_t sextet_b = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[data[i++]];
-        uint32_t sextet_c = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[data[i++]];
-        uint32_t sextet_d = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[data[i++]];
+        uint32_t sextet_a = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[unsigned(data[i++])];
+        uint32_t sextet_b = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[unsigned(data[i++])];
+        uint32_t sextet_c = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[unsigned(data[i++])];
+        uint32_t sextet_d = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[unsigned(data[i++])];
 
         uint32_t triple = (sextet_a << 3 * 6)
         + (sextet_b << 2 * 6)
@@ -212,7 +212,7 @@ char* base64_encode(const unsigned char *data,
 
     if (encoded_data == NULL) return NULL;
 
-    for (int i = 0, j = 0; i < input_length;) {
+    for (unsigned i = 0, j = 0; i < input_length;) {
 
         uint32_t octet_a = i < input_length ? data[i++] : 0;
         uint32_t octet_b = i < input_length ? data[i++] : 0;
@@ -248,12 +248,12 @@ unsigned char* base64_decode(const char *data,
     unsigned char *decoded_data = (unsigned char*) malloc(*output_length);
     if (decoded_data == NULL) return NULL;
 
-    for (int i = 0, j = 0; i < input_length;) {
+    for (unsigned i = 0, j = 0; i < input_length;) {
 
-        uint32_t sextet_a = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[data[i++]];
-        uint32_t sextet_b = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[data[i++]];
-        uint32_t sextet_c = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[data[i++]];
-        uint32_t sextet_d = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[data[i++]];
+        uint32_t sextet_a = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[unsigned(data[i++])];
+        uint32_t sextet_b = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[unsigned(data[i++])];
+        uint32_t sextet_c = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[unsigned(data[i++])];
+        uint32_t sextet_d = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[unsigned(data[i++])];
 
         uint32_t triple = (sextet_a << 3 * 6)
         + (sextet_b << 2 * 6)
@@ -559,7 +559,7 @@ std::string SHARE_DIR = std::string(EXT_SHARE_DIR);
 uint32_t FRAMES = 128;
 uint32_t CHANNELS = 2;
 uint32_t IN_CHANNELS = 0;
-uint32_t SAMPLERATE = 44100;
+uint32_t SAMPLE_RATE = 44100;
 volatile uint64_t TIME = 0l;
 uint64_t DEVICE_TIME = 0l;
 double AUDIO_CLOCK_NOW = 0.0;

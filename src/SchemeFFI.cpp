@@ -151,7 +151,7 @@ void initSchemeFFI(scheme* sc)
         uint32_t    value;
     } integerTable[] = {
         { "*au:block-size*", UNIV::FRAMES },
-        { "*au:samplerate*", UNIV::SAMPLERATE },
+        { "*au:samplerate*", UNIV::SAMPLE_RATE },
         { "*au:channels*", UNIV::CHANNELS },
         { "*au:in-channels*", UNIV::IN_CHANNELS },
     };
@@ -206,7 +206,6 @@ static llvm::Module* jitCompile(const std::string& String)
 
     char modname[256];
     sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
-    char tmpbuf[1024];
 
     std::string asmcode(String);
     SMDiagnostic pa;
