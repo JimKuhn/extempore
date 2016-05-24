@@ -581,7 +581,12 @@
     (print-with-colors *impc:compiler:pretty-print-error-color*
                        'default #t (print "Compiler Error"))
     (print " cannot find" type "")
-    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name "\n"))
+    (if (impc:ir:poly-or-adhoc? (symbol->string name))
+        (let ((split-name (impc:ir:split-and-decode-poly-adhoc-name (symbol->string name))))
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print (car split-name)))
+          (print ":")
+          (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (cadr split-name) "\n")))
+        (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name "\n")))
     (if (impc:aot:currently-compiling?)
         (quit 2)
         (throw ""))))
@@ -9806,6 +9811,10 @@ xtlang's `let' syntax is the same as Scheme"
                      (ipc:define procname symname (eval symname)))
               (print-error "Not a monomorphic xtlang function:" symname))))))
 
+(define ipc:load
+  (lambda (process-name file)
+    (ipc:call process-name 'sys:load file)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-macro (bind-alias symbol type . docstring)
@@ -10012,10 +10021,9 @@ xtlang's `let' syntax is the same as Scheme"
                          (interaction-environment))))
              (eval `(bind-func ,(string->symbol (string-append namestr "_val"))
                       (lambda ,argslist
-                        (let ((obj (,(string->symbol (string-append namestr "_h")) ,@argslist))
-                              (val (pref obj 0)))
-                          (free obj)
-                          val)))
+                        (let ((,(string->symbol (string-append "obj:" namestr "*")) (salloc)))
+                          (tfill! obj ,@argslist)
+                          (pref obj 0))))
                    (interaction-environment))
              (eval `(bind-func ,(string->symbol (string-append "hcopy:[" namestr "*," namestr "*]*"))
                       (lambda (,(string->symbol (string-append "x:" namestr "*")))

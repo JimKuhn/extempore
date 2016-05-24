@@ -49,7 +49,7 @@
 //   (MINISCM) Mini-Scheme is now maintained by Akira KIDA.
 //   (MINISCM)
 //   (MINISCM) This is a revised and modified version by Akira KIDA.
-//   (MINISCM)	current version is 0.85k4 (15 May 1994)
+//   (MINISCM)  current version is 0.85k4 (15 May 1994)
 //
 //   TinyScheme v.1.35 released under MIT licence.  This file also released under MIT licence.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,12 +173,12 @@ typedef void (*func_dealloc)(void *);
 typedef struct num {
     int num_type;
     union {
-	long long ivalue;
-	double rvalue;
-	struct {
-	    long long n;
-	    long long d;
-	} ratvalue;
+        long long ivalue;
+        double rvalue;
+        struct {
+            long long n;
+            long long d;
+        } ratvalue;
     } value;
 } num;
 
@@ -213,10 +213,9 @@ pointer reverse(scheme *sc, pointer a);
 pointer reverse_in_place(scheme *sc, pointer term, pointer list);
 pointer append(scheme *sc, pointer a, pointer b);
 int list_length(scheme *sc, pointer a);
-pointer assoc_strcmp(scheme *sc, pointer key, pointer alist);
-pointer assoc_strcmp_all(scheme *sc, pointer key, pointer alist);
+pointer assoc_strcmp(scheme *sc, pointer key, pointer alist, bool all = false);
 int is_real(pointer a);
-char * string_value(pointer p);
+char *string_value(pointer p);
 pointer list_ref(scheme* sc, int pos, pointer a);
 int eqv(pointer a, pointer b);
 pointer mk_vector(scheme *sc, int len);

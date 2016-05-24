@@ -2,9 +2,10 @@
 ;; do not use (yet)
 
 (bind-dylib libchipmunk
-  (if (string=? "Linux" (sys:platform))
-    "libchipmunk.so"
-    (print-error "tell me where to find the Chipmunk library on your platform here!")))
+  (cond
+    ((string=? (sys:platform) "Linux") "libchipmunk.so")
+    ((string=? (sys:platform) "Windows")
+      (print-error 'Windows 'is 'unlikely 'to 'be '(directly) 'supported 'due 'to 'ABI 'requirements '(aggregates)))))
 
 ;; typedef double cpFloat;
 
