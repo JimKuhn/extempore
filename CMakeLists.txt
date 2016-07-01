@@ -603,13 +603,13 @@ else(WIN32)
     if(PACKAGE)
       add_custom_target(${targetname}
         COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${EXTEMPORE_AOT_COMPILE_PORT}
-        --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
+        --eval "(impc:aot:compile-xtm-file \"${libfile}\")"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     else(PACKAGE)
       add_custom_target(${targetname}
         COMMAND extempore --nobase --noaudio --port=${EXTEMPORE_AOT_COMPILE_PORT}
-        --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
+        --eval "(impc:aot:compile-xtm-file \"${libfile}\")"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     endif(PACKAGE)
@@ -684,16 +684,19 @@ if(BUILD_DEPS)
 
   ExternalProject_Add(nanovg
     PREFIX nanovg
-    URL https://github.com/extemporelang/nanovg/archive/master.zip
+    URL https://github.com/extemporelang/nanovg/archive/0.7.1.zip
     CMAKE_ARGS
+    -DEXTEMPORE_LIB_PATH=${CMAKE_SOURCE_DIR}/libs/platform-shlibs/extempore.lib
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
+  add_dependencies(nanovg extempore)
+
   ExternalProject_Add(kiss_fft
     PREFIX kiss_fft
-    URL https://github.com/extemporelang/kiss_fft/archive/master.zip
+    URL https://github.com/extemporelang/kiss_fft/archive/1.3.0.zip
     CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
@@ -711,7 +714,7 @@ if(BUILD_DEPS)
 
   ExternalProject_Add(glfw3
     PREFIX glfw3
-    URL https://github.com/glfw/glfw/archive/3.1.2.zip
+    URL https://github.com/glfw/glfw/archive/3.2.zip
     CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
